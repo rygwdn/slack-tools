@@ -4,6 +4,7 @@ import { registerPrintCommand } from './print';
 import { registerStatusCommand } from './status';
 import { registerTestCommand } from './test';
 import { registerTodayCommand } from './today';
+import { registerSearchCommand } from './search';
 import { CommandContext } from '../context';
 
 export function registerCommands(program: Command, context: CommandContext): void {
@@ -12,4 +13,5 @@ export function registerCommands(program: Command, context: CommandContext): voi
   registerStatusCommand(program, context);
   registerTestCommand(program, context);
   registerTodayCommand(program, context);
+  registerSearchCommand(program, context);
 }

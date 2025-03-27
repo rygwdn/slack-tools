@@ -1,7 +1,8 @@
 import { WebClient } from '@slack/web-api';
-import { SearchResult } from './types';
+import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../../context';
 import { formatDateForSearch, getDayAfter, getDayBefore } from './utils';
+import { SearchResult } from './types';
 
 /**
  * Search Slack for messages matching the given criteria
@@ -28,36 +29,47 @@ export async function searchMessages(
   // Search for messages from the user
   const searchQuery = `from:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   context.debugLog(`Search query: ${searchQuery}`);
-  const searchResults = await client.search.messages({
-    query: searchQuery,
-    sort: 'timestamp',
-    sort_dir: 'asc',
-    count
-  });
+  const searchResults = await searchSlackMessages(client, searchQuery, count, context);
 
   // Search for thread messages with the user
   const threadQuery = `is:thread with:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   context.debugLog(`Thread query: ${threadQuery}`);
-  const threadResults = await client.search.messages({
-    query: threadQuery,
-    sort: 'timestamp',
-    sort_dir: 'asc',
-    count
-  });
+  const threadResults = await searchSlackMessages(client, threadQuery, count, context);
 
   // Search for messages that mention the user
   const mentionQuery = `to:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   context.debugLog(`Mention query: ${mentionQuery}`);
-  const mentionResults = await client.search.messages({
-    query: mentionQuery,
-    sort: 'timestamp',
-    sort_dir: 'asc',
-    count
-  });
+  const mentionResults = await searchSlackMessages(client, mentionQuery, count, context);
 
   return {
-    messages: searchResults.messages?.matches || [],
-    threadMessages: threadResults.messages?.matches || [],
-    mentionMessages: mentionResults.messages?.matches || []
+    messages: searchResults,
+    threadMessages: threadResults,
+    mentionMessages: mentionResults
   };
+}
+
+/**
+ * General purpose function to search Slack messages with any query
+ */
+export async function searchSlackMessages(
+  client: WebClient,
+  query: string,
+  count: number,
+  context: CommandContext
+): Promise<Match[]> {
+  context.debugLog(`Executing search: ${query}`);
+  
+  try {
+    const searchResults = await client.search.messages({
+      query: query,
+      sort: 'timestamp',
+      sort_dir: 'asc',
+      count
+    });
+    
+    return searchResults.messages?.matches || [];
+  } catch (error) {
+    context.debugLog(`Search error: ${error}`);
+    throw new Error(`Failed to search Slack: ${error}`);
+  }
 }
