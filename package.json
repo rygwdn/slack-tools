@@ -1,0 +1,35 @@
+{
+    "name": "slack-tools",
+    "version": "1.0.0",
+    "description": "Tools for interacting with Slack's local data",
+    "type": "module",
+    "bin": {
+        "slack-tools": "./src/cli.ts"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "tsx src/cli.ts",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "slack",
+        "tokens"
+    ],
+    "author": "rygwdn",
+    "license": "MIT",
+    "dependencies": {
+        "@slack/web-api": "^7.0.1",
+        "@types/node-fetch": "^2.6.12",
+        "commander": "^13.1.0",
+        "keytar": "^7.9.0",
+        "level": "^8.0.0",
+        "sqlite": "^5.1.1",
+        "sqlite3": "^5.1.7"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/sqlite3": "^3.1.11",
+        "tsx": "^4.7.0",
+        "typescript": "^5.0.0"
+    }
+}
