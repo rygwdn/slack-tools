@@ -1,0 +1,32 @@
+---
+description: Installation, setup, and usage instructions for slack-tools
+globs: ["src/cli.ts", "**/commands/*.ts"]
+alwaysApply: false
+---
+
+# Running Slack Tools
+
+## Installation and Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Make the tool globally available:
+   ```bash
+   npm link
+   ```
+
+## Command Execution
+
+- Always run slack-tools commands via `npx tsx src/cli.ts` or the installed CLI command `slack-tools`
+- Make sure the Slack app is closed when running commands (required to access the LevelDB database)
+- When adding new commands, follow the same structure as existing commands in src/commands/
+- Register all new commands in src/commands/index.ts
+
+## Requirements
+
+- Node.js 14.0.0 or higher
+- macOS or Linux operating system
+- Slack desktop app installed

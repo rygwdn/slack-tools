@@ -1,0 +1,45 @@
+---
+description: Overview of Slack Tools project guidelines and documentation
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Slack Tools Guidelines Overview
+
+## Important Safety Rules
+
+**NEVER** automatically commit or push changes with git unless explicit permission has been given by the user. Always wait for direct user confirmation before executing any git commands that would create commits or push code to repositories.
+
+## Documentation Organization
+
+This is a set of guidelines for working with the Slack Tools project. The guidelines are organized into several rule files:
+
+1. **Quality Assurance Requirements** - Guidelines for ensuring code quality before completion
+   - Located in `01-quality-assurance.mdc`
+   - Covers ESLint, Prettier, and TypeScript build processes
+
+2. **TypeScript Guidelines** - Standards for TypeScript code
+   - Located in `02-typescript-guidelines.mdc`
+   - Includes general guidelines, code style, and configuration
+
+3. **Command Handling** - Guidelines for implementing CLI commands
+   - Located in `03-command-handling.mdc`
+   - Covers workspace selection, command safety, and implementation standards
+
+4. **Slack API Integration** - Standards for interacting with the Slack API
+   - Located in `04-slack-api-integration.mdc`
+   - Includes type definitions, API usage, and error handling
+
+5. **Running the Tool** - Instructions for installation and usage
+   - Located in `05-running-the-tool.mdc`
+   - Covers setup, command execution, and requirements
+
+6. **Command Examples** - Examples of common commands
+   - Located in `06-command-examples.mdc`
+   - Includes detailed examples for status and today commands
+
+7. **Code Quality Tools** - Configuration for code quality tools
+   - Located in `07-code-quality-tools.mdc`
+   - Describes ESLint and Prettier configurations
+
+For development, always ensure all quality checks pass before considering a task complete.

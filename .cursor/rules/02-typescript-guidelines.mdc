@@ -1,0 +1,35 @@
+---
+description: TypeScript standards and best practices for the project
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# TypeScript Guidelines
+
+## General TypeScript Guidelines
+
+- Always use types from the @slack/web-api package when available
+- Follow TypeScript best practices like explicit return types
+- Avoid any type unless absolutely necessary
+- Use interfaces instead of types for object definitions
+- Prefer explicit member accessibility (public, private)
+- Use strict boolean expressions
+- Properly handle Promise returns and potential errors
+
+## TypeScript Code Style
+
+- Use 2 spaces for indentation
+- Use single quotes for strings
+- Limit line length to 100 characters
+- Use trailing commas in multiline objects and arrays
+- Prefer const over let, avoid var
+- Use optional chaining and nullish coalescing operators
+- Explicitly handle Promise rejections and errors
+
+## Configuration
+
+TypeScript is configured in `tsconfig.json` with strict type checking. Key settings include:
+- ES2022 target
+- Node.js module resolution
+- Strict null checks
+- Consistent casing in imports

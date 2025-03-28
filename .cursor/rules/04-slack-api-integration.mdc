@@ -1,0 +1,28 @@
+---
+description: Guidelines for interacting with the Slack API
+globs: ["**/slack/**/*.ts", "**/api/**/*.ts"]
+alwaysApply: false
+---
+
+# Slack API Integration
+
+## Type Definitions
+
+- Always import and use types from @slack/web-api instead of creating custom types
+- When extending Slack API types, document the reason and maintain compatibility
+- Use specific types from @slack/web-api/dist/types/response/* for response handling
+
+## API Usage
+
+- Handle rate limiting appropriately
+- Implement proper error handling for all API calls
+- Use pagination when fetching large datasets
+- Cache user and channel information when appropriate
+- Validate input before sending to the API
+
+## Error Handling
+
+- Use descriptive error messages
+- Capture and log API errors with relevant context
+- Handle token validation and authentication errors gracefully
+- Provide user-friendly error messages when possible
