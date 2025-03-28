@@ -9,11 +9,14 @@
     "scripts": {
         "build": "tsc",
         "start": "tsx src/cli.ts",
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "lint": "eslint \"src/**/*.ts\" --ignore-pattern \"dist/**\"",
-        "lint:fix": "eslint \"src/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
-        "format": "prettier --write \"src/**/*.ts\"",
-        "format:check": "prettier --check \"src/**/*.ts\""
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "test:typecheck": "vitest typecheck",
+        "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\"",
+        "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
+        "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+        "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
     },
     "keywords": [
         "slack",
@@ -35,11 +38,14 @@
         "@eslint/js": "^9.23.0",
         "@types/node": "^20.0.0",
         "@types/sqlite3": "^3.1.11",
+        "@vitest/coverage-v8": "^3.0.9",
         "eslint": "^9.23.0",
         "eslint-config-prettier": "^10.1.1",
+        "happy-dom": "^17.4.4",
         "prettier": "^3.5.3",
         "tsx": "^4.7.0",
         "typescript": "^5.0.0",
-        "typescript-eslint": "^8.28.0"
+        "typescript-eslint": "^8.28.0",
+        "vitest": "^3.0.9"
     }
 }

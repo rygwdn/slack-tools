@@ -22,3 +22,22 @@ yarn-error.log*
 
 # macOS specific files
 .DS_Store
+
+# Coverage directory used by testing tools
+coverage/
+.nyc_output/
+
+# Temporary files
+*.log
+*.tmp
+.tmp/
+temp/
+
+# Compiled JavaScript
+*.js.map
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
