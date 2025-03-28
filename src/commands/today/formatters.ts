@@ -2,7 +2,11 @@ import { SlackCache, ThreadMessage } from './types';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../../context';
 
-export function getFriendlyChannelName(channelId: string, cache: SlackCache, userId: string): string {
+export function getFriendlyChannelName(
+  channelId: string,
+  cache: SlackCache,
+  userId: string,
+): string {
   const channel = cache.channels[channelId];
   if (!channel) return channelId;
 
@@ -19,8 +23,8 @@ export function getFriendlyChannelName(channelId: string, cache: SlackCache, use
 
   if (channel.type === 'mpim' && channel.members) {
     const memberNames = channel.members
-      .filter(id => id !== userId)
-      .map(id => cache.users[id]?.displayName || id)
+      .filter((id) => id !== userId)
+      .map((id) => cache.users[id]?.displayName || id)
       .join(', ');
     return `Group DM with ${memberNames}`;
   }
@@ -80,7 +84,7 @@ export function extractThreadTsFromPermalink(permalink?: string): string | undef
   try {
     const url = new URL(permalink);
     return url.searchParams.get('thread_ts') || undefined;
-  } catch (error) {
+  } catch {
     return undefined;
   }
 }
@@ -91,14 +95,14 @@ function shouldIncludeChannel(
   messages: ThreadMessage[],
   cache: SlackCache,
   userId: string,
-  context: CommandContext
+  context: CommandContext,
 ): boolean {
   // Keep the channel if:
   // 1. I sent any message in the channel (including thread replies)
   // 2. OR it's not a bot channel/DM
-  const hasMyMessage = messages.some(msg => {
+  const hasMyMessage = messages.some((msg) => {
     const hasMyDirectMessage = msg.user === userId;
-    const hasMyThreadReply = msg.threadMessages?.some(reply => reply.user === userId) ?? false;
+    const hasMyThreadReply = msg.threadMessages?.some((reply) => reply.user === userId) ?? false;
     return hasMyDirectMessage || hasMyThreadReply;
   });
 
@@ -111,7 +115,9 @@ function shouldIncludeChannel(
     const isBot = dmUser?.isBot || false;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
-      context.debugLog(`Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`);
+      context.debugLog(
+        `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`,
+      );
     }
     return shouldKeep;
   }
@@ -122,8 +128,8 @@ function shouldIncludeChannel(
 // Helper function to organize messages into threads
 function organizeMessagesIntoThreads(
   messages: Match[],
-  context: CommandContext
-): { threadMap: Map<string, ThreadMessage[]>, standaloneMessages: ThreadMessage[] } {
+  context: CommandContext,
+): { threadMap: Map<string, ThreadMessage[]>; standaloneMessages: ThreadMessage[] } {
   const threadMap = new Map<string, ThreadMessage[]>();
   const standaloneMessages: ThreadMessage[] = [];
 
@@ -144,11 +150,11 @@ function organizeMessagesIntoThreads(
       }
       const thread = threadMap.get(threadTs)!;
       // Add the message to the thread if it's not already there
-      if (!thread.some(m => m.ts === message.ts)) {
+      if (!thread.some((m) => m.ts === message.ts)) {
         // Ensure thread_ts is properly set on the message object for later use
         const messageWithThreadTs: ThreadMessage = {
           ...message,
-          thread_ts: threadTs
+          thread_ts: threadTs,
         };
         thread.push(messageWithThreadTs);
         context.debugLog(`Added message to thread: ${message.text?.slice(0, 50)}`);
@@ -156,7 +162,9 @@ function organizeMessagesIntoThreads(
     } else {
       // If no thread_ts or it's the thread parent, it's a standalone/parent message
       standaloneMessages.push(message);
-      context.debugLog(`Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`);
+      context.debugLog(
+        `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`,
+      );
     }
   }
 
@@ -168,7 +176,7 @@ function addMessageToDateChannelStructure(
   message: ThreadMessage,
   threadMessages: ThreadMessage[] = [],
   dateChannelMap: Map<string, Map<string, ThreadMessage[]>>,
-  context: CommandContext
+  context: CommandContext,
 ): void {
   const date = new Date(Number(message.ts) * 1000);
   const dateKey = date.toISOString().split('T')[0];
@@ -189,7 +197,7 @@ function addMessageToDateChannelStructure(
   }
   messagesForChannel.push({
     ...message,
-    threadMessages
+    threadMessages,
   });
 }
 
@@ -197,7 +205,7 @@ function addMessageToDateChannelStructure(
 function groupMessagesByDateAndChannel(
   standaloneMessages: ThreadMessage[],
   threadMap: Map<string, ThreadMessage[]>,
-  context: CommandContext
+  context: CommandContext,
 ): Map<string, Map<string, ThreadMessage[]>> {
   const messagesByDate = new Map<string, Map<string, ThreadMessage[]>>();
 
@@ -207,7 +215,7 @@ function groupMessagesByDateAndChannel(
     if (message.ts && threadMap.has(message.ts)) {
       const threadMessages = threadMap.get(message.ts)!;
       // Filter out the parent message from replies if it exists
-      const replies = threadMessages.filter(m => m.ts !== message.ts);
+      const replies = threadMessages.filter((m) => m.ts !== message.ts);
       addMessageToDateChannelStructure(message, replies, messagesByDate, context);
     } else {
       addMessageToDateChannelStructure(message, [], messagesByDate, context);
@@ -217,7 +225,7 @@ function groupMessagesByDateAndChannel(
   // Process threads where we don't have the parent message
   for (const [threadTs, threadMessages] of threadMap.entries()) {
     // Skip threads we've already handled via standalone messages
-    if (standaloneMessages.some(m => m.ts === threadTs)) {
+    if (standaloneMessages.some((m) => m.ts === threadTs)) {
       continue;
     }
 
@@ -225,11 +233,11 @@ function groupMessagesByDateAndChannel(
     const sortedThreadMessages = threadMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
 
     // Find the parent message (message with ts === thread_ts)
-    const parentMessage = sortedThreadMessages.find(m => m.ts === threadTs);
+    const parentMessage = sortedThreadMessages.find((m) => m.ts === threadTs);
 
     if (parentMessage) {
       // We have the parent, add it with its replies
-      const replies = sortedThreadMessages.filter(m => m.ts !== parentMessage.ts);
+      const replies = sortedThreadMessages.filter((m) => m.ts !== parentMessage.ts);
       addMessageToDateChannelStructure(parentMessage, replies, messagesByDate, context);
     } else {
       // Create a synthetic parent from the first message
@@ -241,9 +249,9 @@ function groupMessagesByDateAndChannel(
         ts: threadTs,
         text: firstMessage.text,
         user: firstMessage.user,
-        channel: firstMessage.channel
+        channel: firstMessage.channel,
       };
-      const replies = sortedThreadMessages.filter(m => m.ts !== firstMessage.ts);
+      const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
       addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate, context);
     }
   }
@@ -252,11 +260,7 @@ function groupMessagesByDateAndChannel(
 }
 
 // Helper function to format a single message
-function formatMessage(
-  message: ThreadMessage,
-  cache: SlackCache,
-  context: CommandContext
-): string {
+function formatMessage(message: ThreadMessage, cache: SlackCache, context: CommandContext): string {
   let markdown = '';
   const timestamp = new Date(Number(message.ts) * 1000);
   const timeString = formatTime(timestamp);
@@ -265,6 +269,8 @@ function formatMessage(
   if (message.user && cache.users[message.user]) {
     userName = cache.users[message.user].displayName;
   }
+
+  context.debugLog(`Formatting message from ${userName}`);
 
   // Format the main message
   markdown += `- [*${timeString}*](${message.permalink || ''}) **${userName}**: `;
@@ -277,19 +283,18 @@ function formatMessage(
   // Any additional lines need to be indented to align with the first line
   if (messageLines.length > 1) {
     const indent = '    '; // 4 spaces for markdown list alignment
-    markdown += messageLines.slice(1)
-      .map(line => `${indent}${line}`)
-      .join('\n') + '\n';
+    markdown +=
+      messageLines
+        .slice(1)
+        .map((line) => `${indent}${line}`)
+        .join('\n') + '\n';
   }
 
   return markdown;
 }
 
 // Helper function to format thread replies
-function formatThreadReplies(
-  replies: ThreadMessage[],
-  cache: SlackCache
-): string {
+function formatThreadReplies(replies: ThreadMessage[], cache: SlackCache): string {
   let markdown = '';
 
   // Sort replies by timestamp
@@ -320,9 +325,11 @@ function formatThreadReplies(
     // Any additional lines in the reply need to be indented further
     if (replyLines.length > 1) {
       const replyIndent = '            '; // 12 spaces for nested list continuation
-      markdown += replyLines.slice(1)
-        .map(line => `${replyIndent}${line}`)
-        .join('\n') + '\n';
+      markdown +=
+        replyLines
+          .slice(1)
+          .map((line) => `${replyIndent}${line}`)
+          .join('\n') + '\n';
     }
   }
 
@@ -332,9 +339,8 @@ function formatThreadReplies(
 export function generateMarkdown(
   messages: Match[],
   cache: SlackCache,
-  dateRange: { startTime: Date; endTime: Date },
   userId: string,
-  context: CommandContext
+  context: CommandContext,
 ): string {
   let markdown = '';
 
@@ -358,7 +364,7 @@ export function generateMarkdown(
     const channelEntries = Array.from(channelsForDate.entries())
       .map(([id, messages]) => [id || 'unknown', messages] as [string, ThreadMessage[]])
       .filter(([channelId, channelMessages]) =>
-        shouldIncludeChannel(channelId, channelMessages, cache, userId, context)
+        shouldIncludeChannel(channelId, channelMessages, cache, userId, context),
       )
       .sort(([aId], [bId]) => {
         const aName = getFriendlyChannelName(aId, cache, userId);
@@ -380,7 +386,9 @@ export function generateMarkdown(
 
         // Add thread replies if any
         if (message.threadMessages?.length) {
-          context.debugLog(`Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`);
+          context.debugLog(
+            `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`,
+          );
           markdown += formatThreadReplies(message.threadMessages, cache);
           markdown += '\n'; // Add extra line after thread
         }

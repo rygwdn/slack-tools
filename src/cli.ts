@@ -13,9 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Read package.json to get version
-const packageJson = JSON.parse(
-  readFileSync(join(__dirname, '../package.json'), 'utf8')
-);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
 
 const program = new Command();
 

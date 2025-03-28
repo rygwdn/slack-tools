@@ -17,7 +17,7 @@ export function registerPrintCommand(program: Command, context: CommandContext):
         // But if a workspace is set, we'll use it to filter results
         const auth = await getSlackAuth({
           workspace: context.hasWorkspace ? context.workspace : undefined,
-          quiet: cmdOptions.quiet
+          quiet: cmdOptions.quiet,
         });
 
         if (Object.keys(auth.tokens).length === 0) {

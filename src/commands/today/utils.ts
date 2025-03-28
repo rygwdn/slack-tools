@@ -4,7 +4,10 @@ import { CommandContext } from '../../context';
 /**
  * Parses and validates date options, returning a date range
  */
-export async function getDateRange(options: { since?: string; until?: string; }, context: CommandContext): Promise<DateRange> {
+export async function getDateRange(
+  options: { since?: string; until?: string },
+  context: CommandContext,
+): Promise<DateRange> {
   let startTime: Date;
   if (options.since) {
     startTime = new Date(options.since);

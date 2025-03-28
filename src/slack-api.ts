@@ -1,6 +1,5 @@
 import { WebClient, LogLevel } from '@slack/web-api';
 import { getSlackAuth } from './auth';
-import type { WorkspaceAuthOptions } from './types';
 import { CommandContext } from './context';
 
 /**
@@ -8,7 +7,7 @@ import { CommandContext } from './context';
  */
 export async function getWorkspaceToken(
   workspaceName: string,
-  context: CommandContext
+  context: CommandContext,
 ): Promise<{
   token: string;
   workspaceUrl: string;
@@ -27,13 +26,13 @@ export async function getWorkspaceToken(
     return {
       token,
       workspaceUrl: workspaceName,
-      cookie: auth.cookie
+      cookie: auth.cookie,
     };
   }
 
   // Try to find by name (case insensitive)
   const wsEntry = Object.entries(auth.tokens).find(
-    ([, details]) => details.name.toLowerCase() === workspaceName.toLowerCase()
+    ([, details]) => details.name.toLowerCase() === workspaceName.toLowerCase(),
   );
 
   if (wsEntry) {
@@ -44,7 +43,7 @@ export async function getWorkspaceToken(
     return {
       token,
       workspaceUrl: wsEntry[0],
-      cookie: auth.cookie
+      cookie: auth.cookie,
     };
   }
 
@@ -53,7 +52,9 @@ export async function getWorkspaceToken(
     context.debugLog(`- ${details.name} (${url})`);
   });
 
-  throw new Error(`Could not find workspace "${workspaceName}". Use 'slack-tools print' to see available workspaces.`);
+  throw new Error(
+    `Could not find workspace "${workspaceName}". Use 'slack-tools print' to see available workspaces.`,
+  );
 }
 
 /**
@@ -62,7 +63,7 @@ export async function getWorkspaceToken(
  */
 export async function getSlackClient(
   workspace: string,
-  context: CommandContext
+  context: CommandContext,
 ): Promise<WebClient> {
   const { token, cookie, workspaceUrl } = await getWorkspaceToken(workspace, context);
 
@@ -76,8 +77,8 @@ export async function getSlackClient(
   // Create and return a web client with the token and cookie
   return new WebClient(token, {
     headers: {
-      'Cookie': `d=${cookie.value}`
+      Cookie: `d=${cookie.value}`,
     },
-    logLevel: context.debug ? LogLevel.DEBUG : LogLevel.ERROR
+    logLevel: context.debug ? LogLevel.DEBUG : LogLevel.ERROR,
   });
 }

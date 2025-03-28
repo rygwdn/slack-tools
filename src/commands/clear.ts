@@ -1,8 +1,7 @@
 import { Command } from 'commander';
 import { clearStoredTokens } from '../cache';
-import { CommandContext } from '../context';
 
-export function registerClearCommand(program: Command, context: CommandContext): void {
+export function registerClearCommand(program: Command): void {
   program
     .command('clear')
     .description('Clear stored tokens from keychain')

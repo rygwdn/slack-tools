@@ -31,10 +31,7 @@ function decryptCookieValue(encryptedValue: Buffer, encryptionKey: Buffer): stri
 
     // Decrypt using AES-128-CBC
     const decipher = crypto.createDecipheriv('aes-128-cbc', encryptionKey, iv);
-    const decrypted = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final()
-    ]);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 
     // Remove padding (PKCS#7 padding is handled automatically by crypto)
     let endPos = decrypted.length;
@@ -44,15 +41,16 @@ function decryptCookieValue(encryptedValue: Buffer, encryptionKey: Buffer): stri
 
     return decrypted.slice(0, endPos).toString('utf8');
   } catch (error) {
-    throw new Error(`Failed to decrypt cookie value: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to decrypt cookie value: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 /**
  * Get the encryption key from the macOS keychain
- * @param quiet Whether to suppress console output
  */
-async function getEncryptionKey(quiet = false): Promise<Buffer> {
+async function getEncryptionKey(): Promise<Buffer> {
   try {
     // Get the encryption key from the macOS keychain
     // The keychain item name for Slack is "Slack App Store Key"
@@ -70,7 +68,9 @@ async function getEncryptionKey(quiet = false): Promise<Buffer> {
 
     return crypto.pbkdf2Sync(key, salt, iterations, keyLength, 'sha1');
   } catch (error) {
-    throw new Error(`Could not retrieve Slack encryption key from keychain: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Could not retrieve Slack encryption key from keychain: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -81,7 +81,10 @@ function getCookiesDbPath(): string {
   const paths = [
     // Slack stores cookies in a similar location to Chrome
     join(homedir(), 'Library/Application Support/Slack/Cookies'),
-    join(homedir(), 'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies')
+    join(
+      homedir(),
+      'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies',
+    ),
   ];
 
   // Return the first path that exists
@@ -95,24 +98,23 @@ function getCookiesDbPath(): string {
 
 /**
  * Extract and decrypt cookie value for Slack
- * @param quiet Whether to suppress console output
  */
-export async function getCookie(quiet = false): Promise<SlackCookie> {
+export async function getCookie(): Promise<SlackCookie> {
   try {
     const dbPath = getCookiesDbPath();
-    const encryptionKey = await getEncryptionKey(quiet);
+    const encryptionKey = await getEncryptionKey();
 
     // Open the SQLite database
     const db = await open({
       filename: dbPath,
       driver: Database.Database,
-      mode: Database.OPEN_READONLY
+      mode: Database.OPEN_READONLY,
     });
 
     try {
       // Get the 'd' cookie with the largest value (most likely to be the correct one)
       const result = await db.get(
-        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC LIMIT 1'
+        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC LIMIT 1',
       );
 
       if (!result || !result.encrypted_value) {
@@ -128,12 +130,14 @@ export async function getCookie(quiet = false): Promise<SlackCookie> {
 
       return {
         name: result.name,
-        value: decryptedValue
+        value: decryptedValue,
       };
     } finally {
       await db.close();
     }
   } catch (error) {
-    throw new Error(`Failed to extract Slack cookie: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to extract Slack cookie: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

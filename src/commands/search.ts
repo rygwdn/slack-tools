@@ -1,9 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
 import { CommandContext } from '../context';
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { performSlackSearch } from '../services/slack-services';
-import { SlackCache } from './today/types';
 import { generateSearchResultsMarkdown } from '../services/formatting-service';
 
 export interface SearchCommandOptions {
@@ -29,7 +27,7 @@ export function registerSearchCommand(program: Command, context: CommandContext)
         const cache = {
           lastUpdated: Date.now(),
           channels: searchResult.channels,
-          users: searchResult.users
+          users: searchResult.users,
         };
 
         context.debugLog('Formatting report...');
@@ -43,7 +41,6 @@ export function registerSearchCommand(program: Command, context: CommandContext)
         } else {
           console.log(markdown);
         }
-
       } catch (error) {
         console.error('Error:', error);
         process.exit(1);

@@ -1,7 +1,11 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { getStoredTokens as getKeychainTokens, storeTokens as storeKeychainTokens, clearStoredTokens as clearKeychainTokens } from './keychain';
+import {
+  getStoredTokens as getKeychainTokens,
+  storeTokens as storeKeychainTokens,
+  clearStoredTokens as clearKeychainTokens,
+} from './keychain';
 import type { WorkspaceTokens, CacheConfig } from './types';
 
 const CONFIG_DIR = join(homedir(), '.slack-tools');
@@ -82,7 +86,10 @@ export async function clearStoredTokens(): Promise<void> {
 /**
  * Load Slack cache from file, returns null if cache doesn't exist or is expired
  */
-export async function loadSlackCache<T extends { lastUpdated: number }>(cacheFile = SLACK_CACHE_FILE, ttl = SLACK_CACHE_TTL): Promise<T | null> {
+export async function loadSlackCache<T extends { lastUpdated: number }>(
+  cacheFile = SLACK_CACHE_FILE,
+  ttl = SLACK_CACHE_TTL,
+): Promise<T | null> {
   try {
     await ensureConfigDir();
     const data = await fs.readFile(cacheFile, 'utf-8');
@@ -92,7 +99,7 @@ export async function loadSlackCache<T extends { lastUpdated: number }>(cacheFil
     if (Date.now() - cache.lastUpdated < ttl) {
       return cache;
     }
-  } catch (error) {
+  } catch {
     // File doesn't exist or is invalid
   }
   return null;

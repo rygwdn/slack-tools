@@ -12,7 +12,7 @@ export async function searchMessages(
   username: string | undefined,
   dateRange: { startTime: Date; endTime: Date },
   count: number,
-  context: CommandContext
+  context: CommandContext,
 ): Promise<SearchResult> {
   if (!username) {
     throw new Error('Username is required for searching messages');
@@ -44,7 +44,7 @@ export async function searchMessages(
   return {
     messages: searchResults,
     threadMessages: threadResults,
-    mentionMessages: mentionResults
+    mentionMessages: mentionResults,
   };
 }
 
@@ -55,18 +55,18 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
-  context: CommandContext
+  context: CommandContext,
 ): Promise<Match[]> {
   context.debugLog(`Executing search: ${query}`);
-  
+
   try {
     const searchResults = await client.search.messages({
       query: query,
       sort: 'timestamp',
       sort_dir: 'asc',
-      count
+      count,
     });
-    
+
     return searchResults.messages?.matches || [];
   } catch (error) {
     context.debugLog(`Search error: ${error}`);

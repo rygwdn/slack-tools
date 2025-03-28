@@ -7,7 +7,7 @@ import { performSlackSearch, setSlackStatus, getSlackStatus } from '../services/
 import {
   generateSearchResultsMarkdown,
   formatStatusOutput,
-  formatStatusUpdateOutput
+  formatStatusUpdateOutput,
 } from '../services/formatting-service';
 
 export function registerMcpCommand(program: Command, context: CommandContext): void {
@@ -17,7 +17,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
     .action(async () => {
       const server = new McpServer({
         name: 'slack-tools-server',
-        version: '1.0.0'
+        version: '1.0.0',
       });
 
       // Add tool for search capability
@@ -26,7 +26,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
         {
           query: z.string(),
           count: z.number().optional().default(100),
-          format: z.enum(['markdown', 'json']).optional().default('markdown')
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
         },
         async ({ query, count, format }) => {
           try {
@@ -34,40 +34,44 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
             if (format === 'json') {
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify(results, null, 2)
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(results, null, 2),
+                  },
+                ],
               };
             } else {
               // Format the results as markdown
               const cache = {
                 lastUpdated: Date.now(),
                 channels: results.channels,
-                users: results.users
+                users: results.users,
               };
 
               const markdown = generateSearchResultsMarkdown(
                 results.messages,
                 cache,
                 results.userId,
-                context
+                context,
               );
 
               return {
-                content: [{
-                  type: 'text',
-                  text: markdown
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
               };
             }
           } catch (error) {
             return {
               content: [{ type: 'text', text: `Error: ${error}` }],
-              isError: true
+              isError: true,
             };
           }
-        }
+        },
       );
 
       // Add tool for status capability
@@ -77,7 +81,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
           text: z.string(),
           emoji: z.string().optional(),
           duration: z.number().optional(),
-          format: z.enum(['markdown', 'json']).optional().default('markdown')
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
         },
         async ({ text, emoji, duration, format }) => {
           try {
@@ -85,36 +89,40 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
             if (format === 'json') {
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2)
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
               };
             } else {
               // Format the result as markdown
               const markdown = formatStatusUpdateOutput(result);
 
               return {
-                content: [{
-                  type: 'text',
-                  text: markdown
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
               };
             }
           } catch (error) {
             return {
               content: [{ type: 'text', text: `Error: ${error}` }],
-              isError: true
+              isError: true,
             };
           }
-        }
+        },
       );
 
       // Add tool for getting status
       server.tool(
         'get-status',
         {
-          format: z.enum(['markdown', 'json']).optional().default('markdown')
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
         },
         async ({ format }) => {
           try {
@@ -122,37 +130,39 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
             if (format === 'json') {
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify(status, null, 2)
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(status, null, 2),
+                  },
+                ],
               };
             } else {
               // Format the status as markdown
               const markdown = formatStatusOutput(status);
 
               return {
-                content: [{
-                  type: 'text',
-                  text: markdown
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
               };
             }
           } catch (error) {
             return {
               content: [{ type: 'text', text: `Error: ${error}` }],
-              isError: true
+              isError: true,
             };
           }
-        }
+        },
       );
 
       // Add a simple prompt for demonstration
-      server.prompt(
-        'help',
-        {},
-        () => ({
-          messages: [{
+      server.prompt('help', {}, () => ({
+        messages: [
+          {
             role: 'user',
             content: {
               type: 'text',
@@ -162,11 +172,11 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
               - set-status: Set your Slack status with text, optional emoji, and optional duration.
                 Can return formatted markdown (default) or JSON with 'format' parameter.
               - get-status: Get your current Slack status.
-                Can return formatted markdown (default) or JSON with 'format' parameter.`
-            }
-          }]
-        })
-      );
+                Can return formatted markdown (default) or JSON with 'format' parameter.`,
+            },
+          },
+        ],
+      }));
 
       console.log('Starting MCP server...');
       const transport = new StdioServerTransport();

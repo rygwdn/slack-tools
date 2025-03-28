@@ -1,10 +1,8 @@
-import { WebClient } from '@slack/web-api';
 import { CommandContext } from '../context';
 import { getSlackClient } from '../slack-api';
 import { searchSlackMessages } from '../commands/today/slack-service';
 import { getSlackEntityCache } from '../commands/today/slack-entity-cache';
 import { saveSlackCache } from '../cache';
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 
 /**
  * Search for messages in Slack
@@ -36,7 +34,7 @@ export async function performSlackSearch(query: string, count: number, context: 
       messages,
       userId,
       channels: cache.channels,
-      users: cache.users
+      users: cache.users,
     };
   } catch (error) {
     throw new Error(`Search failed: ${error}`);
@@ -64,7 +62,7 @@ export function formatEmoji(emoji: string): string {
  */
 export function calculateExpirationTime(durationMinutes?: number): number {
   if (!durationMinutes) return 0;
-  return Math.floor(Date.now() / 1000) + (durationMinutes * 60);
+  return Math.floor(Date.now() / 1000) + durationMinutes * 60;
 }
 
 /**
@@ -74,7 +72,7 @@ export async function setSlackStatus(
   text: string,
   context: CommandContext,
   emoji?: string,
-  durationMinutes?: number
+  durationMinutes?: number,
 ) {
   try {
     const workspace = context.workspace;
@@ -93,7 +91,7 @@ export async function setSlackStatus(
         'Status will expire in',
         durationMinutes,
         'minutes at',
-        new Date(expirationTime * 1000).toISOString()
+        new Date(expirationTime * 1000).toISOString(),
       );
     } else {
       context.debugLog('Setting permanent status (no expiration)');
@@ -105,8 +103,8 @@ export async function setSlackStatus(
       profile: {
         status_text: text,
         status_emoji: formattedEmoji,
-        status_expiration: expirationTime
-      }
+        status_expiration: expirationTime,
+      },
     });
 
     context.debugLog('API response:', response);
@@ -115,7 +113,7 @@ export async function setSlackStatus(
       success: true,
       text,
       emoji: formattedEmoji,
-      expirationTime: expirationTime ? new Date(expirationTime * 1000).toISOString() : null
+      expirationTime: expirationTime ? new Date(expirationTime * 1000).toISOString() : null,
     };
   } catch (error) {
     throw new Error(`Status update failed: ${error}`);
@@ -136,8 +134,9 @@ export async function getSlackStatus(context: CommandContext) {
     return {
       status: userProfile.profile?.status_text || '',
       emoji: userProfile.profile?.status_emoji || '',
-      expirationTime: userProfile.profile?.status_expiration ?
-        new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString() : null
+      expirationTime: userProfile.profile?.status_expiration
+        ? new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString()
+        : null,
     };
   } catch (error) {
     throw new Error(`Status retrieval failed: ${error}`);

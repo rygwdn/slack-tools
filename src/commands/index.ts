@@ -9,7 +9,7 @@ import { registerMcpCommand } from './mcp';
 import { CommandContext } from '../context';
 
 export function registerCommands(program: Command, context: CommandContext): void {
-  registerClearCommand(program, context);
+  registerClearCommand(program);
   registerPrintCommand(program, context);
   registerStatusCommand(program, context);
   registerTestCommand(program, context);

@@ -6,7 +6,7 @@ export function registerTestCommand(program: Command, context: CommandContext): 
   program
     .command('test')
     .description('Test authentication with Slack API')
-    .action(async (options) => {
+    .action(async (_options) => {
       try {
         // The workspace getter will handle validation automatically
         const workspace = context.workspace;
@@ -28,7 +28,7 @@ export function registerTestCommand(program: Command, context: CommandContext): 
         console.error('Error:', error);
 
         if (!context.debug) {
-          console.log("\nTip: Run with -d/--debug flag for more troubleshooting information");
+          console.log('\nTip: Run with -d/--debug flag for more troubleshooting information');
         }
 
         process.exit(1);

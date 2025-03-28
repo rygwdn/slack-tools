@@ -67,6 +67,7 @@ export class CommandContext {
    * @param message The message or object to log
    * @param ...args Additional arguments to log
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debugLog(message: any, ...args: any[]): void {
     if (this._debug) {
       if (args.length > 0) {

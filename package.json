@@ -9,7 +9,11 @@
     "scripts": {
         "build": "tsc",
         "start": "tsx src/cli.ts",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "lint": "eslint \"src/**/*.ts\" --ignore-pattern \"dist/**\"",
+        "lint:fix": "eslint \"src/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "format:check": "prettier --check \"src/**/*.ts\""
     },
     "keywords": [
         "slack",
@@ -28,9 +32,14 @@
         "zod": "^3.24.2"
     },
     "devDependencies": {
+        "@eslint/js": "^9.23.0",
         "@types/node": "^20.0.0",
         "@types/sqlite3": "^3.1.11",
+        "eslint": "^9.23.0",
+        "eslint-config-prettier": "^10.1.1",
+        "prettier": "^3.5.3",
         "tsx": "^4.7.0",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "typescript-eslint": "^8.28.0"
     }
 }

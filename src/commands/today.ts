@@ -33,16 +33,26 @@ export function registerTodayCommand(program: Command, context: CommandContext):
         const client = await getSlackClient(workspace, context);
         const authTest = await client.auth.test();
         const userId = authTest.user_id as string;
-        const username = options.username || authTest.user as string;
+        const username = options.username || (authTest.user as string);
 
         context.debugLog(`Searching messages for user: ${username}...`);
-        context.debugLog(`Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`);
+        context.debugLog(
+          `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
+        );
 
         // Search messages
-        const { messages, threadMessages, mentionMessages } = await searchMessages(client, username, dateRange, count, context);
+        const { messages, threadMessages, mentionMessages } = await searchMessages(
+          client,
+          username,
+          dateRange,
+          count,
+          context,
+        );
         const allMessages = [...messages, ...threadMessages, ...mentionMessages];
 
-        context.debugLog(`Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`);
+        context.debugLog(
+          `Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`,
+        );
         context.debugLog(`Found ${allMessages.length} total messages. Fetching details...`);
 
         // Get user and channel information
@@ -51,7 +61,7 @@ export function registerTodayCommand(program: Command, context: CommandContext):
         context.debugLog('Formatting report...');
 
         // Process and format messages
-        const markdown = generateMarkdown(allMessages, cache, dateRange, userId, context);
+        const markdown = generateMarkdown(allMessages, cache, userId, context);
 
         if (options.output) {
           await fs.writeFile(options.output, markdown);
@@ -63,7 +73,6 @@ export function registerTodayCommand(program: Command, context: CommandContext):
         // Update and save the cache
         cache.lastUpdated = Date.now();
         await saveSlackCache(cache);
-
       } catch (error) {
         console.error('Error:', error);
         process.exit(1);

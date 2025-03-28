@@ -1,13 +1,16 @@
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../../context';
-import { SlackCache, CachedUser, CachedChannel } from './types';
+import { SlackCache } from './types';
 import { loadSlackCache, saveSlackCache } from '../../cache';
 
 /**
  * Extracts user and channel IDs from Slack messages
  */
-function extractEntitiesFromMessages(messages: Match[]): { userIds: Set<string>, channelIds: Set<string> } {
+function extractEntitiesFromMessages(messages: Match[]): {
+  userIds: Set<string>;
+  channelIds: Set<string>;
+} {
   const userIds = new Set<string>();
   const channelIds = new Set<string>();
 
@@ -46,7 +49,7 @@ async function fetchAndCacheUsers(
   userIds: string[],
   cache: SlackCache,
   context: CommandContext,
-  isCacheLoaded: boolean
+  isCacheLoaded: boolean,
 ): Promise<void> {
   for (const userId of userIds) {
     try {
@@ -54,7 +57,7 @@ async function fetchAndCacheUsers(
       if (userResponse.ok && userResponse.user) {
         cache.users[userId] = {
           displayName: userResponse.user.real_name || userResponse.user.name || userId,
-          isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot')
+          isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot'),
         };
         if (isCacheLoaded) {
           context.debugLog(`Added missing user to cache: ${cache.users[userId].displayName}`);
@@ -74,7 +77,7 @@ async function fetchDmUserInfo(
   userId: string,
   cache: SlackCache,
   context: CommandContext,
-  isCacheLoaded: boolean
+  isCacheLoaded: boolean,
 ): Promise<void> {
   if (!cache.users[userId]) {
     try {
@@ -82,7 +85,7 @@ async function fetchDmUserInfo(
       if (userResponse.ok && userResponse.user) {
         cache.users[userId] = {
           displayName: userResponse.user.real_name || userResponse.user.name || userId,
-          isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot')
+          isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot'),
         };
         if (isCacheLoaded) {
           context.debugLog(`Added missing DM user to cache: ${cache.users[userId].displayName}`);
@@ -100,7 +103,7 @@ async function fetchDmUserInfo(
 async function fetchChannelMembers(
   client: WebClient,
   channelId: string,
-  context: CommandContext
+  context: CommandContext,
 ): Promise<string[] | undefined> {
   try {
     const result = await client.conversations.members({ channel: channelId });
@@ -120,7 +123,7 @@ async function fetchAndCacheChannels(
   cache: SlackCache,
   context: CommandContext,
   isCacheLoaded: boolean,
-  userIds: Set<string>
+  userIds: Set<string>,
 ): Promise<void> {
   for (const channelId of channelIds) {
     try {
@@ -132,7 +135,7 @@ async function fetchAndCacheChannels(
 
         if (channel.is_im) {
           // For DMs, the other user's ID is stored in the 'user' property
-          const otherUserId = 'user' in channel ? channel.user as string : undefined;
+          const otherUserId = 'user' in channel ? (channel.user as string) : undefined;
           if (otherUserId) {
             userIds.add(otherUserId);
             await fetchDmUserInfo(client, otherUserId, cache, context, isCacheLoaded);
@@ -145,7 +148,7 @@ async function fetchAndCacheChannels(
         cache.channels[channelId] = {
           displayName: channelName,
           type: channel.is_im ? 'im' : channel.is_mpim ? 'mpim' : 'channel',
-          members
+          members,
         };
         if (isCacheLoaded) {
           context.debugLog(`Added missing channel to cache: ${channelName}`);
@@ -161,11 +164,13 @@ async function fetchAndCacheChannels(
  * Initializes or loads the Slack entity cache
  */
 async function initializeCache(): Promise<SlackCache> {
-  return await loadSlackCache<SlackCache>() || {
-    users: {},
-    channels: {},
-    lastUpdated: 0
-  };
+  return (
+    (await loadSlackCache<SlackCache>()) || {
+      users: {},
+      channels: {},
+      lastUpdated: 0,
+    }
+  );
 }
 
 /**
@@ -174,7 +179,7 @@ async function initializeCache(): Promise<SlackCache> {
 export async function getSlackEntityCache(
   client: WebClient,
   messages: Match[],
-  context: CommandContext
+  context: CommandContext,
 ): Promise<SlackCache> {
   // Initialize or load existing cache
   const cache = await initializeCache();
@@ -184,13 +189,15 @@ export async function getSlackEntityCache(
   const { userIds, channelIds } = extractEntitiesFromMessages(messages);
 
   // Find which entities are missing from cache
-  const missingUserIds = Array.from(userIds).filter(id => !cache.users[id]);
-  const missingChannelIds = Array.from(channelIds).filter(id => !cache.channels[id]);
+  const missingUserIds = Array.from(userIds).filter((id) => !cache.users[id]);
+  const missingChannelIds = Array.from(channelIds).filter((id) => !cache.channels[id]);
 
   // Log cache status
   if (isCacheLoaded) {
     context.debugLog('Using cached user and channel information with updates for missing entries');
-    context.debugLog(`Found ${missingUserIds.length} users and ${missingChannelIds.length} channels missing from cache`);
+    context.debugLog(
+      `Found ${missingUserIds.length} users and ${missingChannelIds.length} channels missing from cache`,
+    );
   } else {
     context.debugLog('No cache found, fetching all user and channel information');
   }

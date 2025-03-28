@@ -10,8 +10,11 @@ function getLevelDBPath(): string {
   if (platform() === 'darwin') {
     // Try both possible macOS paths
     const paths = [
-      join(homedir(), 'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb'),
-      join(homedir(), 'Library/Application Support/Slack/Local Storage/leveldb')
+      join(
+        homedir(),
+        'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb',
+      ),
+      join(homedir(), 'Library/Application Support/Slack/Local Storage/leveldb'),
     ];
 
     // Return the first path that exists
@@ -63,7 +66,7 @@ export async function getTokens(quiet = false): Promise<WorkspaceTokens> {
     for (const team of Object.values(config.teams)) {
       tokens[team.url] = {
         token: team.token,
-        name: team.name
+        name: team.name,
       };
     }
 
@@ -79,9 +82,9 @@ export async function getTokens(quiet = false): Promise<WorkspaceTokens> {
       if (dbError.code === 'LEVEL_DATABASE_NOT_OPEN' && dbError.cause?.code === 'LEVEL_LOCKED') {
         throw new Error(
           "Slack's Local Storage database is locked. Please make sure Slack is completely closed:\n" +
-          "1. Quit Slack from the menu bar\n" +
-          "2. Check Activity Monitor/Task Manager to ensure no Slack processes are running\n" +
-          "3. Try running this command again"
+            '1. Quit Slack from the menu bar\n' +
+            '2. Check Activity Monitor/Task Manager to ensure no Slack processes are running\n' +
+            '3. Try running this command again',
         );
       }
     }

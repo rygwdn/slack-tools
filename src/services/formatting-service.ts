@@ -10,13 +10,16 @@ export function generateSearchResultsMarkdown(
   messages: Match[],
   cache: SlackCache,
   userId: string,
-  context: CommandContext
+  context: CommandContext,
 ): string {
   let markdown = '';
 
   if (messages.length === 0) {
-    return "# Search Results\n\nNo messages found matching your search criteria.\n";
+    context.debugLog('No search results found');
+    return '# Search Results\n\nNo messages found matching your search criteria.\n';
   }
+
+  context.debugLog(`Processing ${messages.length} search results`);
 
   // Group messages by channel
   const messagesByChannel = new Map<string, Match[]>();
@@ -31,12 +34,11 @@ export function generateSearchResultsMarkdown(
   }
 
   // Sort channels by name
-  const sortedChannels = Array.from(messagesByChannel.keys())
-    .sort((aId, bId) => {
-      const aName = getFriendlyChannelName(aId, cache, userId);
-      const bName = getFriendlyChannelName(bId, cache, userId);
-      return aName.localeCompare(bName);
-    });
+  const sortedChannels = Array.from(messagesByChannel.keys()).sort((aId, bId) => {
+    const aName = getFriendlyChannelName(aId, cache, userId);
+    const bName = getFriendlyChannelName(bId, cache, userId);
+    return aName.localeCompare(bName);
+  });
 
   // Add header for search results
   markdown += `# Search Results\n\n`;
@@ -78,9 +80,11 @@ export function generateSearchResultsMarkdown(
 
       if (messageLines.length > 1) {
         const indent = '    '; // 4 spaces for markdown list alignment
-        markdown += messageLines.slice(1)
-          .map(line => `${indent}${line}`)
-          .join('\n') + '\n';
+        markdown +=
+          messageLines
+            .slice(1)
+            .map((line) => `${indent}${line}`)
+            .join('\n') + '\n';
       }
 
       markdown += '\n'; // Extra space between messages
