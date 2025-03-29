@@ -1,21 +1,21 @@
 import { CommandContext } from '../context';
 import { getSlackClient } from '../slack-api';
-import { getDateRange } from '../commands/today/utils';
-import { searchMessages } from '../commands/today/slack-service';
-import { getSlackEntityCache } from '../commands/today/slack-entity-cache';
-import { generateMarkdown } from '../commands/today/formatters';
+import { getDateRange } from '../commands/my_messages/utils';
+import { searchMessages } from '../commands/my_messages/slack-service';
+import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
+import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { SlackCache } from '../commands/today/types';
+import { SlackCache } from '../commands/my_messages/types';
 
-interface TodayOptions {
+interface MyMessagesOptions {
   username?: string;
   since?: string;
   until?: string;
   count: number;
 }
 
-export interface TodaySummaryResult {
+export interface MyMessagesSummaryResult {
   markdown: string;
   allMessages: Match[];
   userId: string;
@@ -27,15 +27,16 @@ export interface TodaySummaryResult {
 }
 
 /**
- * Generate a today summary for Slack activity
- * @param options Options for generating the summary
- * @param context The command context
- * @returns The generated summary
+ * Generate a my messages summary for Slack activity
+ *
+ * @param options Options for the summary generation
+ * @param context Command context
+ * @returns Generated summary result
  */
-export async function generateTodaySummary(
-  options: TodayOptions,
+export async function generateMyMessagesSummary(
+  options: MyMessagesOptions,
   context: CommandContext,
-): Promise<TodaySummaryResult> {
+): Promise<MyMessagesSummaryResult> {
   // Get date range
   const dateRange = await getDateRange(options, context);
 
@@ -45,7 +46,7 @@ export async function generateTodaySummary(
   const userId = authTest.user_id as string;
   const username = options.username || (authTest.user as string);
 
-  context.debugLog(`Generating today summary for user: ${username}`);
+  context.debugLog(`Generating my messages summary for user: ${username}`);
   context.debugLog(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
   );

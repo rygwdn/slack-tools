@@ -1,7 +1,11 @@
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../context';
-import { formatSlackText, getFriendlyChannelName, formatTime } from '../commands/today/formatters';
-import { SlackCache } from '../commands/today/types';
+import {
+  formatSlackText,
+  getFriendlyChannelName,
+  formatTime,
+} from '../commands/my_messages/formatters';
+import { SlackCache } from '../commands/my_messages/types';
 
 /**
  * Generate markdown output from search results

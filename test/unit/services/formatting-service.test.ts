@@ -7,8 +7,8 @@ import {
 import { CommandContext } from '../../../src/context';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 
-// Mock the formatters from today command
-vi.mock('../../../src/commands/today/formatters', () => ({
+// Mock the formatters from my_messages command
+vi.mock('../../../src/commands/my_messages/formatters', () => ({
   getFriendlyChannelName: vi.fn((channelId, _cache) => {
     if (channelId === 'C123') return '#general';
     if (channelId === 'C456') return '#random';

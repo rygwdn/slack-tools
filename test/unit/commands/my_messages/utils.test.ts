@@ -4,10 +4,10 @@ import {
   getDayAfter,
   getDayBefore,
   getDateRange,
-} from '../../../../src/commands/today/utils';
+} from '../../../../src/commands/my_messages/utils';
 import { CommandContext } from '../../../../src/context';
 
-describe('Today Command Utils', () => {
+describe('My Messages Command Utils', () => {
   let context: CommandContext;
 
   beforeEach(() => {

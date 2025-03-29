@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
 import { CommandContext } from '../context';
-import { TodayCommandOptions } from './today/types';
-import { generateTodaySummary } from '../services/today-service';
+import { MyMessagesCommandOptions } from './my_messages/types';
+import { generateMyMessagesSummary } from '../services/my-messages-service';
 
 export function registerMyMessagesCommand(program: Command, context: CommandContext): void {
   program
@@ -13,7 +13,7 @@ export function registerMyMessagesCommand(program: Command, context: CommandCont
     .option('-e, --until <date>', 'End date (YYYY-MM-DD format), defaults to today')
     .option('-c, --count <number>', 'Number of messages to fetch (default: 200)', '200')
     .option('-o, --output <file>', 'Output markdown to a file')
-    .action(async (options: TodayCommandOptions) => {
+    .action(async (options: MyMessagesCommandOptions) => {
       try {
         // The workspace getter will handle validation automatically
         const workspace = context.workspace;
@@ -21,8 +21,8 @@ export function registerMyMessagesCommand(program: Command, context: CommandCont
         const count = parseInt(options.count, 10);
         context.debugLog(`Generating daily summary for workspace: ${workspace}`);
 
-        // Use the shared service to generate the today summary
-        const result = await generateTodaySummary(
+        // Use the shared service to generate the my messages summary
+        const result = await generateMyMessagesSummary(
           {
             username: options.username,
             since: options.since,

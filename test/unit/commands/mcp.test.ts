@@ -18,7 +18,7 @@ import {
   formatStatusUpdateOutput,
 } from '../../../src/services/formatting-service';
 
-import { generateTodaySummary } from '../../../src/services/today-service';
+import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
 
 // Define tool handler types for better type safety
 type SearchToolHandler = (params: {
@@ -33,7 +33,7 @@ type SetStatusToolHandler = (params: {
   format?: string;
 }) => Promise<any>;
 type GetStatusToolHandler = (params: { format?: string }) => Promise<any>;
-type TodayToolHandler = (params: {
+type MyMessagesToolHandler = (params: {
   username?: string;
   since?: string;
   until?: string;
@@ -44,7 +44,7 @@ type ToolHandler =
   | SearchToolHandler
   | SetStatusToolHandler
   | GetStatusToolHandler
-  | TodayToolHandler;
+  | MyMessagesToolHandler;
 
 // Mock MCP SDK
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
@@ -80,8 +80,8 @@ vi.mock('../../../src/services/formatting-service', () => ({
   formatStatusUpdateOutput: vi.fn(),
 }));
 
-vi.mock('../../../src/services/today-service', () => ({
-  generateTodaySummary: vi.fn(),
+vi.mock('../../../src/services/my-messages-service', () => ({
+  generateMyMessagesSummary: vi.fn(),
 }));
 
 describe('MCP Command', () => {
@@ -172,7 +172,7 @@ describe('MCP Command', () => {
       // Check if all tools were registered
       expect(mockMcpServer.tool).toHaveBeenCalledTimes(4);
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
-        'today',
+        'my_messages',
         expect.anything(),
         expect.any(Function),
       );
@@ -182,12 +182,12 @@ describe('MCP Command', () => {
         expect.any(Function),
       );
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
-        'set-status',
+        'set_status',
         expect.anything(),
         expect.any(Function),
       );
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
-        'get-status',
+        'get_status',
         expect.anything(),
         expect.any(Function),
       );
@@ -433,7 +433,7 @@ describe('MCP Command', () => {
     });
   });
 
-  describe('tool: set-status', () => {
+  describe('tool: set_status', () => {
     it('should call setSlackStatus and return formatted results', async () => {
       // Setup status mocks
       const mockStatusResult = {
@@ -453,7 +453,7 @@ describe('MCP Command', () => {
       // Capture the status handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'set-status') {
+          if (name === 'set_status') {
             statusHandler = handler as SetStatusToolHandler;
           }
           return mockMcpServer;
@@ -472,7 +472,7 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the set-status handler
+      // Execute the set_status handler
       expect(statusHandler).not.toBeNull();
       const result = await statusHandler!({
         text: 'Working',
@@ -493,7 +493,7 @@ describe('MCP Command', () => {
       });
     });
 
-    it('should handle errors in set-status', async () => {
+    it('should handle errors in set_status', async () => {
       // Setup error mock
       const mockError = new Error('Status update failed');
       vi.mocked(setSlackStatus).mockRejectedValueOnce(mockError);
@@ -504,7 +504,7 @@ describe('MCP Command', () => {
       // Capture the status handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'set-status') {
+          if (name === 'set_status') {
             statusHandler = handler as SetStatusToolHandler;
           }
           return mockMcpServer;
@@ -523,7 +523,7 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the set-status handler
+      // Execute the set_status handler
       const result = await statusHandler!({
         text: 'Working',
         emoji: 'computer',
@@ -537,7 +537,7 @@ describe('MCP Command', () => {
     });
   });
 
-  describe('tool: get-status', () => {
+  describe('tool: get_status', () => {
     it('should call getSlackStatus and return formatted results', async () => {
       // Setup status mocks
       const mockStatus = {
@@ -553,10 +553,10 @@ describe('MCP Command', () => {
       // Setup command execution
       let getStatusHandler: GetStatusToolHandler | null = null;
 
-      // Capture the get-status handler
+      // Capture the get_status handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'get-status') {
+          if (name === 'get_status') {
             getStatusHandler = handler as GetStatusToolHandler;
           }
           return mockMcpServer;
@@ -575,7 +575,7 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the get-status handler
+      // Execute the get_status handler
       expect(getStatusHandler).not.toBeNull();
       const result = await getStatusHandler!({
         format: 'markdown',
@@ -594,7 +594,7 @@ describe('MCP Command', () => {
       });
     });
 
-    it('should handle errors in get-status', async () => {
+    it('should handle errors in get_status', async () => {
       // Setup error mock
       const mockError = new Error('Status retrieval failed');
       vi.mocked(getSlackStatus).mockRejectedValueOnce(mockError);
@@ -602,10 +602,10 @@ describe('MCP Command', () => {
       // Setup command execution
       let getStatusHandler: GetStatusToolHandler | null = null;
 
-      // Capture the get-status handler
+      // Capture the get_status handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'get-status') {
+          if (name === 'get_status') {
             getStatusHandler = handler as GetStatusToolHandler;
           }
           return mockMcpServer;
@@ -624,7 +624,7 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the get-status handler
+      // Execute the get_status handler
       const result = await getStatusHandler!({});
 
       // Check the result
@@ -635,8 +635,8 @@ describe('MCP Command', () => {
     });
   });
 
-  describe('tool: today', () => {
-    it('should call generateTodaySummary and return markdown results', async () => {
+  describe('tool: my_messages', () => {
+    it('should call generateMyMessagesSummary and return markdown results', async () => {
       // Setup mocks for today
       const mockTodayResult = {
         markdown: '# Today Summary\n\nTest content',
@@ -653,16 +653,16 @@ describe('MCP Command', () => {
         },
       };
 
-      vi.mocked(generateTodaySummary).mockResolvedValueOnce(mockTodayResult);
+      vi.mocked(generateMyMessagesSummary).mockResolvedValueOnce(mockTodayResult);
 
       // Setup command execution
-      let todayHandler: TodayToolHandler | null = null;
+      let todayHandler: MyMessagesToolHandler | null = null;
 
       // Capture the today handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'today') {
-            todayHandler = handler as TodayToolHandler;
+          if (name === 'my_messages') {
+            todayHandler = handler as MyMessagesToolHandler;
           }
           return mockMcpServer;
         },
@@ -692,7 +692,7 @@ describe('MCP Command', () => {
       });
 
       // Check today service was called with correct parameters
-      expect(generateTodaySummary).toHaveBeenCalledWith(
+      expect(generateMyMessagesSummary).toHaveBeenCalledWith(
         {
           username: 'testuser',
           since: '2023-01-01',
@@ -725,16 +725,16 @@ describe('MCP Command', () => {
         },
       };
 
-      vi.mocked(generateTodaySummary).mockResolvedValueOnce(mockTodayResult);
+      vi.mocked(generateMyMessagesSummary).mockResolvedValueOnce(mockTodayResult);
 
       // Setup command execution
-      let todayHandler: TodayToolHandler | null = null;
+      let todayHandler: MyMessagesToolHandler | null = null;
 
       // Capture the today handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'today') {
-            todayHandler = handler as TodayToolHandler;
+          if (name === 'my_messages') {
+            todayHandler = handler as MyMessagesToolHandler;
           }
           return mockMcpServer;
         },
@@ -777,16 +777,16 @@ describe('MCP Command', () => {
     it('should handle errors in today tool', async () => {
       // Setup error condition
       const mockError = new Error('Failed to generate today summary');
-      vi.mocked(generateTodaySummary).mockRejectedValueOnce(mockError);
+      vi.mocked(generateMyMessagesSummary).mockRejectedValueOnce(mockError);
 
       // Setup command execution
-      let todayHandler: TodayToolHandler | null = null;
+      let todayHandler: MyMessagesToolHandler | null = null;
 
       // Capture the today handler
       vi.mocked(mockMcpServer.tool).mockImplementation(
         (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'today') {
-            todayHandler = handler as TodayToolHandler;
+          if (name === 'my_messages') {
+            todayHandler = handler as MyMessagesToolHandler;
           }
           return mockMcpServer;
         },

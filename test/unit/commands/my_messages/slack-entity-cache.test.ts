@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSlackEntityCache } from '../../../../src/commands/today/slack-entity-cache';
+import { getSlackEntityCache } from '../../../../src/commands/my_messages/slack-entity-cache';
 import { CommandContext } from '../../../../src/context';
-import { SlackCache } from '../../../../src/commands/today/types';
+import { SlackCache } from '../../../../src/commands/my_messages/types';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 

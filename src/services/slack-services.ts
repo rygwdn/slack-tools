@@ -1,7 +1,7 @@
 import { CommandContext } from '../context';
 import { getSlackClient } from '../slack-api';
-import { searchSlackMessages } from '../commands/today/slack-service';
-import { getSlackEntityCache } from '../commands/today/slack-entity-cache';
+import { searchSlackMessages } from '../commands/my_messages/slack-service';
+import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
 import { saveSlackCache } from '../cache';
 
 /**

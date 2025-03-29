@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { searchMessages, searchSlackMessages } from '../../../../src/commands/today/slack-service';
+import {
+  searchMessages,
+  searchSlackMessages,
+} from '../../../../src/commands/my_messages/slack-service';
 import { CommandContext } from '../../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import * as utils from '../../../../src/commands/today/utils';
+import * as utils from '../../../../src/commands/my_messages/utils';
 
 // Mock dependencies
-vi.mock('../../../../src/commands/today/utils', () => ({
+vi.mock('../../../../src/commands/my_messages/utils', () => ({
   formatDateForSearch: vi.fn(),
   getDayAfter: vi.fn(),
   getDayBefore: vi.fn(),

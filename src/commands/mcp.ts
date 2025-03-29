@@ -9,7 +9,7 @@ import {
   formatStatusOutput,
   formatStatusUpdateOutput,
 } from '../services/formatting-service';
-import { generateTodaySummary } from '../services/today-service';
+import { generateMyMessagesSummary } from '../services/my-messages-service';
 
 export function registerMcpCommand(program: Command, context: CommandContext): void {
   program
@@ -28,9 +28,9 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
         version: '1.0.0',
       });
 
-      // Add today tool
+      // Add my_messages tool
       server.tool(
-        'today',
+        'my_messages',
         {
           username: z.string().optional(),
           since: z.string().optional().describe('Start date in YYYY-MM-DD format'),
@@ -40,7 +40,10 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
         },
         async ({ username, since, until, count, format }) => {
           try {
-            const result = await generateTodaySummary({ username, since, until, count }, context);
+            const result = await generateMyMessagesSummary(
+              { username, since, until, count },
+              context,
+            );
 
             if (format === 'json') {
               return {
@@ -134,7 +137,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add tool for status capability
       server.tool(
-        'set-status',
+        'set_status',
         {
           text: z.string(),
           emoji: z.string().optional(),
@@ -178,7 +181,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add tool for getting status
       server.tool(
-        'get-status',
+        'get_status',
         {
           format: z.enum(['markdown', 'json']).optional().default('markdown'),
         },
@@ -227,11 +230,11 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
               text: `You can use the following tools:
               - search: Search Slack with a query string and optional count.
                 Can return formatted markdown (default) or JSON with 'format' parameter.
-              - set-status: Set your Slack status with text, optional emoji, and optional duration.
+              - set_status: Set your Slack status with text, optional emoji, and optional duration.
                 Can return formatted markdown (default) or JSON with 'format' parameter.
-              - get-status: Get your current Slack status.
+              - get_status: Get your current Slack status.
                 Can return formatted markdown (default) or JSON with 'format' parameter.
-              - today: Generate a summary of your Slack activity for a given time period.
+              - my_messages: Generate a summary of your Slack activity for a given time period.
                 Options include username, since (YYYY-MM-DD), until (YYYY-MM-DD), and count.
                 Can return formatted markdown (default) or JSON with 'format' parameter.`,
             },

@@ -1,4 +1,4 @@
-// Interface definitions for the today command
+// Interface definitions for the my_messages command
 
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 
@@ -8,26 +8,38 @@ export interface ThreadMessage extends Match {
   threadMessages?: ThreadMessage[];
 }
 
-export interface CachedUser {
+export interface SlackUserInfo {
   displayName: string;
   isBot: boolean;
 }
 
-export interface CachedChannel {
+export interface SlackChannelInfo {
   displayName: string;
-  type: 'channel' | 'im' | 'mpim';
+  type: 'channel' | 'im' | 'mpim' | 'group';
   members?: string[];
 }
 
 export interface SlackCache {
-  users: Record<string, CachedUser>;
-  channels: Record<string, CachedChannel>;
   lastUpdated: number;
+  users: {
+    [userId: string]: SlackUserInfo;
+  };
+  channels: {
+    [channelId: string]: SlackChannelInfo;
+  };
 }
 
 export interface DateRange {
   startTime: Date;
   endTime: Date;
+}
+
+export interface MessageContext {
+  channelId: string;
+  ts: string;
+  text?: string;
+  isThread?: boolean;
+  threadTs?: string;
 }
 
 export interface SearchResult {
@@ -36,7 +48,7 @@ export interface SearchResult {
   mentionMessages: Match[];
 }
 
-export interface TodayCommandOptions {
+export interface MyMessagesCommandOptions {
   username?: string;
   since?: string;
   until?: string;

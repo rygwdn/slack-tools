@@ -8,14 +8,14 @@ import {
 } from '../../../src/services/slack-services';
 import { CommandContext } from '../../../src/context';
 import * as slackApi from '../../../src/slack-api';
-import * as slackService from '../../../src/commands/today/slack-service';
-import * as slackEntityCache from '../../../src/commands/today/slack-entity-cache';
+import * as slackService from '../../../src/commands/my_messages/slack-service';
+import * as slackEntityCache from '../../../src/commands/my_messages/slack-entity-cache';
 import * as cache from '../../../src/cache';
 
 // Mock all dependencies
 vi.mock('../../../src/slack-api');
-vi.mock('../../../src/commands/today/slack-service');
-vi.mock('../../../src/commands/today/slack-entity-cache');
+vi.mock('../../../src/commands/my_messages/slack-service');
+vi.mock('../../../src/commands/my_messages/slack-entity-cache');
 vi.mock('../../../src/cache');
 
 describe('Slack Services', () => {

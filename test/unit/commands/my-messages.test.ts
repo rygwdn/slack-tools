@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { registerMyMessagesCommand } from '../../../src/commands/today';
+import { registerMyMessagesCommand } from '../../../src/commands/my-messages';
 import { CommandContext } from '../../../src/context';
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import { TodayCommandOptions } from '../../../src/commands/today/types';
-import { generateTodaySummary } from '../../../src/services/today-service';
+import { MyMessagesCommandOptions } from '../../../src/commands/my_messages/types';
+import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
 
 // Mock dependencies
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
-vi.mock('../../../src/services/today-service', () => ({
-  generateTodaySummary: vi.fn(),
+// Mock the my messages service
+vi.mock('../../../src/services/my-messages-service', () => ({
+  generateMyMessagesSummary: vi.fn(),
 }));
 
 describe('My Messages Command', () => {
@@ -51,7 +52,7 @@ describe('My Messages Command', () => {
       },
     };
 
-    vi.mocked(generateTodaySummary).mockResolvedValue(mockTodayResult);
+    vi.mocked(generateMyMessagesSummary).mockResolvedValue(mockTodayResult);
 
     // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -97,7 +98,7 @@ describe('My Messages Command', () => {
 
     it('should generate a daily summary when executed', async () => {
       // Setup command execution
-      let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
+      let actionCallback: ((options: MyMessagesCommandOptions) => Promise<void>) | null = null;
 
       vi.spyOn(program, 'command').mockReturnValue({
         description: vi.fn().mockReturnThis(),
@@ -114,7 +115,7 @@ describe('My Messages Command', () => {
       await actionCallback!({ count: '50' });
 
       // Check if today service was called with correct parameters
-      expect(generateTodaySummary).toHaveBeenCalledWith(
+      expect(generateMyMessagesSummary).toHaveBeenCalledWith(
         {
           username: undefined,
           since: undefined,
@@ -130,7 +131,7 @@ describe('My Messages Command', () => {
 
     it('should use provided options when specified', async () => {
       // Setup command execution
-      let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
+      let actionCallback: ((options: MyMessagesCommandOptions) => Promise<void>) | null = null;
 
       vi.spyOn(program, 'command').mockReturnValue({
         description: vi.fn().mockReturnThis(),
@@ -153,7 +154,7 @@ describe('My Messages Command', () => {
       await actionCallback!(customOptions);
 
       // Check if today service was called with correct parameters
-      expect(generateTodaySummary).toHaveBeenCalledWith(
+      expect(generateMyMessagesSummary).toHaveBeenCalledWith(
         {
           username: 'customuser',
           since: '2023-01-01',
@@ -166,7 +167,7 @@ describe('My Messages Command', () => {
 
     it('should write to file when output option is provided', async () => {
       // Setup command execution
-      let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
+      let actionCallback: ((options: MyMessagesCommandOptions) => Promise<void>) | null = null;
 
       vi.spyOn(program, 'command').mockReturnValue({
         description: vi.fn().mockReturnThis(),
@@ -189,10 +190,10 @@ describe('My Messages Command', () => {
     it('should handle errors properly', async () => {
       // Setup error condition
       const testError = new Error('Test error');
-      vi.mocked(generateTodaySummary).mockRejectedValueOnce(testError);
+      vi.mocked(generateMyMessagesSummary).mockRejectedValueOnce(testError);
 
       // Setup command execution
-      let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
+      let actionCallback: ((options: MyMessagesCommandOptions) => Promise<void>) | null = null;
 
       vi.spyOn(program, 'command').mockReturnValue({
         description: vi.fn().mockReturnThis(),

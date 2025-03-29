@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  getFriendlyChannelName,
   formatSlackText,
+  getFriendlyChannelName,
   formatTime,
   isValidThreadMessage,
   extractThreadTsFromPermalink,
   generateMarkdown,
-} from '../../../../src/commands/today/formatters';
+} from '../../../../src/commands/my_messages/formatters';
 import { CommandContext } from '../../../../src/context';
-import { SlackCache, ThreadMessage } from '../../../../src/commands/today/types';
+import { SlackCache, ThreadMessage } from '../../../../src/commands/my_messages/types';
 
-describe('Today Formatters', () => {
+describe('My Messages Formatters', () => {
   let context: CommandContext;
   let mockCache: SlackCache;
 
