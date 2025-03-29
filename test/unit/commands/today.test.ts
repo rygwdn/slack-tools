@@ -2,56 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerTodayCommand } from '../../../src/commands/today';
 import { CommandContext } from '../../../src/context';
 import { Command } from 'commander';
-import { WebClient } from '@slack/web-api';
 import * as fs from 'fs/promises';
-import { TodayCommandOptions, DateRange } from '../../../src/commands/today/types';
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
+import { TodayCommandOptions } from '../../../src/commands/today/types';
+import { generateTodaySummary } from '../../../src/services/today-service';
 
 // Mock dependencies
-vi.mock('../../../src/slack-api', () => ({
-  getSlackClient: vi.fn(),
-}));
-
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
-vi.mock('../../../src/commands/today/utils', () => ({
-  getDateRange: vi.fn(),
-  formatDateForSearch: vi.fn(),
-  getDayAfter: vi.fn(),
-  getDayBefore: vi.fn(),
+vi.mock('../../../src/services/today-service', () => ({
+  generateTodaySummary: vi.fn(),
 }));
-
-vi.mock('../../../src/commands/today/slack-service', () => ({
-  searchMessages: vi.fn(),
-}));
-
-vi.mock('../../../src/commands/today/slack-entity-cache', () => ({
-  getSlackEntityCache: vi.fn(),
-}));
-
-vi.mock('../../../src/commands/today/formatters', () => ({
-  generateMarkdown: vi.fn(),
-}));
-
-vi.mock('../../../src/cache', () => ({
-  saveSlackCache: vi.fn(),
-}));
-
-// Import the mocked functions
-import { getSlackClient } from '../../../src/slack-api';
-import { getDateRange } from '../../../src/commands/today/utils';
-import { searchMessages } from '../../../src/commands/today/slack-service';
-import { getSlackEntityCache } from '../../../src/commands/today/slack-entity-cache';
-import { generateMarkdown } from '../../../src/commands/today/formatters';
-import { saveSlackCache } from '../../../src/cache';
 
 describe('Today Command', () => {
   let context: CommandContext;
   let program: Command;
-  let mockClient: any;
-  let mockDateRange: DateRange;
+  let mockTodayResult: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,23 +32,27 @@ describe('Today Command', () => {
     // Initialize program
     program = new Command();
 
-    // Setup mock client
-    mockClient = {
-      auth: {
-        test: vi.fn().mockResolvedValue({
-          user_id: 'U123',
-          user: 'testuser',
-        }),
+    // Setup mock today summary results
+    mockTodayResult = {
+      markdown: '# Daily Summary\n\nTest markdown',
+      allMessages: [
+        { ts: '1234', text: 'Test message' },
+        { ts: '5678', text: 'Thread reply' },
+        { ts: '9012', text: 'Message with mention' },
+      ],
+      userId: 'U123',
+      dateRange: {
+        startTime: new Date('2023-01-01'),
+        endTime: new Date('2023-01-01'),
+      },
+      cache: {
+        users: { U123: { displayName: 'Test User', isBot: false } },
+        channels: { C123: { displayName: 'general', type: 'channel' } },
+        lastUpdated: Date.now(),
       },
     };
-    vi.mocked(getSlackClient).mockResolvedValue(mockClient as unknown as WebClient);
 
-    // Setup mock date range
-    mockDateRange = {
-      startTime: new Date('2023-01-01'),
-      endTime: new Date('2023-01-01'),
-    };
-    vi.mocked(getDateRange).mockResolvedValue(mockDateRange);
+    vi.mocked(generateTodaySummary).mockResolvedValue(mockTodayResult);
 
     // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -124,30 +95,6 @@ describe('Today Command', () => {
     });
 
     it('should generate a daily summary when executed', async () => {
-      // Mock search results
-      const messages: Match[] = [{ ts: '1234', text: 'Test message' }];
-      const threadMessages: Match[] = [{ ts: '5678', text: 'Thread reply' }];
-      const mentionMessages: Match[] = [{ ts: '9012', text: 'Message with mention' }];
-
-      vi.mocked(searchMessages).mockResolvedValueOnce({
-        messages,
-        threadMessages,
-        mentionMessages,
-      });
-
-      // Mock cache
-      const mockCache = {
-        users: { U123: { displayName: 'Test User', isBot: false } },
-        channels: { C123: { displayName: 'general', type: 'channel' as const } },
-        lastUpdated: 0,
-      };
-
-      vi.mocked(getSlackEntityCache).mockResolvedValueOnce(mockCache);
-
-      // Mock markdown generation
-      const mockMarkdown = '# Daily Summary\n\nTest markdown';
-      vi.mocked(generateMarkdown).mockReturnValueOnce(mockMarkdown);
-
       // Setup command execution
       let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
 
@@ -165,53 +112,22 @@ describe('Today Command', () => {
       expect(actionCallback).not.toBeNull();
       await actionCallback!({ count: '50' });
 
-      // Check if correct auth test was requested
-      expect(mockClient.auth.test).toHaveBeenCalled();
-
-      // Check if date range was fetched
-      expect(getDateRange).toHaveBeenCalled();
-
-      // Check if messages were searched
-      expect(searchMessages).toHaveBeenCalledWith(
-        mockClient,
-        'testuser', // Default username from auth test
-        mockDateRange,
-        50, // Parsed count from options
+      // Check if today service was called with correct parameters
+      expect(generateTodaySummary).toHaveBeenCalledWith(
+        {
+          username: undefined,
+          since: undefined,
+          until: undefined,
+          count: 50,
+        },
         context,
       );
 
-      // Check if entity cache was fetched
-      const allMessages = [...messages, ...threadMessages, ...mentionMessages];
-      expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, allMessages, context);
-
-      // Check if markdown was generated
-      expect(generateMarkdown).toHaveBeenCalledWith(allMessages, mockCache, 'U123', context);
-
       // Check if results were displayed
-      expect(console.log).toHaveBeenCalledWith(mockMarkdown);
-
-      // Check if cache was saved
-      expect(saveSlackCache).toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith(mockTodayResult.markdown);
     });
 
-    it('should use provided username instead of authenticated user', async () => {
-      // Mock minimal search result
-      vi.mocked(searchMessages).mockResolvedValueOnce({
-        messages: [],
-        threadMessages: [],
-        mentionMessages: [],
-      });
-
-      // Mock minimal cache
-      vi.mocked(getSlackEntityCache).mockResolvedValueOnce({
-        users: {},
-        channels: {},
-        lastUpdated: 0,
-      });
-
-      // Mock markdown generation
-      vi.mocked(generateMarkdown).mockReturnValueOnce('# Daily Summary');
-
+    it('should use provided options when specified', async () => {
       // Setup command execution
       let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
 
@@ -225,40 +141,29 @@ describe('Today Command', () => {
 
       registerTodayCommand(program, context);
 
-      // Execute the command action with custom username
-      const customUsername = 'customuser';
-      await actionCallback!({ count: '50', username: customUsername });
+      // Execute the command action with custom options
+      const customOptions = {
+        username: 'customuser',
+        since: '2023-01-01',
+        until: '2023-01-02',
+        count: '100',
+      };
 
-      // Check if searched with custom username
-      expect(searchMessages).toHaveBeenCalledWith(
-        expect.anything(),
-        customUsername,
-        expect.anything(),
-        expect.anything(),
-        expect.anything(),
+      await actionCallback!(customOptions);
+
+      // Check if today service was called with correct parameters
+      expect(generateTodaySummary).toHaveBeenCalledWith(
+        {
+          username: 'customuser',
+          since: '2023-01-01',
+          until: '2023-01-02',
+          count: 100,
+        },
+        context,
       );
     });
 
-    it('should write results to file when output option is provided', async () => {
-      // Mock minimal search result
-      vi.mocked(searchMessages).mockResolvedValueOnce({
-        messages: [],
-        threadMessages: [],
-        mentionMessages: [],
-      });
-
-      // Mock minimal cache
-      vi.mocked(getSlackEntityCache).mockResolvedValueOnce({
-        users: {},
-        channels: {},
-        lastUpdated: 0,
-      });
-
-      // Mock markdown generation
-      const mockMarkdown = '# Daily Summary';
-      vi.mocked(generateMarkdown).mockReturnValueOnce(mockMarkdown);
-      vi.mocked(fs.writeFile).mockResolvedValueOnce(undefined);
-
+    it('should write to file when output option is provided', async () => {
       // Setup command execution
       let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
 
@@ -272,19 +177,18 @@ describe('Today Command', () => {
 
       registerTodayCommand(program, context);
 
-      // Execute the command action with output option
-      const outputFile = 'daily-summary.md';
-      await actionCallback!({ count: '50', output: outputFile });
+      // Execute the command action with output file
+      await actionCallback!({ count: '50', output: 'output.md' });
 
       // Check if file was written
-      expect(fs.writeFile).toHaveBeenCalledWith(outputFile, mockMarkdown);
-      expect(console.log).toHaveBeenCalledWith(`Report written to: ${outputFile}`);
+      expect(fs.writeFile).toHaveBeenCalledWith('output.md', mockTodayResult.markdown);
+      expect(console.log).toHaveBeenCalledWith('Report written to: output.md');
     });
 
-    it('should handle errors gracefully', async () => {
-      // Mock error
-      const searchError = new Error('Search failed');
-      vi.mocked(searchMessages).mockRejectedValueOnce(searchError);
+    it('should handle errors properly', async () => {
+      // Setup error condition
+      const testError = new Error('Test error');
+      vi.mocked(generateTodaySummary).mockRejectedValueOnce(testError);
 
       // Setup command execution
       let actionCallback: ((options: TodayCommandOptions) => Promise<void>) | null = null;
@@ -302,8 +206,8 @@ describe('Today Command', () => {
       // Execute the command action
       await actionCallback!({ count: '50' });
 
-      // Check if error was handled
-      expect(console.error).toHaveBeenCalledWith('Error:', searchError);
+      // Check error handling
+      expect(console.error).toHaveBeenCalled();
       expect(process.exit).toHaveBeenCalledWith(1);
     });
   });

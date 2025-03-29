@@ -9,7 +9,7 @@ import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse
 
 // Mock the formatters from today command
 vi.mock('../../../src/commands/today/formatters', () => ({
-  getFriendlyChannelName: vi.fn((channelId, cache) => {
+  getFriendlyChannelName: vi.fn((channelId, _cache) => {
     if (channelId === 'C123') return '#general';
     if (channelId === 'C456') return '#random';
     if (channelId === 'D123') return 'DM with user1';

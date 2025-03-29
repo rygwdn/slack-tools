@@ -9,16 +9,74 @@ import {
   formatStatusOutput,
   formatStatusUpdateOutput,
 } from '../services/formatting-service';
+import { generateTodaySummary } from '../services/today-service';
 
 export function registerMcpCommand(program: Command, context: CommandContext): void {
   program
     .command('mcp')
     .description('Start an MCP server with search and status capabilities')
     .action(async () => {
+      // Ensure workspace is set on launch
+      if (!context.hasWorkspace) {
+        console.error('Error: Workspace must be specified with --workspace or --last-workspace');
+        console.error('Example: slack-tools mcp --workspace your-workspace');
+        process.exit(1);
+      }
+
       const server = new McpServer({
         name: 'slack-tools-server',
         version: '1.0.0',
       });
+
+      // Add today tool
+      server.tool(
+        'today',
+        {
+          username: z.string().optional(),
+          since: z.string().optional().describe('Start date in YYYY-MM-DD format'),
+          until: z.string().optional().describe('End date in YYYY-MM-DD format'),
+          count: z.number().optional().default(200),
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ username, since, until, count, format }) => {
+          try {
+            const result = await generateTodaySummary({ username, since, until, count }, context);
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        messages: result.allMessages,
+                        userId: result.userId,
+                        dateRange: result.dateRange,
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+              };
+            } else {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: result.markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
 
       // Add tool for search capability
       server.tool(
@@ -172,13 +230,15 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
               - set-status: Set your Slack status with text, optional emoji, and optional duration.
                 Can return formatted markdown (default) or JSON with 'format' parameter.
               - get-status: Get your current Slack status.
+                Can return formatted markdown (default) or JSON with 'format' parameter.
+              - today: Generate a summary of your Slack activity for a given time period.
+                Options include username, since (YYYY-MM-DD), until (YYYY-MM-DD), and count.
                 Can return formatted markdown (default) or JSON with 'format' parameter.`,
             },
           },
         ],
       }));
 
-      console.log('Starting MCP server...');
       const transport = new StdioServerTransport();
       await server.connect(transport);
     });

@@ -18,6 +18,8 @@ import {
   formatStatusUpdateOutput,
 } from '../../../src/services/formatting-service';
 
+import { generateTodaySummary } from '../../../src/services/today-service';
+
 // Define tool handler types for better type safety
 type SearchToolHandler = (params: {
   query: string;
@@ -31,7 +33,18 @@ type SetStatusToolHandler = (params: {
   format?: string;
 }) => Promise<any>;
 type GetStatusToolHandler = (params: { format?: string }) => Promise<any>;
-type ToolHandler = SearchToolHandler | SetStatusToolHandler | GetStatusToolHandler;
+type TodayToolHandler = (params: {
+  username?: string;
+  since?: string;
+  until?: string;
+  count?: number;
+  format?: string;
+}) => Promise<any>;
+type ToolHandler =
+  | SearchToolHandler
+  | SetStatusToolHandler
+  | GetStatusToolHandler
+  | TodayToolHandler;
 
 // Mock MCP SDK
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
@@ -65,6 +78,10 @@ vi.mock('../../../src/services/formatting-service', () => ({
   generateSearchResultsMarkdown: vi.fn(),
   formatStatusOutput: vi.fn(),
   formatStatusUpdateOutput: vi.fn(),
+}));
+
+vi.mock('../../../src/services/today-service', () => ({
+  generateTodaySummary: vi.fn(),
 }));
 
 describe('MCP Command', () => {
@@ -153,7 +170,12 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Check if all tools were registered
-      expect(mockMcpServer.tool).toHaveBeenCalledTimes(3);
+      expect(mockMcpServer.tool).toHaveBeenCalledTimes(4);
+      expect(mockMcpServer.tool).toHaveBeenCalledWith(
+        'today',
+        expect.anything(),
+        expect.any(Function),
+      );
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'search',
         expect.anything(),
@@ -169,6 +191,33 @@ describe('MCP Command', () => {
         expect.anything(),
         expect.any(Function),
       );
+    });
+
+    it('should verify workspace is set on launch', async () => {
+      // Setup command execution with no workspace
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      // Set workspace to undefined
+      context.workspace = undefined;
+
+      // Mock process.exit to prevent actual exit
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+      registerMcpCommand(program, context);
+
+      // Execute the command action and expect it to exit
+      await actionCallback!();
+
+      // Should show error and exit
+      expect(console.error).toHaveBeenCalled();
+      expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should register the help prompt with the server', async () => {
@@ -583,6 +632,188 @@ describe('MCP Command', () => {
         content: [{ type: 'text', text: 'Error: Error: Status retrieval failed' }],
         isError: true,
       });
+    });
+  });
+
+  describe('tool: today', () => {
+    it('should call generateTodaySummary and return markdown results', async () => {
+      // Setup mocks for today
+      const mockTodayResult = {
+        markdown: '# Today Summary\n\nTest content',
+        allMessages: [{ ts: '1', text: 'Test message' }],
+        userId: 'U123',
+        dateRange: {
+          startTime: new Date('2023-01-01'),
+          endTime: new Date('2023-01-01'),
+        },
+        cache: {
+          users: {},
+          channels: {},
+          lastUpdated: Date.now(),
+        },
+      };
+
+      vi.mocked(generateTodaySummary).mockResolvedValueOnce(mockTodayResult);
+
+      // Setup command execution
+      let todayHandler: TodayToolHandler | null = null;
+
+      // Capture the today handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'today') {
+            todayHandler = handler as TodayToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+
+      // Execute the command action to register handlers
+      await actionCallback!();
+
+      // Execute the today handler
+      const result = await todayHandler!({
+        username: 'testuser',
+        since: '2023-01-01',
+        until: '2023-01-01',
+        count: 100,
+        format: 'markdown',
+      });
+
+      // Check today service was called with correct parameters
+      expect(generateTodaySummary).toHaveBeenCalledWith(
+        {
+          username: 'testuser',
+          since: '2023-01-01',
+          until: '2023-01-01',
+          count: 100,
+        },
+        context,
+      );
+
+      // Check the result format for markdown
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toBe(mockTodayResult.markdown);
+    });
+
+    it('should handle json format for today tool', async () => {
+      // Setup mocks for today
+      const mockTodayResult = {
+        markdown: '# Today Summary\n\nTest content',
+        allMessages: [{ ts: '1', text: 'Test message' }],
+        userId: 'U123',
+        dateRange: {
+          startTime: new Date('2023-01-01'),
+          endTime: new Date('2023-01-01'),
+        },
+        cache: {
+          users: {},
+          channels: {},
+          lastUpdated: Date.now(),
+        },
+      };
+
+      vi.mocked(generateTodaySummary).mockResolvedValueOnce(mockTodayResult);
+
+      // Setup command execution
+      let todayHandler: TodayToolHandler | null = null;
+
+      // Capture the today handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'today') {
+            todayHandler = handler as TodayToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+
+      // Execute the command action to register handlers
+      await actionCallback!();
+
+      // Execute the today handler with JSON format
+      const result = await todayHandler!({
+        username: 'testuser',
+        since: '2023-01-01',
+        until: '2023-01-01',
+        count: 100,
+        format: 'json',
+      });
+
+      // Check the result format for JSON
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+
+      // The text should be a JSON string
+      const jsonResult = JSON.parse(result.content[0].text);
+      expect(jsonResult).toHaveProperty('messages');
+      expect(jsonResult).toHaveProperty('userId', 'U123');
+      expect(jsonResult).toHaveProperty('dateRange');
+    });
+
+    it('should handle errors in today tool', async () => {
+      // Setup error condition
+      const mockError = new Error('Failed to generate today summary');
+      vi.mocked(generateTodaySummary).mockRejectedValueOnce(mockError);
+
+      // Setup command execution
+      let todayHandler: TodayToolHandler | null = null;
+
+      // Capture the today handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'today') {
+            todayHandler = handler as TodayToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+
+      // Execute the command action to register handlers
+      await actionCallback!();
+
+      // Execute the today handler and expect error handling
+      const result = await todayHandler!({ count: 100 });
+
+      // Check error response format
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('Error:');
+      expect(result.isError).toBe(true);
     });
   });
 });

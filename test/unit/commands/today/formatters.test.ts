@@ -9,7 +9,6 @@ import {
 } from '../../../../src/commands/today/formatters';
 import { CommandContext } from '../../../../src/context';
 import { SlackCache, ThreadMessage } from '../../../../src/commands/today/types';
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 
 describe('Today Formatters', () => {
   let context: CommandContext;
