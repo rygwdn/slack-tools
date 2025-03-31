@@ -1,7 +1,7 @@
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../../context';
-import { formatDateForSearch, getDayAfter, getDayBefore } from './utils';
+import { formatDateForSearch, getDayAfter, getDayBefore } from '../../utils/date-utils';
 import { SearchResult } from './types';
 
 /**

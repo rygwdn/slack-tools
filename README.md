@@ -49,7 +49,7 @@ The MCP server provides the following tools:
 - **slack_get_status** - Retrieve your current Slack status
 - **slack_my_messages** - Generate summaries of your Slack activity
 - **slack_create_reminder** - Create Slack reminders with custom text and timing
-- **slack_list_reminders** - List all your pending and completed reminders
+- **slack_list_reminders** - List and filter Slack reminders by status, due dates, and completion dates
 - **slack_user_activity** - Get activity statistics for a user across channels
 - **slack_get_thread_replies** - Retrieve replies in a message thread
 - **system_datetime** - Get the current date and time in both system timezone and UTC
@@ -129,14 +129,33 @@ slack-tools -w Build reminder create "Check on project status" --time "in 2 hour
 
 #### Listing Reminders
 
-```bash
-slack-tools reminder list
+```
+slack-tools reminder list [options]
 ```
 
-Example:
+Options:
+- `--status <status>` - Filter by status: pending (default), completed, all
+- `--due-after <date>` - Filter reminders due after this date/time
+- `--due-before <date>` - Filter reminders due before this date/time
+- `--completed-after <date>` - Filter reminders completed after this date/time
+- `--completed-before <date>` - Filter reminders completed before this date/time
+
+Examples:
 ```bash
-# List all your reminders
+# List all your pending reminders (default)
 slack-tools -w Build reminder list
+
+# List completed reminders
+slack-tools -w Build reminder list --status completed
+
+# List all reminders (both pending and completed)
+slack-tools -w Build reminder list --status all
+
+# List pending reminders due before a specific date
+slack-tools -w Build reminder list --due-before "next friday"
+
+# List completed reminders that were completed after a specific date
+slack-tools -w Build reminder list --status completed --completed-after "yesterday"
 ```
 
 ### Thread Command

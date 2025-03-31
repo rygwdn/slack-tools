@@ -18,6 +18,7 @@ import {
   formatStatusUpdateOutput,
 } from '../services/formatting-service';
 import { generateMyMessagesSummary } from '../services/my-messages-service';
+import { parseDateToTimestamp } from '../utils/date-utils';
 
 export function registerMcpCommand(program: Command, context: CommandContext): void {
   program
@@ -217,44 +218,88 @@ ${user ? `- **User:** ${user}` : ''}
       );
 
       // Add tool for listing reminders
-      server.tool('slack_list_reminders', {}, async () => {
-        try {
-          const result = await listSlackReminders(context);
+      server.tool(
+        'slack_list_reminders',
+        {
+          status: z
+            .enum(['pending', 'completed', 'all'])
+            .optional()
+            .default('pending')
+            .describe('Filter by status: pending (default), completed, all'),
+          due_after: z
+            .string()
+            .optional()
+            .describe('Show reminders due after this date/time (e.g., "tomorrow", "2024-08-01")'),
+          due_before: z.string().optional().describe('Show reminders due before this date/time'),
+          completed_after: z
+            .string()
+            .optional()
+            .describe('Show reminders completed after this date/time'),
+          completed_before: z
+            .string()
+            .optional()
+            .describe('Show reminders completed before this date/time'),
+        },
+        async ({ status, due_after, due_before, completed_after, completed_before }) => {
+          try {
+            // Parse date strings to timestamps
+            const dueAfterTs = parseDateToTimestamp(due_after);
+            const dueBeforeTs = parseDateToTimestamp(due_before);
+            const completedAfterTs = parseDateToTimestamp(completed_after);
+            const completedBeforeTs = parseDateToTimestamp(completed_before);
 
-          // Format as markdown
-          let markdown = '## Reminders\n\n';
-
-          if (result.reminders.length === 0) {
-            markdown += 'No reminders found.';
-          } else {
-            result.reminders.forEach((reminder: any, index: number) => {
-              const time = new Date(parseInt(reminder.time) * 1000).toLocaleString();
-              markdown += `### ${index + 1}. ${reminder.text}\n`;
-              markdown += `- **Time:** ${time}\n`;
-              if (reminder.complete) {
-                markdown += `- **Status:** Completed\n`;
-              } else {
-                markdown += `- **Status:** Pending\n`;
-              }
-              markdown += '\n';
+            // Call service with filter options
+            const result = await listSlackReminders(context, {
+              statusFilter: status,
+              dueAfterTs,
+              dueBeforeTs,
+              completedAfterTs,
+              completedBeforeTs,
             });
-          }
 
-          return {
-            content: [
-              {
-                type: 'text',
-                text: markdown,
-              },
-            ],
-          };
-        } catch (error) {
-          return {
-            content: [{ type: 'text', text: `Error: ${error}` }],
-            isError: true,
-          };
-        }
-      });
+            // Format as markdown
+            let markdown = '## Reminders\n\n';
+
+            if (result.reminders.length === 0) {
+              markdown += 'No reminders found matching the criteria.\n';
+            } else {
+              result.reminders.forEach((reminder, index) => {
+                const isComplete = (reminder.complete_ts || 0) > 0;
+                const dueTimeStr = reminder.time
+                  ? new Date(parseInt(String(reminder.time)) * 1000).toLocaleString()
+                  : 'N/A (Recurring?)';
+
+                const completedTimeStr =
+                  isComplete && reminder.complete_ts
+                    ? new Date(parseInt(String(reminder.complete_ts)) * 1000).toLocaleString()
+                    : '';
+
+                markdown += `### ${index + 1}. ${reminder.text}\n`;
+                markdown += `- **Due:** ${dueTimeStr}\n`;
+                markdown += `- **Status:** ${isComplete ? '✅ Complete' : '⏳ Pending'}`;
+                if (completedTimeStr) {
+                  markdown += ` (completed on ${completedTimeStr})`;
+                }
+                markdown += '\n\n';
+              });
+            }
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: markdown,
+                },
+              ],
+            };
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
 
       // Add tool for getting thread replies
       server.tool(
@@ -276,14 +321,16 @@ ${user ? `- **User:** ${user}` : ''}
             } else {
               markdown += `Found ${result.replies.length} replies:\n\n`;
 
-              result.replies.forEach((reply: any, index: number) => {
-                const user = result.users[reply.user]?.displayName || reply.user;
-                const time = new Date(parseInt(reply.ts) * 1000).toLocaleString();
+              result.replies.forEach((reply, index) => {
+                const user = result.users[reply.user ?? '']?.displayName || reply.user;
+                const time = reply.ts
+                  ? new Date(parseInt(reply.ts) * 1000).toLocaleString()
+                  : 'Unknown time';
 
                 markdown += `### Reply ${index + 1}\n`;
                 markdown += `- **From:** ${user}\n`;
                 markdown += `- **Time:** ${time}\n`;
-                markdown += `- **Text:** ${reply.text}\n\n`;
+                markdown += `- **Text:** ${reply.text || ''}\n\n`;
               });
             }
 

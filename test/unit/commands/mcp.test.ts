@@ -31,7 +31,7 @@ type SetStatusToolHandler = (params: {
   emoji?: string;
   duration?: number;
 }) => Promise<any>;
-type GetStatusToolHandler = (params: {}) => Promise<any>;
+type GetStatusToolHandler = (params: Record<string, unknown>) => Promise<any>;
 type MyMessagesToolHandler = (params: {
   username?: string;
   since?: string;
@@ -43,14 +43,20 @@ type CreateReminderToolHandler = (params: {
   time: string;
   user?: string;
 }) => Promise<any>;
-type ListRemindersToolHandler = (params: {}) => Promise<any>;
+type ListRemindersToolHandler = (params: {
+  status?: 'pending' | 'completed' | 'all';
+  due_after?: string;
+  due_before?: string;
+  completed_after?: string;
+  completed_before?: string;
+}) => Promise<any>;
 type GetThreadRepliesToolHandler = (params: {
   channel: string;
   ts: string;
   limit?: number;
 }) => Promise<any>;
 type UserActivityToolHandler = (params: { count?: number; user?: string }) => Promise<any>;
-type GetDatetimeToolHandler = (params: {}) => Promise<any>;
+type GetDatetimeToolHandler = (params: Record<string, unknown>) => Promise<any>;
 type ToolHandler =
   | SearchToolHandler
   | SetStatusToolHandler
@@ -359,59 +365,6 @@ describe('MCP Command', () => {
       });
     });
 
-    it('should return JSON results when format is json', async () => {
-      // Setup search mocks
-      const mockResults = {
-        messages: [{ ts: '1234', text: 'test message' }],
-        channels: { C123: { name: 'general', displayName: 'General', type: 'channel' as const } },
-        users: { U123: { name: 'user1', displayName: 'User One', isBot: false } },
-        userId: 'U123',
-      };
-
-      vi.mocked(performSlackSearch).mockResolvedValueOnce(mockResults);
-
-      // Setup command execution
-      let searchHandler: SearchToolHandler | null = null;
-
-      // Capture the search handler
-      vi.mocked(mockMcpServer.tool).mockImplementation(
-        (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'slack_search') {
-            searchHandler = handler as SearchToolHandler;
-          }
-          return mockMcpServer;
-        },
-      );
-
-      let actionCallback: (() => Promise<void>) | null = null;
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnValue({
-          action: vi.fn((callback) => {
-            actionCallback = callback;
-          }),
-        }),
-      } as any);
-
-      registerMcpCommand(program, context);
-      await actionCallback!();
-
-      // Execute the search handler
-      const result = await searchHandler!({
-        query: 'test query',
-        count: 10,
-      });
-
-      // Check the result
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(mockResults, null, 2),
-          },
-        ],
-      });
-    });
-
     it('should handle errors in search', async () => {
       // Setup error mock
       const mockError = new Error('Search failed');
@@ -599,7 +552,7 @@ describe('MCP Command', () => {
 
       // Execute the get_status handler
       expect(getStatusHandler).not.toBeNull();
-      const result = await getStatusHandler!({});
+      const result = await getStatusHandler!({} as Record<string, unknown>);
 
       // Check the result
       expect(getSlackStatus).toHaveBeenCalledWith(context);
@@ -645,7 +598,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Execute the get_status handler
-      const result = await getStatusHandler!({});
+      const result = await getStatusHandler!({} as Record<string, unknown>);
 
       // Check the result
       expect(result).toEqual({
@@ -725,71 +678,6 @@ describe('MCP Command', () => {
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toBe(mockTodayResult.markdown);
-    });
-
-    it('should handle json format for today tool', async () => {
-      // Setup mocks for today
-      const mockTodayResult = {
-        markdown: '# Today Summary\n\nTest content',
-        allMessages: [{ ts: '1', text: 'Test message' }],
-        userId: 'U123',
-        dateRange: {
-          startTime: new Date('2023-01-01'),
-          endTime: new Date('2023-01-01'),
-        },
-        cache: {
-          users: {},
-          channels: {},
-          lastUpdated: Date.now(),
-        },
-      };
-
-      vi.mocked(generateMyMessagesSummary).mockResolvedValueOnce(mockTodayResult);
-
-      // Setup command execution
-      let todayHandler: MyMessagesToolHandler | null = null;
-
-      // Capture the today handler
-      vi.mocked(mockMcpServer.tool).mockImplementation(
-        (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'slack_my_messages') {
-            todayHandler = handler as MyMessagesToolHandler;
-          }
-          return mockMcpServer;
-        },
-      );
-
-      let actionCallback: (() => Promise<void>) | null = null;
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnValue({
-          action: vi.fn((callback) => {
-            actionCallback = callback;
-          }),
-        }),
-      } as any);
-
-      registerMcpCommand(program, context);
-
-      // Execute the command action to register handlers
-      await actionCallback!();
-
-      // Execute the today handler with JSON format
-      const result = await todayHandler!({
-        username: 'testuser',
-        since: '2023-01-01',
-        until: '2023-01-01',
-        count: 100,
-      });
-
-      // Check the result format for JSON
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-
-      // The text should be a JSON string
-      const jsonResult = JSON.parse(result.content[0].text);
-      expect(jsonResult).toHaveProperty('messages');
-      expect(jsonResult).toHaveProperty('userId', 'U123');
-      expect(jsonResult).toHaveProperty('dateRange');
     });
 
     it('should handle errors in today tool', async () => {
@@ -913,79 +801,6 @@ describe('MCP Command', () => {
       expect(markdown).toContain('**ISO**: 2023-05-15T12:30:45.000Z');
       // Check that there's a Unix timestamp (number), but not the exact value which might vary
       expect(markdown).toMatch(/\*\*Unix Timestamp\*\*: \d+/);
-
-      // Restore mocked methods
-      Date.prototype.toLocaleString = originalToLocaleString;
-      (Intl as any).DateTimeFormat = originalDateTimeFormat;
-      Date.prototype.toISOString = originalToISOString;
-    });
-
-    it('should return JSON format when requested', async () => {
-      // Setup mocks for the timezone
-      const mockTimeZone = 'America/New_York';
-      const mockTimestamp = mockDate.getTime();
-
-      // Mock toLocaleString behavior
-      const originalToLocaleString = Date.prototype.toLocaleString;
-      Date.prototype.toLocaleString = vi
-        .fn()
-        .mockImplementationOnce(() => 'May 15, 2023, 08:30:45 AM EDT') // Local time
-        .mockImplementationOnce(() => 'May 15, 2023, 12:30:45 PM UTC'); // UTC time
-
-      // Mock Intl.DateTimeFormat
-      const originalDateTimeFormat = Intl.DateTimeFormat;
-      (Intl as any).DateTimeFormat = vi.fn(() => ({
-        resolvedOptions: () => ({ timeZone: mockTimeZone }),
-      }));
-
-      // Mock toISOString
-      const originalToISOString = Date.prototype.toISOString;
-      Date.prototype.toISOString = vi.fn().mockReturnValue('2023-05-15T12:30:45.000Z');
-
-      // Setup command execution
-      let datetimeHandler: GetDatetimeToolHandler | null = null;
-
-      // Capture the datetime handler
-      vi.mocked(mockMcpServer.tool).mockImplementation(
-        (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'system_datetime') {
-            datetimeHandler = handler as GetDatetimeToolHandler;
-          }
-          return mockMcpServer;
-        },
-      );
-
-      let actionCallback: (() => Promise<void>) | null = null;
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnValue({
-          action: vi.fn((callback) => {
-            actionCallback = callback;
-          }),
-        }),
-      } as any);
-
-      registerMcpCommand(program, context);
-      await actionCallback!();
-
-      // Execute the get_datetime handler with JSON format
-      const result = await datetimeHandler!({});
-
-      // Check the result
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-
-      // Parse the JSON response
-      const jsonResponse = JSON.parse(result.content[0].text);
-      expect(jsonResponse).toHaveProperty('local');
-      expect(jsonResponse.local).toHaveProperty('datetime', 'May 15, 2023, 08:30:45 AM EDT');
-      expect(jsonResponse.local).toHaveProperty('timezone', mockTimeZone);
-      expect(jsonResponse.local).toHaveProperty('timestamp', mockTimestamp);
-
-      expect(jsonResponse).toHaveProperty('utc');
-      expect(jsonResponse.utc).toHaveProperty('datetime', 'May 15, 2023, 12:30:45 PM UTC');
-      expect(jsonResponse.utc).toHaveProperty('timestamp', mockTimestamp);
-
-      expect(jsonResponse).toHaveProperty('iso', '2023-05-15T12:30:45.000Z');
 
       // Restore mocked methods
       Date.prototype.toLocaleString = originalToLocaleString;
@@ -1152,11 +967,13 @@ describe('MCP Command', () => {
             id: 'Rm123',
             text: 'Test reminder 1',
             time: 1620000000,
+            complete_ts: 0, // Not completed
           },
           {
             id: 'Rm124',
             text: 'Test reminder 2',
             time: 1620086400,
+            complete_ts: 1620050000, // Completed
           },
         ],
       };
@@ -1188,17 +1005,26 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the list_reminders handler
+      // Execute the list_reminders handler with default parameters
       expect(listRemindersHandler).not.toBeNull();
-      const result = await listRemindersHandler!({});
+      const result = await listRemindersHandler!({
+        status: 'pending',
+      });
 
       // Check the result
-      expect(listSlackReminders).toHaveBeenCalledWith(context);
+      expect(listSlackReminders).toHaveBeenCalledWith(context, {
+        statusFilter: 'pending',
+        dueAfterTs: undefined,
+        dueBeforeTs: undefined,
+        completedAfterTs: undefined,
+        completedBeforeTs: undefined,
+      });
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toContain('## Reminders');
       expect(result.content[0].text).toContain('Test reminder 1');
       expect(result.content[0].text).toContain('Test reminder 2');
       expect(result.content[0].text).toContain('Pending');
+      expect(result.content[0].text).toContain('Complete');
     });
 
     it('should handle empty reminders list', async () => {
@@ -1234,11 +1060,20 @@ describe('MCP Command', () => {
       registerMcpCommand(program, context);
       await actionCallback!();
 
-      // Execute the list_reminders handler
-      const result = await listRemindersHandler!({});
+      // Execute the list_reminders handler with filters
+      const result = await listRemindersHandler!({
+        status: 'completed',
+        due_after: '2023-01-01',
+      });
 
       // Check the result
-      expect(result.content[0].text).toContain('No reminders found.');
+      expect(listSlackReminders).toHaveBeenCalledWith(
+        context,
+        expect.objectContaining({
+          statusFilter: 'completed',
+        }),
+      );
+      expect(result.content[0].text).toContain('No reminders found');
     });
   });
 

@@ -6,10 +6,10 @@ import {
 import { CommandContext } from '../../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import * as utils from '../../../../src/commands/my_messages/utils';
+import * as dateUtils from '../../../../src/utils/date-utils';
 
 // Mock dependencies
-vi.mock('../../../../src/commands/my_messages/utils', () => ({
+vi.mock('../../../../src/utils/date-utils', () => ({
   formatDateForSearch: vi.fn(),
   getDayAfter: vi.fn(),
   getDayBefore: vi.fn(),
@@ -33,9 +33,13 @@ describe('Slack Service', () => {
     } as unknown as WebClient;
 
     // Mock the date utility functions to return predictable values
-    vi.mocked(utils.getDayBefore).mockImplementation((date) => new Date(date.getTime() - 86400000)); // -1 day
-    vi.mocked(utils.getDayAfter).mockImplementation((date) => new Date(date.getTime() + 86400000)); // +1 day
-    vi.mocked(utils.formatDateForSearch).mockImplementation((date) => {
+    vi.mocked(dateUtils.getDayBefore).mockImplementation(
+      (date) => new Date(date.getTime() - 86400000),
+    ); // -1 day
+    vi.mocked(dateUtils.getDayAfter).mockImplementation(
+      (date) => new Date(date.getTime() + 86400000),
+    ); // +1 day
+    vi.mocked(dateUtils.formatDateForSearch).mockImplementation((date) => {
       return date.toISOString().split('T')[0]; // Simple YYYY-MM-DD format
     });
   });
@@ -170,9 +174,9 @@ describe('Slack Service', () => {
       );
 
       // Verify the API calls
-      expect(utils.getDayBefore).toHaveBeenCalledWith(startTime);
-      expect(utils.getDayAfter).toHaveBeenCalledWith(endTime);
-      expect(utils.formatDateForSearch).toHaveBeenCalledTimes(2);
+      expect(dateUtils.getDayBefore).toHaveBeenCalledWith(startTime);
+      expect(dateUtils.getDayAfter).toHaveBeenCalledWith(endTime);
+      expect(dateUtils.formatDateForSearch).toHaveBeenCalledTimes(2);
 
       // Check that all three searches were executed
       expect(searchSlackMessagesSpy).toHaveBeenCalledTimes(3);

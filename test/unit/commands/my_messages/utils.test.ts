@@ -4,7 +4,7 @@ import {
   getDayAfter,
   getDayBefore,
   getDateRange,
-} from '../../../../src/commands/my_messages/utils';
+} from '../../../../src/utils/date-utils';
 import { CommandContext } from '../../../../src/context';
 
 describe('My Messages Command Utils', () => {

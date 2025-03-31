@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
 import { CommandContext } from '../../../src/context';
 import { WebClient } from '@slack/web-api';
-import { getDateRange } from '../../../src/commands/my_messages/utils';
+import { getDateRange } from '../../../src/utils/date-utils';
 import { searchMessages } from '../../../src/commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../../../src/commands/my_messages/slack-entity-cache';
 import { generateMarkdown } from '../../../src/commands/my_messages/formatters';
@@ -15,7 +15,7 @@ vi.mock('../../../src/slack-api', () => ({
   getSlackClient: vi.fn(),
 }));
 
-vi.mock('../../../src/commands/my_messages/utils', () => ({
+vi.mock('../../../src/utils/date-utils', () => ({
   getDateRange: vi.fn(),
 }));
 

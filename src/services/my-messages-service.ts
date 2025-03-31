@@ -1,6 +1,6 @@
 import { CommandContext } from '../context';
 import { getSlackClient } from '../slack-api';
-import { getDateRange } from '../commands/my_messages/utils';
+import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
 import { generateMarkdown } from '../commands/my_messages/formatters';
