@@ -35,7 +35,32 @@ Global options:
 - `-l, --last-workspace` - Use the last used workspace
 - `-d, --debug` - Enable debug mode for detailed logging
 
-#### Status Command
+### MCP Command
+
+Start a Model Context Protocol (MCP) server for AI assistants to interact with Slack:
+
+```bash
+slack-tools mcp
+```
+
+The MCP server provides the following tools:
+- **slack_search** - Search Slack messages with full formatting
+- **slack_set_status** - Update your Slack status with text, emoji, and expiration
+- **slack_get_status** - Retrieve your current Slack status
+- **slack_my_messages** - Generate summaries of your Slack activity
+- **system_datetime** - Get the current date and time in both system timezone and UTC
+
+This command is especially useful for integrating Slack with AI assistants like Claude that support the MCP protocol.
+
+**Note:** A workspace must be specified when using this command.
+
+Example:
+```bash
+# Start MCP server with a specific workspace
+slack-tools -w Build mcp
+```
+
+### Status Command
 
 Set your Slack status:
 
@@ -64,7 +89,7 @@ slack-tools -w Build status "in a meeting" --duration=60
 slack-tools -w Build status away
 ```
 
-#### Today Command
+### Today Command
 
 Generate a summary of your Slack activity:
 

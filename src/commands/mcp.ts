@@ -30,7 +30,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add my_messages tool
       server.tool(
-        'my_messages',
+        'slack_my_messages',
         {
           username: z.string().optional(),
           since: z.string().optional().describe('Start date in YYYY-MM-DD format'),
@@ -83,7 +83,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add tool for search capability
       server.tool(
-        'search',
+        'slack_search',
         {
           query: z.string(),
           count: z.number().optional().default(100),
@@ -137,7 +137,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add tool for status capability
       server.tool(
-        'set_status',
+        'slack_set_status',
         {
           text: z.string(),
           emoji: z.string().optional(),
@@ -181,7 +181,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Add tool for getting status
       server.tool(
-        'get_status',
+        'slack_get_status',
         {
           format: z.enum(['markdown', 'json']).optional().default('markdown'),
         },
@@ -220,27 +220,94 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
         },
       );
 
-      // Add a simple prompt for demonstration
-      server.prompt('help', {}, () => ({
-        messages: [
-          {
-            role: 'user',
-            content: {
-              type: 'text',
-              text: `You can use the following tools:
-              - search: Search Slack with a query string and optional count.
-                Can return formatted markdown (default) or JSON with 'format' parameter.
-              - set_status: Set your Slack status with text, optional emoji, and optional duration.
-                Can return formatted markdown (default) or JSON with 'format' parameter.
-              - get_status: Get your current Slack status.
-                Can return formatted markdown (default) or JSON with 'format' parameter.
-              - my_messages: Generate a summary of your Slack activity for a given time period.
-                Options include username, since (YYYY-MM-DD), until (YYYY-MM-DD), and count.
-                Can return formatted markdown (default) or JSON with 'format' parameter.`,
-            },
-          },
-        ],
-      }));
+      // Add tool for getting current date and time
+      server.tool(
+        'system_datetime',
+        {
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ format }) => {
+          try {
+            const now = new Date();
+
+            // Format the date for local timezone
+            const localOptions: Intl.DateTimeFormatOptions = {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              timeZoneName: 'short',
+            };
+            const localDatetime = now.toLocaleString(undefined, localOptions);
+
+            // Format for UTC
+            const utcOptions: Intl.DateTimeFormatOptions = {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              timeZone: 'UTC',
+              timeZoneName: 'short',
+            };
+            const utcDatetime = now.toLocaleString(undefined, utcOptions);
+
+            // Get timezone name
+            const timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+            // Create response object
+            const datetimeInfo = {
+              local: {
+                datetime: localDatetime,
+                timezone: timeZoneName,
+                timestamp: now.getTime(),
+              },
+              utc: {
+                datetime: utcDatetime,
+                timestamp: now.getTime(),
+              },
+              iso: now.toISOString(),
+            };
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(datetimeInfo, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Format as markdown
+              const markdown = `
+## Current Date and Time
+- **Local (${timeZoneName})**: ${localDatetime}
+- **UTC**: ${utcDatetime}
+- **ISO**: ${now.toISOString()}
+- **Unix Timestamp**: ${Math.floor(now.getTime() / 1000)}
+              `.trim();
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
 
       const transport = new StdioServerTransport();
       await server.connect(transport);

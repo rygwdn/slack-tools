@@ -53,6 +53,7 @@ describe('Slack Service', () => {
       ];
 
       const mockResponse = {
+        ok: true,
         messages: {
           matches: mockMatches,
         },
@@ -81,6 +82,7 @@ describe('Slack Service', () => {
     it('should handle empty results', async () => {
       // Setup empty response
       const mockResponse = {
+        ok: true,
         messages: {
           matches: [],
         },
@@ -98,6 +100,7 @@ describe('Slack Service', () => {
     it('should handle undefined matches', async () => {
       // Setup a response with no matches property
       const mockResponse = {
+        ok: true,
         messages: {},
       };
 
@@ -137,16 +140,19 @@ describe('Slack Service', () => {
 
       // First call will be from:user
       searchSlackMessagesSpy.mockResolvedValueOnce({
+        ok: true,
         messages: { matches: searchMatches },
       });
 
       // Second call will be is:thread with:user
       searchSlackMessagesSpy.mockResolvedValueOnce({
+        ok: true,
         messages: { matches: threadMatches },
       });
 
       // Third call will be to:user
       searchSlackMessagesSpy.mockResolvedValueOnce({
+        ok: true,
         messages: { matches: mentionMatches },
       });
 
