@@ -25,44 +25,32 @@ import {
 import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
 
 // Define tool handler types for better type safety
-type SearchToolHandler = (params: {
-  query: string;
-  count?: number;
-  format?: string;
-}) => Promise<any>;
+type SearchToolHandler = (params: { query: string; count?: number }) => Promise<any>;
 type SetStatusToolHandler = (params: {
   text: string;
   emoji?: string;
   duration?: number;
-  format?: string;
 }) => Promise<any>;
-type GetStatusToolHandler = (params: { format?: string }) => Promise<any>;
+type GetStatusToolHandler = (params: {}) => Promise<any>;
 type MyMessagesToolHandler = (params: {
   username?: string;
   since?: string;
   until?: string;
   count?: number;
-  format?: string;
 }) => Promise<any>;
 type CreateReminderToolHandler = (params: {
   text: string;
   time: string;
   user?: string;
-  format?: string;
 }) => Promise<any>;
-type ListRemindersToolHandler = (params: { format?: string }) => Promise<any>;
+type ListRemindersToolHandler = (params: {}) => Promise<any>;
 type GetThreadRepliesToolHandler = (params: {
   channel: string;
   ts: string;
   limit?: number;
-  format?: string;
 }) => Promise<any>;
-type UserActivityToolHandler = (params: {
-  count?: number;
-  user?: string;
-  format?: string;
-}) => Promise<any>;
-type GetDatetimeToolHandler = (params: { format?: string }) => Promise<any>;
+type UserActivityToolHandler = (params: { count?: number; user?: string }) => Promise<any>;
+type GetDatetimeToolHandler = (params: {}) => Promise<any>;
 type ToolHandler =
   | SearchToolHandler
   | SetStatusToolHandler
@@ -348,7 +336,6 @@ describe('MCP Command', () => {
       const result = await searchHandler!({
         query: 'test query',
         count: 10,
-        format: 'markdown',
       });
 
       // Check the result
@@ -412,7 +399,6 @@ describe('MCP Command', () => {
       const result = await searchHandler!({
         query: 'test query',
         count: 10,
-        format: 'json',
       });
 
       // Check the result
@@ -514,7 +500,6 @@ describe('MCP Command', () => {
       const result = await statusHandler!({
         text: 'Working',
         emoji: 'computer',
-        format: 'markdown',
       });
 
       // Check the result
@@ -614,9 +599,7 @@ describe('MCP Command', () => {
 
       // Execute the get_status handler
       expect(getStatusHandler).not.toBeNull();
-      const result = await getStatusHandler!({
-        format: 'markdown',
-      });
+      const result = await getStatusHandler!({});
 
       // Check the result
       expect(getSlackStatus).toHaveBeenCalledWith(context);
@@ -725,7 +708,6 @@ describe('MCP Command', () => {
         since: '2023-01-01',
         until: '2023-01-01',
         count: 100,
-        format: 'markdown',
       });
 
       // Check today service was called with correct parameters
@@ -797,7 +779,6 @@ describe('MCP Command', () => {
         since: '2023-01-01',
         until: '2023-01-01',
         count: 100,
-        format: 'json',
       });
 
       // Check the result format for JSON
@@ -917,7 +898,7 @@ describe('MCP Command', () => {
 
       // Execute the get_datetime handler
       expect(datetimeHandler).not.toBeNull();
-      const result = await datetimeHandler!({ format: 'markdown' });
+      const result = await datetimeHandler!({});
 
       // Check the result
       expect(result.content).toHaveLength(1);
@@ -987,7 +968,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Execute the get_datetime handler with JSON format
-      const result = await datetimeHandler!({ format: 'json' });
+      const result = await datetimeHandler!({});
 
       // Check the result
       expect(result.content).toHaveLength(1);
@@ -1103,7 +1084,6 @@ describe('MCP Command', () => {
       const result = await createReminderHandler!({
         text: 'Test reminder',
         time: 'in 30 minutes',
-        format: 'markdown',
       });
 
       // Check the result
@@ -1210,9 +1190,7 @@ describe('MCP Command', () => {
 
       // Execute the list_reminders handler
       expect(listRemindersHandler).not.toBeNull();
-      const result = await listRemindersHandler!({
-        format: 'markdown',
-      });
+      const result = await listRemindersHandler!({});
 
       // Check the result
       expect(listSlackReminders).toHaveBeenCalledWith(context);
@@ -1257,9 +1235,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Execute the list_reminders handler
-      const result = await listRemindersHandler!({
-        format: 'markdown',
-      });
+      const result = await listRemindersHandler!({});
 
       // Check the result
       expect(result.content[0].text).toContain('No reminders found.');
@@ -1327,7 +1303,6 @@ describe('MCP Command', () => {
         channel: 'C123',
         ts: '1620000000',
         limit: 10,
-        format: 'markdown',
       });
 
       // Check the result
@@ -1394,7 +1369,6 @@ describe('MCP Command', () => {
       const result = await userActivityHandler!({
         user: 'U123',
         count: 100,
-        format: 'markdown',
       });
 
       // Check the result

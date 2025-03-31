@@ -44,7 +44,7 @@ slack-tools mcp
 ```
 
 The MCP server provides the following tools:
-- **slack_search** - Search Slack messages with full formatting
+- **slack_search** - Search Slack messages with markdown formatting
 - **slack_set_status** - Update your Slack status with text, emoji, and expiration
 - **slack_get_status** - Retrieve your current Slack status
 - **slack_my_messages** - Generate summaries of your Slack activity
@@ -54,7 +54,7 @@ The MCP server provides the following tools:
 - **slack_get_thread_replies** - Retrieve replies in a message thread
 - **system_datetime** - Get the current date and time in both system timezone and UTC
 
-This command is especially useful for integrating Slack with AI assistants like Claude that support the MCP protocol.
+This command is especially useful for integrating Slack with AI assistants like Claude that support the MCP protocol. All tool responses are formatted in markdown for easy readability.
 
 **Note:** A workspace must be specified when using this command.
 
