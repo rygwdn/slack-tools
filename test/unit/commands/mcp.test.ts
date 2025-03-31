@@ -10,6 +10,10 @@ import {
   performSlackSearch,
   setSlackStatus,
   getSlackStatus,
+  createSlackReminder,
+  listSlackReminders,
+  getSlackThreadReplies,
+  getSlackUserActivity,
 } from '../../../src/services/slack-services';
 
 import {
@@ -40,12 +44,34 @@ type MyMessagesToolHandler = (params: {
   count?: number;
   format?: string;
 }) => Promise<any>;
+type CreateReminderToolHandler = (params: {
+  text: string;
+  time: string;
+  user?: string;
+  format?: string;
+}) => Promise<any>;
+type ListRemindersToolHandler = (params: { format?: string }) => Promise<any>;
+type GetThreadRepliesToolHandler = (params: {
+  channel: string;
+  ts: string;
+  limit?: number;
+  format?: string;
+}) => Promise<any>;
+type UserActivityToolHandler = (params: {
+  count?: number;
+  user?: string;
+  format?: string;
+}) => Promise<any>;
 type GetDatetimeToolHandler = (params: { format?: string }) => Promise<any>;
 type ToolHandler =
   | SearchToolHandler
   | SetStatusToolHandler
   | GetStatusToolHandler
   | MyMessagesToolHandler
+  | CreateReminderToolHandler
+  | ListRemindersToolHandler
+  | GetThreadRepliesToolHandler
+  | UserActivityToolHandler
   | GetDatetimeToolHandler;
 
 // Mock MCP SDK
@@ -74,6 +100,10 @@ vi.mock('../../../src/services/slack-services', () => ({
   performSlackSearch: vi.fn(),
   setSlackStatus: vi.fn(),
   getSlackStatus: vi.fn(),
+  createSlackReminder: vi.fn(),
+  listSlackReminders: vi.fn(),
+  getSlackThreadReplies: vi.fn(),
+  getSlackUserActivity: vi.fn(),
 }));
 
 vi.mock('../../../src/services/formatting-service', () => ({
@@ -176,7 +206,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Check if all tools were registered
-      expect(mockMcpServer.tool).toHaveBeenCalledTimes(5);
+      expect(mockMcpServer.tool).toHaveBeenCalledTimes(9);
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'slack_my_messages',
         expect.anything(),
@@ -194,6 +224,26 @@ describe('MCP Command', () => {
       );
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'slack_get_status',
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(mockMcpServer.tool).toHaveBeenCalledWith(
+        'slack_create_reminder',
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(mockMcpServer.tool).toHaveBeenCalledWith(
+        'slack_list_reminders',
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(mockMcpServer.tool).toHaveBeenCalledWith(
+        'slack_get_thread_replies',
+        expect.anything(),
+        expect.any(Function),
+      );
+      expect(mockMcpServer.tool).toHaveBeenCalledWith(
+        'slack_user_activity',
         expect.anything(),
         expect.any(Function),
       );
@@ -1005,6 +1055,356 @@ describe('MCP Command', () => {
 
       // Restore mocked method
       Date.prototype.toLocaleString = originalToLocaleString;
+    });
+  });
+
+  describe('tool: create_reminder', () => {
+    it('should call createSlackReminder and return markdown results', async () => {
+      // Setup reminder mocks
+      const mockReminderResult = {
+        success: true,
+        reminder: {
+          id: 'Rm123',
+          text: 'Test reminder',
+          time: 1620000000,
+          user: 'U123',
+        },
+      };
+
+      vi.mocked(createSlackReminder).mockResolvedValueOnce(mockReminderResult);
+
+      // Setup command execution
+      let createReminderHandler: CreateReminderToolHandler | null = null;
+
+      // Capture the create_reminder handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_create_reminder') {
+            createReminderHandler = handler as CreateReminderToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the create_reminder handler
+      expect(createReminderHandler).not.toBeNull();
+      const result = await createReminderHandler!({
+        text: 'Test reminder',
+        time: 'in 30 minutes',
+        format: 'markdown',
+      });
+
+      // Check the result
+      expect(createSlackReminder).toHaveBeenCalledWith(
+        'Test reminder',
+        'in 30 minutes',
+        context,
+        undefined,
+      );
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('Test reminder');
+      expect(result.content[0].text).toContain('in 30 minutes');
+      expect(result.content[0].text).toContain('✅');
+    });
+
+    it('should handle errors in create_reminder', async () => {
+      // Setup error mock
+      const mockError = new Error('Reminder creation failed');
+      vi.mocked(createSlackReminder).mockRejectedValueOnce(mockError);
+
+      // Setup command execution
+      let createReminderHandler: CreateReminderToolHandler | null = null;
+
+      // Capture the create_reminder handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_create_reminder') {
+            createReminderHandler = handler as CreateReminderToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the handler
+      const result = await createReminderHandler!({
+        text: 'Test reminder',
+        time: 'in 30 minutes',
+      });
+
+      // Check the result
+      expect(result).toEqual({
+        content: [{ type: 'text', text: 'Error: Error: Reminder creation failed' }],
+        isError: true,
+      });
+    });
+  });
+
+  describe('tool: list_reminders', () => {
+    it('should call listSlackReminders and return markdown results', async () => {
+      // Setup reminders mock
+      const mockRemindersResult = {
+        reminders: [
+          {
+            id: 'Rm123',
+            text: 'Test reminder 1',
+            time: 1620000000,
+          },
+          {
+            id: 'Rm124',
+            text: 'Test reminder 2',
+            time: 1620086400,
+          },
+        ],
+      };
+
+      vi.mocked(listSlackReminders).mockResolvedValueOnce(mockRemindersResult);
+
+      // Setup command execution
+      let listRemindersHandler: ListRemindersToolHandler | null = null;
+
+      // Capture the list_reminders handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_list_reminders') {
+            listRemindersHandler = handler as ListRemindersToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the list_reminders handler
+      expect(listRemindersHandler).not.toBeNull();
+      const result = await listRemindersHandler!({
+        format: 'markdown',
+      });
+
+      // Check the result
+      expect(listSlackReminders).toHaveBeenCalledWith(context);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('## Reminders');
+      expect(result.content[0].text).toContain('Test reminder 1');
+      expect(result.content[0].text).toContain('Test reminder 2');
+      expect(result.content[0].text).toContain('Pending');
+    });
+
+    it('should handle empty reminders list', async () => {
+      // Setup empty reminders mock
+      const mockEmptyRemindersResult = {
+        reminders: [],
+      };
+
+      vi.mocked(listSlackReminders).mockResolvedValueOnce(mockEmptyRemindersResult);
+
+      // Setup command execution
+      let listRemindersHandler: ListRemindersToolHandler | null = null;
+
+      // Capture the list_reminders handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_list_reminders') {
+            listRemindersHandler = handler as ListRemindersToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the list_reminders handler
+      const result = await listRemindersHandler!({
+        format: 'markdown',
+      });
+
+      // Check the result
+      expect(result.content[0].text).toContain('No reminders found.');
+    });
+  });
+
+  describe('tool: get_thread_replies', () => {
+    it('should call getSlackThreadReplies and return markdown results', async () => {
+      // Setup mock thread replies
+      const mockThreadRepliesResult = {
+        replies: [
+          {
+            ts: '1620000001',
+            text: 'Reply 1',
+            user: 'U123',
+          },
+          {
+            ts: '1620000002',
+            text: 'Reply 2',
+            user: 'U456',
+          },
+        ],
+        users: {
+          U123: { displayName: 'User One', isBot: false },
+          U456: { displayName: 'User Two', isBot: false },
+        },
+        channels: {
+          C123: {
+            displayName: 'general',
+            type: 'channel' as 'channel' | 'im' | 'mpim' | 'group',
+          },
+        },
+      };
+
+      vi.mocked(getSlackThreadReplies).mockResolvedValueOnce(mockThreadRepliesResult);
+
+      // Setup command execution
+      let getThreadRepliesHandler: GetThreadRepliesToolHandler | null = null;
+
+      // Capture the get_thread_replies handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_get_thread_replies') {
+            getThreadRepliesHandler = handler as GetThreadRepliesToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the get_thread_replies handler
+      expect(getThreadRepliesHandler).not.toBeNull();
+      const result = await getThreadRepliesHandler!({
+        channel: 'C123',
+        ts: '1620000000',
+        limit: 10,
+        format: 'markdown',
+      });
+
+      // Check the result
+      expect(getSlackThreadReplies).toHaveBeenCalledWith('C123', '1620000000', context, 10);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('Thread Replies');
+      expect(result.content[0].text).toContain('Reply 1');
+      expect(result.content[0].text).toContain('Reply 2');
+      expect(result.content[0].text).toContain('User One');
+      expect(result.content[0].text).toContain('User Two');
+    });
+  });
+
+  describe('tool: user_activity', () => {
+    it('should call getSlackUserActivity and return markdown results', async () => {
+      // Setup mock user activity
+      const mockUserActivityResult = {
+        userId: 'U123',
+        totalMessages: 10,
+        channelBreakdown: [
+          {
+            channelId: 'C123',
+            channelName: 'general',
+            messageCount: 7,
+          },
+          {
+            channelId: 'C456',
+            channelName: 'random',
+            messageCount: 3,
+          },
+        ],
+        timePeriod: 'Last 100 messages',
+      };
+
+      vi.mocked(getSlackUserActivity).mockResolvedValueOnce(mockUserActivityResult);
+
+      // Setup command execution
+      let userActivityHandler: UserActivityToolHandler | null = null;
+
+      // Capture the user_activity handler
+      vi.mocked(mockMcpServer.tool).mockImplementation(
+        (name: string, schema: any, handler: ToolHandler) => {
+          if (name === 'slack_user_activity') {
+            userActivityHandler = handler as UserActivityToolHandler;
+          }
+          return mockMcpServer;
+        },
+      );
+
+      let actionCallback: (() => Promise<void>) | null = null;
+      vi.spyOn(program, 'command').mockReturnValue({
+        description: vi.fn().mockReturnValue({
+          action: vi.fn((callback) => {
+            actionCallback = callback;
+          }),
+        }),
+      } as any);
+
+      registerMcpCommand(program, context);
+      await actionCallback!();
+
+      // Execute the user_activity handler
+      expect(userActivityHandler).not.toBeNull();
+      const result = await userActivityHandler!({
+        user: 'U123',
+        count: 100,
+        format: 'markdown',
+      });
+
+      // Check the result
+      expect(getSlackUserActivity).toHaveBeenCalledWith(100, context, 'U123');
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('User Activity Summary');
+      expect(result.content[0].text).toContain('**User:** U123');
+      expect(result.content[0].text).toContain('**Total Messages:**');
+      expect(result.content[0].text).toContain('general');
+      expect(result.content[0].text).toContain('random');
     });
   });
 });

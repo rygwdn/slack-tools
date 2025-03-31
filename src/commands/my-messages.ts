@@ -7,7 +7,9 @@ import { generateMyMessagesSummary } from '../services/my-messages-service';
 export function registerMyMessagesCommand(program: Command, context: CommandContext): void {
   program
     .command('my-messages')
-    .description('Generate a daily summary report for Slack activity')
+    .description(
+      'Generate a summary of your Slack activity including messages you sent and messages mentioning you',
+    )
     .option('-u, --username <username>', 'Slack username to filter by')
     .option('-s, --since <date>', 'Start date (YYYY-MM-DD format), defaults to today')
     .option('-e, --until <date>', 'End date (YYYY-MM-DD format), defaults to today')

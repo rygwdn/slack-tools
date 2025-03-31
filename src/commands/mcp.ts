@@ -3,7 +3,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { CommandContext } from '../context';
-import { performSlackSearch, setSlackStatus, getSlackStatus } from '../services/slack-services';
+import {
+  performSlackSearch,
+  setSlackStatus,
+  getSlackStatus,
+  createSlackReminder,
+  listSlackReminders,
+  getSlackThreadReplies,
+  getSlackUserActivity,
+} from '../services/slack-services';
 import {
   generateSearchResultsMarkdown,
   formatStatusOutput,
@@ -32,11 +40,19 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
       server.tool(
         'slack_my_messages',
         {
-          username: z.string().optional(),
+          username: z.string().optional().describe('Username to fetch messages for'),
           since: z.string().optional().describe('Start date in YYYY-MM-DD format'),
           until: z.string().optional().describe('End date in YYYY-MM-DD format'),
-          count: z.number().optional().default(200),
-          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+          count: z
+            .number()
+            .optional()
+            .default(200)
+            .describe('Maximum number of messages to retrieve'),
+          format: z
+            .enum(['markdown', 'json'])
+            .optional()
+            .default('markdown')
+            .describe('Output format'),
         },
         async ({ username, since, until, count, format }) => {
           try {
@@ -201,6 +217,240 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
             } else {
               // Format the status as markdown
               const markdown = formatStatusOutput(status);
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
+
+      // Add tool for creating reminders
+      server.tool(
+        'slack_create_reminder',
+        {
+          text: z.string().describe('The reminder text'),
+          time: z
+            .string()
+            .describe(
+              'When to remind (unix timestamp, ISO datetime, or relative time like "in 5 minutes")',
+            ),
+          user: z
+            .string()
+            .optional()
+            .describe('User ID to create reminder for (defaults to current user)'),
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ text, time, user, format }) => {
+          try {
+            const result = await createSlackReminder(text, time, context, user);
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Format as markdown
+              const markdown = `
+## Reminder Created
+- **Text:** ${text}
+- **Time:** ${time}
+${user ? `- **User:** ${user}` : ''}
+- **Success:** ${result.success ? '✅' : '❌'}
+              `.trim();
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
+
+      // Add tool for listing reminders
+      server.tool(
+        'slack_list_reminders',
+        {
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ format }) => {
+          try {
+            const result = await listSlackReminders(context);
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Format as markdown
+              let markdown = '## Reminders\n\n';
+
+              if (result.reminders.length === 0) {
+                markdown += 'No reminders found.';
+              } else {
+                result.reminders.forEach((reminder: any, index: number) => {
+                  const time = new Date(parseInt(reminder.time) * 1000).toLocaleString();
+                  markdown += `### ${index + 1}. ${reminder.text}\n`;
+                  markdown += `- **Time:** ${time}\n`;
+                  if (reminder.complete) {
+                    markdown += `- **Status:** Completed\n`;
+                  } else {
+                    markdown += `- **Status:** Pending\n`;
+                  }
+                  markdown += '\n';
+                });
+              }
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
+
+      // Add tool for getting thread replies
+      server.tool(
+        'slack_get_thread_replies',
+        {
+          channel: z.string().describe('Channel ID containing the thread'),
+          ts: z.string().describe('Timestamp of the parent message'),
+          limit: z.number().optional().describe('Maximum number of replies to fetch'),
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ channel, ts, limit, format }) => {
+          try {
+            const result = await getSlackThreadReplies(channel, ts, context, limit);
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Format as markdown
+              let markdown = `## Thread Replies\n\n`;
+
+              if (result.replies.length === 0) {
+                markdown += 'No replies found in this thread.';
+              } else {
+                markdown += `Found ${result.replies.length} replies:\n\n`;
+
+                result.replies.forEach((reply: any, index: number) => {
+                  const user = result.users[reply.user]?.displayName || reply.user;
+                  const time = new Date(parseInt(reply.ts) * 1000).toLocaleString();
+
+                  markdown += `### Reply ${index + 1}\n`;
+                  markdown += `- **From:** ${user}\n`;
+                  markdown += `- **Time:** ${time}\n`;
+                  markdown += `- **Text:** ${reply.text}\n\n`;
+                });
+              }
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: markdown,
+                  },
+                ],
+              };
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text', text: `Error: ${error}` }],
+              isError: true,
+            };
+          }
+        },
+      );
+
+      // Add tool for user activity
+      server.tool(
+        'slack_user_activity',
+        {
+          count: z.number().optional().default(100).describe('Number of messages to analyze'),
+          user: z.string().optional().describe('User ID (defaults to current user)'),
+          format: z.enum(['markdown', 'json']).optional().default('markdown'),
+        },
+        async ({ count, user, format }) => {
+          try {
+            const result = await getSlackUserActivity(count, context, user);
+
+            if (format === 'json') {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2),
+                  },
+                ],
+              };
+            } else {
+              // Format as markdown
+              let markdown = `## User Activity Summary\n\n`;
+              markdown += `- **User:** ${result.userId}\n`;
+              markdown += `- **Total Messages:** ${result.totalMessages}\n`;
+              markdown += `- **Time Period:** ${result.timePeriod}\n\n`;
+
+              markdown += `### Channel Breakdown\n\n`;
+
+              if (result.channelBreakdown.length === 0) {
+                markdown += 'No channel activity found.';
+              } else {
+                markdown += `| Channel | Message Count | % of Total |\n`;
+                markdown += `| ------- | ------------- | ---------- |\n`;
+
+                result.channelBreakdown.forEach((item) => {
+                  const percentage = ((item.messageCount / result.totalMessages) * 100).toFixed(1);
+                  markdown += `| ${item.channelName} | ${item.messageCount} | ${percentage}% |\n`;
+                });
+              }
 
               return {
                 content: [

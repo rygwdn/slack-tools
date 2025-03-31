@@ -29,6 +29,14 @@ export interface MyMessagesSummaryResult {
 /**
  * Generate a my messages summary for Slack activity
  *
+ * Includes:
+ * - Messages sent BY the user in any channel or DM
+ * - Messages sent TO the user (in DMs and @mentions in channels)
+ * - Thread messages involving the user
+ *
+ * Does NOT include:
+ * - Messages sent to the user in multi-user channels/groups (unless the user participated in the thread)
+ *
  * @param options Options for the summary generation
  * @param context Command context
  * @returns Generated summary result

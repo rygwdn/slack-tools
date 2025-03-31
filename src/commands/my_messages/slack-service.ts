@@ -6,6 +6,11 @@ import { SearchResult } from './types';
 
 /**
  * Search Slack for messages matching the given criteria
+ *
+ * This function retrieves:
+ * 1. Messages sent BY the user (in any channel)
+ * 2. Thread messages involving the user
+ * 3. Messages sent TO the user (in DMs and @mentions in channels)
  */
 export async function searchMessages(
   client: WebClient,

@@ -142,3 +142,177 @@ export async function getSlackStatus(context: CommandContext) {
     throw new Error(`Status retrieval failed: ${error}`);
   }
 }
+
+/**
+ * Create a reminder in Slack
+ */
+export async function createSlackReminder(
+  text: string,
+  time: string,
+  context: CommandContext,
+  user?: string,
+) {
+  try {
+    const workspace = context.workspace;
+    context.debugLog('Creating reminder for workspace:', workspace);
+    context.debugLog('Reminder text:', text);
+    context.debugLog('Reminder time:', time);
+
+    if (user) {
+      context.debugLog('Reminder for user:', user);
+    }
+
+    // Get client and create reminder
+    const client = await getSlackClient(workspace, context);
+    const response = await client.reminders.add({
+      text,
+      time,
+      user,
+    });
+
+    context.debugLog('API response:', response);
+
+    return {
+      success: true,
+      reminder: response.reminder,
+    };
+  } catch (error) {
+    throw new Error(`Reminder creation failed: ${error}`);
+  }
+}
+
+/**
+ * List reminders in Slack
+ */
+export async function listSlackReminders(context: CommandContext) {
+  try {
+    const workspace = context.workspace;
+    context.debugLog('Listing reminders for workspace:', workspace);
+
+    // Get client and list reminders
+    const client = await getSlackClient(workspace, context);
+    const response = await client.reminders.list();
+
+    context.debugLog('Found reminders:', response.reminders?.length || 0);
+
+    return {
+      reminders: response.reminders || [],
+    };
+  } catch (error) {
+    throw new Error(`Listing reminders failed: ${error}`);
+  }
+}
+
+/**
+ * Get thread replies for a message
+ */
+export async function getSlackThreadReplies(
+  channel: string,
+  ts: string,
+  context: CommandContext,
+  limit?: number,
+) {
+  try {
+    const workspace = context.workspace;
+    context.debugLog('Getting thread replies in workspace:', workspace);
+    context.debugLog('Channel:', channel);
+    context.debugLog('Thread timestamp:', ts);
+
+    if (limit) {
+      context.debugLog('Limit:', limit);
+    }
+
+    // Get client and fetch thread replies
+    const client = await getSlackClient(workspace, context);
+    const response = await client.conversations.replies({
+      channel,
+      ts,
+      limit,
+    });
+
+    const messages = response.messages?.filter((msg) => msg.ts !== ts) || [];
+    context.debugLog('Found replies:', messages.length);
+
+    // Convert conversation replies to a format compatible with entity cache
+    // This avoids type conflicts between different Slack API response types
+    const normalizedMessages = messages.map((msg) => ({
+      iid: msg.ts,
+      ts: msg.ts,
+      text: msg.text,
+      user: msg.user,
+      channel: { id: channel },
+      team: msg.team,
+    }));
+
+    // Get user and channel information
+    const cache = await getSlackEntityCache(client, normalizedMessages, context);
+
+    return {
+      replies: messages,
+      channels: cache.channels,
+      users: cache.users,
+    };
+  } catch (error) {
+    throw new Error(`Getting thread replies failed: ${error}`);
+  }
+}
+
+/**
+ * Get user activity statistics
+ */
+export async function getSlackUserActivity(count: number, context: CommandContext, user?: string) {
+  try {
+    const workspace = context.workspace;
+    context.debugLog('Getting user activity for workspace:', workspace);
+
+    if (user) {
+      context.debugLog('User:', user);
+    }
+
+    // Get client
+    const client = await getSlackClient(workspace, context);
+
+    // Get user ID if not provided
+    let userId = user;
+    if (!userId) {
+      const authTest = await client.auth.test();
+      userId = authTest.user_id as string;
+      context.debugLog('Using current user ID:', userId);
+    }
+
+    // Search for user's messages
+    const query = `from:<@${userId}>`;
+    const messages = await searchSlackMessages(client, query, count, context);
+
+    context.debugLog(`Found ${messages.length} messages for user`);
+
+    // Get channel information
+    const cache = await getSlackEntityCache(client, messages, context);
+
+    // Create activity summary by channel
+    const channelActivity: Record<string, number> = {};
+    messages.forEach((msg) => {
+      const channelId = msg.channel?.id || 'unknown';
+      channelActivity[channelId] = (channelActivity[channelId] || 0) + 1;
+    });
+
+    // Add channel names to the activity data
+    const activityWithNames = Object.entries(channelActivity).map(([channelId, messageCount]) => ({
+      channelId,
+      channelName: cache.channels[channelId]?.displayName || 'Unknown channel',
+      messageCount,
+    }));
+
+    // Sort by message count (descending)
+    activityWithNames.sort((a, b) => b.messageCount - a.messageCount);
+
+    return {
+      userId,
+      totalMessages: messages.length,
+      channelBreakdown: activityWithNames,
+      timePeriod: `Last ${count} messages`,
+    };
+  } catch (error) {
+    throw new Error(`Getting user activity failed: ${error}`);
+  }
+}
