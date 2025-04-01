@@ -1,11 +1,48 @@
 /**
  * Parses a date string into a Unix timestamp (seconds).
- * Handles various date formats recognizable by Date.parse().
+ * Handles various date formats recognizable by Date.parse() and relative times like "in X minutes/hours/days".
  * @param dateString - The date string to parse (e.g., "tomorrow", "2024-08-01", "in 5 minutes").
  * @returns The Unix timestamp in seconds, or undefined if parsing fails.
  */
 export function parseDateToTimestamp(dateString: string | undefined): number | undefined {
   if (!dateString) return undefined;
+
+  // Handle relative time expressions like "in X minutes/hours/days"
+  const inMatch = dateString.match(
+    /^in\s+(\d+)\s+(minute|minutes|min|mins|hour|hours|day|days|week|weeks)$/i,
+  );
+  if (inMatch) {
+    const amount = parseInt(inMatch[1], 10);
+    const unit = inMatch[2].toLowerCase();
+
+    const now = new Date();
+    const nowTimestamp = Math.floor(now.getTime() / 1000);
+
+    if (unit.startsWith('minute') || unit.startsWith('min')) {
+      return nowTimestamp + amount * 60;
+    } else if (unit.startsWith('hour')) {
+      return nowTimestamp + amount * 60 * 60;
+    } else if (unit.startsWith('day')) {
+      return nowTimestamp + amount * 24 * 60 * 60;
+    } else if (unit.startsWith('week')) {
+      return nowTimestamp + amount * 7 * 24 * 60 * 60;
+    }
+  }
+
+  // Handle common terms
+  if (dateString.toLowerCase() === 'tomorrow') {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0); // Set to 9 AM tomorrow
+    return Math.floor(tomorrow.getTime() / 1000);
+  }
+
+  if (dateString.toLowerCase() === 'today') {
+    const today = new Date();
+    today.setHours(17, 0, 0, 0); // Set to 5 PM today
+    return Math.floor(today.getTime() / 1000);
+  }
+
   // Try parsing common date/time strings. Note: Date.parse returns milliseconds.
   const timestampMs = Date.parse(dateString);
   if (isNaN(timestampMs)) {

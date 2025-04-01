@@ -4,6 +4,7 @@ import { searchSlackMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
 import { saveSlackCache } from '../cache';
 import { Reminder } from '@slack/web-api/dist/types/response/RemindersListResponse';
+import { formatSlackText } from '../commands/my_messages/formatters';
 
 /**
  * Search for messages in Slack
@@ -179,74 +180,6 @@ export async function createSlackReminder(
     };
   } catch (error) {
     throw new Error(`Reminder creation failed: ${error}`);
-  }
-}
-
-// Define the shape of the filter options object
-interface ReminderFilterOptions {
-  statusFilter?: 'pending' | 'completed' | 'all';
-  dueAfterTs?: number; // Unix timestamp (seconds)
-  dueBeforeTs?: number; // Unix timestamp (seconds)
-  completedAfterTs?: number; // Unix timestamp (seconds)
-  completedBeforeTs?: number; // Unix timestamp (seconds)
-}
-
-/**
- * List Slack reminders with granular filtering
- */
-export async function listSlackReminders(
-  context: CommandContext,
-  filters: ReminderFilterOptions = {}, // Accept an object, default to empty
-) {
-  try {
-    // Set default status filter if not provided
-    const statusFilter = filters.statusFilter || 'pending';
-
-    const workspace = context.workspace;
-    context.debugLog('Listing reminders for workspace:', workspace);
-    context.debugLog('Filters:', filters); // Log the whole filter object
-
-    const client = await getSlackClient(workspace, context);
-    const response = await client.reminders.list();
-
-    context.debugLog('Raw reminders count:', response.reminders?.length || 0);
-
-    const allReminders = response.reminders || [];
-
-    // Apply filtering based on the provided filters
-    const filteredReminders = allReminders.filter((reminder: Reminder) => {
-      const reminderTime = reminder.time || 0;
-      // Get complete_ts with proper typing
-      const completeTs = reminder.complete_ts || 0;
-      const isComplete = completeTs > 0;
-
-      // 1. Filter by status (pending, completed, all)
-      if (statusFilter === 'pending' && isComplete) return false;
-      if (statusFilter === 'completed' && !isComplete) return false;
-      // 'all' status passes this stage
-
-      // 2. Filter by due date
-      if (filters.dueAfterTs && (!reminderTime || reminderTime <= filters.dueAfterTs)) return false;
-      if (filters.dueBeforeTs && (!reminderTime || reminderTime >= filters.dueBeforeTs))
-        return false;
-
-      // 3. Filter by completion date (only if reminder is complete)
-      if (isComplete) {
-        if (filters.completedAfterTs && completeTs <= filters.completedAfterTs) return false;
-        if (filters.completedBeforeTs && completeTs >= filters.completedBeforeTs) return false;
-      }
-
-      // If we passed all filters, include the reminder
-      return true;
-    });
-
-    context.debugLog('Filtered reminders count:', filteredReminders.length);
-
-    return {
-      reminders: filteredReminders,
-    };
-  } catch (error) {
-    throw new Error(`Listing reminders failed: ${error}`);
   }
 }
 

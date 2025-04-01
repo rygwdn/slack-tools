@@ -73,42 +73,30 @@ slack-tools status [options] <text>
 ```
 
 Options:
-- `--emoji <emoji>` - Emoji for the status (optional)
-- `--duration <duration>` - Duration in minutes before status expires (omit for permanent)
-
-**Important Note:** When using the status command with multi-word text and options, use the `--option=value` format:
+- `-e, --emoji <emoji>` - Status emoji (without colons), e.g., "coffee" for :coffee:
+- `-d, --duration <minutes>` - Duration in minutes after which the status will clear
 
 Examples:
 ```bash
-# Set "lunch break" status with pizza emoji for 30 minutes
-slack-tools -w Build status "lunch break" --emoji=pizza --duration=30
+# Set status with emoji and 1-hour duration
+slack-tools -w Build status "In a meeting" --emoji calendar --duration 60
 
-# Set "focus time" status with headphones emoji, no expiration
-slack-tools -w Build status "focus time" --emoji=headphones
+# Set status with emoji and no expiration
+slack-tools -w Build status "Working remotely" --emoji house
 
-# Set "in a meeting" status without emoji for 60 minutes
-slack-tools -w Build status "in a meeting" --duration=60
+# Clear status by passing empty text
+slack-tools -w Build status ""
 
 # Set "away" status with no emoji and no expiration
 slack-tools -w Build status away
 ```
 
-### Reminder Command
+### Create Reminder Command
 
-Manage your Slack reminders:
-
-```bash
-slack-tools reminder [subcommand]
-```
-
-Subcommands:
-- `create <text>` - Create a new reminder
-- `list` - List all your reminders
-
-#### Creating Reminders
+Create a new Slack reminder:
 
 ```bash
-slack-tools reminder create [options] <text>
+slack-tools create-reminder [options] <text>
 ```
 
 Options:
@@ -118,44 +106,13 @@ Options:
 Examples:
 ```bash
 # Create a reminder for 30 minutes from now (default)
-slack-tools -w Build reminder create "Call the team"
+slack-tools -w Build create-reminder "Call the team"
 
 # Create a reminder for a specific time
-slack-tools -w Build reminder create "Weekly report" --time "tomorrow at 9am"
+slack-tools -w Build create-reminder "Weekly report" --time "tomorrow at 9am"
 
 # Create a reminder with a custom relative time
-slack-tools -w Build reminder create "Check on project status" --time "in 2 hours"
-```
-
-#### Listing Reminders
-
-```
-slack-tools reminder list [options]
-```
-
-Options:
-- `--status <status>` - Filter by status: pending (default), completed, all
-- `--due-after <date>` - Filter reminders due after this date/time
-- `--due-before <date>` - Filter reminders due before this date/time
-- `--completed-after <date>` - Filter reminders completed after this date/time
-- `--completed-before <date>` - Filter reminders completed before this date/time
-
-Examples:
-```bash
-# List all your pending reminders (default)
-slack-tools -w Build reminder list
-
-# List completed reminders
-slack-tools -w Build reminder list --status completed
-
-# List all reminders (both pending and completed)
-slack-tools -w Build reminder list --status all
-
-# List pending reminders due before a specific date
-slack-tools -w Build reminder list --due-before "next friday"
-
-# List completed reminders that were completed after a specific date
-slack-tools -w Build reminder list --status completed --completed-after "yesterday"
+slack-tools -w Build create-reminder "Check on project status" --time "in 2 hours"
 ```
 
 ### Thread Command
