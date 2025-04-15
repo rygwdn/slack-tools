@@ -112,14 +112,42 @@ export async function getCookie(): Promise<SlackCookie> {
     });
 
     try {
-      // Get the 'd' cookie with the largest value (most likely to be the correct one)
-      const result = await db.get(
-        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC LIMIT 1',
+      // Get all 'd' cookies
+      const results = await db.all(
+        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC',
       );
 
-      if (!result || !result.encrypted_value) {
+      if (!results || results.length === 0 || !results[0].encrypted_value) {
         throw new Error('Could not find any Slack "d" cookies in cookies database');
       }
+      
+      // Check if there are multiple cookies with different tokens
+      if (results.length > 1) {
+        const uniqueTokens = new Set();
+        const validResults = [];
+        
+        for (const result of results) {
+          try {
+            const decrypted = decryptCookieValue(result.encrypted_value, encryptionKey);
+            const xoxdIndex = decrypted.indexOf('xoxd-');
+            
+            if (xoxdIndex !== -1) {
+              const token = decrypted.substring(xoxdIndex);
+              uniqueTokens.add(token);
+              validResults.push({ ...result, decryptedValue: token });
+            }
+          } catch (e) {
+            // Skip invalid cookies
+          }
+        }
+        
+        if (uniqueTokens.size > 1) {
+          throw new Error(`Found ${uniqueTokens.size} different Slack tokens in cookies. Please clear unused cookies.`);
+        }
+      }
+      
+      // Use the first result (already sorted by length)
+      const result = results[0];
 
       // Decrypt the cookie value
       const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
