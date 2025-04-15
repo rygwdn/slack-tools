@@ -124,6 +124,17 @@ export async function getCookie(): Promise<SlackCookie> {
       // Decrypt the cookie value
       const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
 
+      // Check if the string contains xoxd but not at the beginning
+      const xoxdIndex = decryptedValue.indexOf('xoxd-');
+      if (xoxdIndex !== -1) {
+        // Extract the part from 'xoxd-' onwards
+        const fixedValue = decryptedValue.substring(xoxdIndex);
+        return {
+          name: result.name,
+          value: fixedValue,
+        };
+      }
+
       if (!decryptedValue.startsWith('xoxd-')) {
         throw new Error('Decrypted cookie value does not have the required xoxd- prefix');
       }
