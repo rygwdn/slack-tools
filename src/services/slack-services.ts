@@ -3,8 +3,6 @@ import { getSlackClient } from '../slack-api';
 import { searchSlackMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
 import { saveSlackCache } from '../cache';
-import { Reminder } from '@slack/web-api/dist/types/response/RemindersListResponse';
-import { formatSlackText } from '../commands/my_messages/formatters';
 
 /**
  * Search for messages in Slack

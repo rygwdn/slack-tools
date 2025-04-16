@@ -136,7 +136,7 @@ export async function getCookie(): Promise<SlackCookie> {
               uniqueTokens.add(token);
               validResults.push({ ...result, decryptedValue: token });
             }
-          } catch (e) {
+          } catch {
             // Skip invalid cookies
           }
         }
