@@ -8,8 +8,12 @@ export function registerSearchTools(server: McpServer, context: CommandContext):
   server.tool(
     'slack_search',
     {
-      query: z.string(),
-      count: z.number().optional().default(100),
+      query: z.string().describe(
+        'Search query with Slack search modifiers. Supports operators like "from:", "in:", "has:", etc. For user searches, use from:@username or from:"Display Name" format.'
+      ),
+      count: z.number().optional().default(100).describe(
+        'Maximum number of results to return (1-1000). Default is 100.'
+      ),
     },
     async ({ query, count }) => {
       try {

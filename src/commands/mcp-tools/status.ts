@@ -9,9 +9,9 @@ export function registerStatusTools(server: McpServer, context: CommandContext):
   server.tool(
     'slack_set_status',
     {
-      text: z.string(),
-      emoji: z.string().optional(),
-      duration: z.number().optional(),
+      text: z.string().describe('Status text to display (up to 100 characters)'),
+      emoji: z.string().optional().describe('Emoji code to display with status (without colons, e.g. "computer" for :computer:)'),
+      duration: z.number().optional().describe('Duration in minutes before automatically clearing the status'),
     },
     async ({ text, emoji, duration }) => {
       try {
@@ -38,7 +38,9 @@ export function registerStatusTools(server: McpServer, context: CommandContext):
   );
 
   // Tool for getting status
-  server.tool('slack_get_status', {}, async () => {
+  server.tool('slack_get_status', {
+    /* No parameters needed - gets current user's status */
+  }, async () => {
     try {
       const status = await getSlackStatus(context);
 

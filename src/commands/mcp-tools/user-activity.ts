@@ -7,8 +7,8 @@ export function registerUserActivityTools(server: McpServer, context: CommandCon
   server.tool(
     'slack_user_activity',
     {
-      count: z.number().optional().default(100).describe('Number of messages to analyze'),
-      user: z.string().optional().describe('User ID (defaults to current user)'),
+      count: z.number().optional().default(100).describe('Number of recent messages to analyze (1-1000). Default is 100.'),
+      user: z.string().optional().describe('Slack user ID to analyze activity for (e.g. "U12345678"). If omitted, analyzes the current user\'s activity.'),
     },
     async ({ count, user }) => {
       try {

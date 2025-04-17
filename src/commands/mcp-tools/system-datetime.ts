@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export function registerSystemDatetimeTools(server: McpServer): void {
-  server.tool('system_datetime', {}, async () => {
+  server.tool('system_datetime', {
+    /* No parameters needed - returns current system date and time information */
+  }, async () => {
     try {
       const now = new Date();
 
