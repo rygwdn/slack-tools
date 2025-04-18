@@ -112,6 +112,8 @@ describe('Channel Search MCP Tool', () => {
     expect(markdownContent).toContain('🔒 private-team');
     expect(markdownContent).toContain('in:dev-team');
     expect(markdownContent).toContain('in:private-team');
+    expect(markdownContent).toContain('in:<#C34567>'); // ID format for dev-team
+    expect(markdownContent).toContain('in:<#C45678>'); // ID format for private-team
   });
 
   it('should handle empty query properly', async () => {
@@ -158,6 +160,19 @@ describe('Channel Search MCP Tool', () => {
     const markdownContent = result.content[0].text;
     
     expect(markdownContent).toContain('in:general');
+    expect(markdownContent).toContain('in:<#C12345>');
     expect(markdownContent).toContain('Search Format');
+    expect(markdownContent).toContain('ID Search Format');
+  });
+  
+  it('should handle channel ID links in the query', async () => {
+    // Test with a Slack channel link format
+    const result = await toolHandler({ query: '<#C12345|general>' });
+    
+    // The search should find the channel by ID
+    const markdownContent = result.content[0].text;
+    expect(markdownContent).toContain('#general');
+    expect(markdownContent).toContain('in:general');
+    expect(markdownContent).toContain('in:<#C12345>');
   });
 });

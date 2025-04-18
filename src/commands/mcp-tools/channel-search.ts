@@ -17,8 +17,17 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
         const workspace = context.workspace;
         const client = await getSlackClient(workspace, context);
 
-        // Clean the query
-        const cleanQuery = query.trim().replace(/^#/, '');
+        // Clean the query - handle different formats:
+        // 1. Regular channel name: #general -> general
+        // 2. Channel ID: C12345 -> C12345 
+        // 3. Slack link format: <#C12345|general> -> C12345
+        let cleanQuery = query.trim().replace(/^#/, '');
+        
+        // Extract channel ID from Slack link format <#C12345|channel-name>
+        const channelLinkMatch = cleanQuery.match(/^<#(C[A-Z0-9]+)\|.+>$/);
+        if (channelLinkMatch) {
+          cleanQuery = channelLinkMatch[1]; // Use the channel ID
+        }
         
         if (!cleanQuery) {
           return {
@@ -59,7 +68,12 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
           // Skip archived channels
           if (channel.is_archived) return false;
           
-          // Search in channel name and topic/purpose if available
+          // Check if we're searching by channel ID (starts with 'C')
+          if (cleanQuery.match(/^C[A-Z0-9]+$/)) {
+            return channel.id === cleanQuery;
+          }
+          
+          // Otherwise search in channel name and topic/purpose if available
           return (
             (channel.name && channel.name.toLowerCase().includes(cleanQuery.toLowerCase())) ||
             (channel.topic?.value && channel.topic.value.toLowerCase().includes(cleanQuery.toLowerCase())) ||
@@ -82,7 +96,8 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
           const topic = channel.topic?.value || '';
           
           // The format to use in search queries
-          const searchFormat = `in:${channelName}`;
+          const nameSearchFormat = `in:${channelName}`;
+          const idSearchFormat = `in:<#${channelId}>`;
           
           return {
             id: channelId,
@@ -90,7 +105,8 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
             is_private: isPrivate,
             member_count: memberCount,
             topic: topic,
-            search_format: searchFormat,
+            name_search_format: nameSearchFormat,
+            id_search_format: idSearchFormat,
           };
         });
         
@@ -106,8 +122,8 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
         
         // Create markdown output
         let markdown = `## Channel Search Results for "${query}"\n\n`;
-        markdown += "| Channel | Members | Private | Search Format | Topic |\n";
-        markdown += "|---------|---------|---------|---------------|-------|\n";
+        markdown += "| Channel | Members | Private | Search Format | ID Search Format | Topic |\n";
+        markdown += "|---------|---------|---------|---------------|------------------|-------|\n";
         
         formattedResults.forEach(channel => {
           const channelDisplay = channel.is_private ? '🔒 ' + channel.name : '#' + channel.name;
@@ -115,12 +131,14 @@ export function registerChannelSearchTool(server: McpServer, context: CommandCon
             ? channel.topic.substring(0, 30) + '...' 
             : channel.topic;
           
-          markdown += `| ${channelDisplay} | ${channel.member_count} | ${channel.is_private ? 'Yes' : 'No'} | \`${channel.search_format}\` | ${truncatedTopic} |\n`;
+          markdown += `| ${channelDisplay} | ${channel.member_count} | ${channel.is_private ? 'Yes' : 'No'} | \`${channel.name_search_format}\` | \`${channel.id_search_format}\` | ${truncatedTopic} |\n`;
         });
         
         markdown += `\n*Found ${formattedResults.length} matching channels*\n`;
-        markdown += "\nTo search for messages in these channels, use the search format in the slack_search tool (e.g., `in:general hello`).\n";
-        markdown += "\nNote: Channel searches using `in:` will only work for channels you're a member of.";
+        markdown += "\nTo search for messages in these channels, use either search format in the slack_search tool:\n";
+        markdown += "- Name format: `in:general hello` (works for public channels)\n";
+        markdown += "- ID format: `in:<#C12345> hello` (works for any channel you're a member of, including private channels)\n";
+        markdown += "\nNote: Channel searches using any format will only work for channels you're a member of.";
         
         return {
           content: [
