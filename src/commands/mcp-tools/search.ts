@@ -9,7 +9,7 @@ export function registerSearchTools(server: McpServer, context: CommandContext):
     'slack_search',
     {
       query: z.string().describe(
-        'Search query with Slack search modifiers. Supports operators like "from:", "in:", "has:", etc. For user searches, use from:@username or from:"Display Name" format.'
+        'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, the correct format is from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). Use the slack_user_search tool first to find the correct user format if needed.'
       ),
       count: z.number().optional().default(100).describe(
         'Maximum number of results to return (1-1000). Default is 100.'

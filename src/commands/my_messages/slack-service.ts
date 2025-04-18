@@ -2,6 +2,7 @@ import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { CommandContext } from '../../context';
 import { formatDateForSearch, getDayAfter, getDayBefore } from '../../utils/date-utils';
+import { enhanceSearchQuery } from '../../utils/user-utils';
 import { SearchResult } from './types';
 
 /**
@@ -37,7 +38,8 @@ export async function searchMessages(
   const searchResults = await searchSlackMessages(client, searchQuery, count, context);
 
   // Search for thread messages with the user
-  const threadQuery = `is:thread with:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
+  // Note: We add @ to be consistent, but our regex doesn't detect with: clauses yet
+  const threadQuery = `is:thread with:@${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   context.debugLog(`Thread query: ${threadQuery}`);
   const threadResults = await searchSlackMessages(client, threadQuery, count, context);
 
@@ -62,11 +64,15 @@ export async function searchSlackMessages(
   count: number,
   context: CommandContext,
 ): Promise<Match[]> {
-  context.debugLog(`Executing search: ${query}`);
-
+  context.debugLog(`Original search query: ${query}`);
+  
+  // Enhance the search query with proper user formatting
+  const enhancedQuery = await enhanceSearchQuery(client, query, context);
+  context.debugLog(`Executing search with enhanced query: ${enhancedQuery}`);
+  
   try {
     const searchResults = await client.search.messages({
-      query: query,
+      query: enhancedQuery,
       sort: 'timestamp',
       sort_dir: 'asc',
       count,
