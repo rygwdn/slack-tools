@@ -190,7 +190,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Check if all tools were registered
-      expect(mockMcpServer.tool).toHaveBeenCalledTimes(10);
+      expect(mockMcpServer.tool).toHaveBeenCalledTimes(11);
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'slack_my_messages',
         expect.anything(),

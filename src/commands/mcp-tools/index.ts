@@ -10,6 +10,7 @@ import { registerUserActivityTools } from './user-activity';
 import { registerSystemDatetimeTools } from './system-datetime';
 import { registerUserSearchTool } from './user-search';
 import { registerChannelSearchTool } from './channel-search';
+import { registerUserProfileTool } from './user-profile';
 
 export function registerAllTools(server: McpServer, context: CommandContext): void {
   registerMyMessagesTools(server, context);
@@ -20,5 +21,6 @@ export function registerAllTools(server: McpServer, context: CommandContext): vo
   registerUserActivityTools(server, context);
   registerUserSearchTool(server, context);
   registerChannelSearchTool(server, context);
+  registerUserProfileTool(server, context);
   registerSystemDatetimeTools(server);
 }

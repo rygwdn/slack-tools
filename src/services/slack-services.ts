@@ -294,3 +294,57 @@ export async function getSlackUserActivity(count: number, context: CommandContex
     throw new Error(`Getting user activity failed: ${error}`);
   }
 }
+
+/**
+ * Get detailed user profile information
+ */
+export async function getUserProfile(userId: string, context: CommandContext) {
+  try {
+    const workspace = context.workspace;
+    const client = await getSlackClient(workspace, context);
+
+    // First get basic user info
+    const userInfo = await client.users.info({ user: userId });
+    
+    if (!userInfo.ok || !userInfo.user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+
+    // Then get detailed profile
+    const userProfile = await client.users.profile.get({ user: userId });
+    
+    if (!userProfile.ok || !userProfile.profile) {
+      throw new Error(`Profile not found for user: ${userId}`);
+    }
+
+    // Combine data from both endpoints
+    return {
+      userId: userId,
+      username: userInfo.user.name,
+      realName: userInfo.user.real_name,
+      displayName: userProfile.profile.display_name || userInfo.user.real_name || userInfo.user.name,
+      email: userProfile.profile.email,
+      phone: userProfile.profile.phone,
+      title: userProfile.profile.title,
+      teamId: userInfo.user.team_id,
+      timezone: userInfo.user.tz,
+      timezoneLabel: userInfo.user.tz_label,
+      avatarUrl: userProfile.profile.image_original || userProfile.profile.image_512,
+      status: {
+        text: userProfile.profile.status_text || '',
+        emoji: userProfile.profile.status_emoji || '',
+        expiration: userProfile.profile.status_expiration 
+          ? new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString() 
+          : null,
+      },
+      isBot: userInfo.user.is_bot || false,
+      isAdmin: userInfo.user.is_admin || false,
+      isOwner: userInfo.user.is_owner || false,
+      isRestricted: userInfo.user.is_restricted || false,
+      isUltraRestricted: userInfo.user.is_ultra_restricted || false,
+      updated: userInfo.user.updated ? new Date(Number(userInfo.user.updated) * 1000).toISOString() : null,
+    };
+  } catch (error) {
+    throw new Error(`User profile retrieval failed: ${error}`);
+  }
+}

@@ -5,6 +5,7 @@ import {
   setSlackStatus,
   getSlackStatus,
   performSlackSearch,
+  getUserProfile,
 } from '../../../src/services/slack-services';
 import { CommandContext } from '../../../src/context';
 import * as slackApi from '../../../src/slack-api';
@@ -319,6 +320,155 @@ describe('Slack Services', () => {
       await expect(performSlackSearch('failed query', 10, context)).rejects.toThrow(
         /Search failed:/,
       );
+    });
+  });
+
+  describe('getUserProfile', () => {
+    let mockClient: any;
+
+    beforeEach(() => {
+      // Setup mock client
+      mockClient = {
+        users: {
+          info: vi.fn().mockResolvedValue({
+            ok: true,
+            user: {
+              id: 'U12345',
+              name: 'testuser',
+              real_name: 'Test User',
+              team_id: 'T12345',
+              tz: 'America/Los_Angeles',
+              tz_label: 'Pacific Standard Time',
+              is_bot: false,
+              is_admin: true,
+              is_owner: false,
+              is_restricted: false,
+              is_ultra_restricted: false,
+              updated: '1609459200',
+            },
+          }),
+          profile: {
+            get: vi.fn().mockResolvedValue({
+              ok: true,
+              profile: {
+                display_name: 'Test User',
+                email: 'test@example.com',
+                phone: '123-456-7890',
+                title: 'Software Engineer',
+                status_text: 'Working',
+                status_emoji: ':computer:',
+                status_expiration: '1609545600',
+                image_original: 'https://example.com/profile.jpg',
+                image_512: 'https://example.com/profile_512.jpg',
+              },
+            }),
+          },
+        },
+      };
+
+      // Mock getSlackClient to return our mockClient
+      vi.mocked(slackApi.getSlackClient).mockResolvedValue(mockClient);
+    });
+
+    it('should retrieve user profile information', async () => {
+      const userId = 'U12345';
+      const result = await getUserProfile(userId, context);
+
+      // Check that client methods were called correctly
+      expect(slackApi.getSlackClient).toHaveBeenCalledWith('test-workspace', context);
+      expect(mockClient.users.info).toHaveBeenCalledWith({ user: userId });
+      expect(mockClient.users.profile.get).toHaveBeenCalledWith({ user: userId });
+
+      // Check result structure
+      expect(result).toEqual({
+        userId: 'U12345',
+        username: 'testuser',
+        realName: 'Test User',
+        displayName: 'Test User',
+        email: 'test@example.com',
+        phone: '123-456-7890',
+        title: 'Software Engineer',
+        teamId: 'T12345',
+        timezone: 'America/Los_Angeles',
+        timezoneLabel: 'Pacific Standard Time',
+        avatarUrl: 'https://example.com/profile.jpg',
+        status: {
+          text: 'Working',
+          emoji: ':computer:',
+          expiration: new Date(1609545600 * 1000).toISOString(),
+        },
+        isBot: false,
+        isAdmin: true,
+        isOwner: false,
+        isRestricted: false,
+        isUltraRestricted: false,
+        updated: new Date(1609459200 * 1000).toISOString(),
+      });
+    });
+
+    it('should use fallbacks for display name', async () => {
+      // Override the profile.get mock to remove display_name
+      mockClient.users.profile.get.mockResolvedValueOnce({
+        ok: true,
+        profile: {
+          email: 'test@example.com',
+          status_text: '',
+          status_emoji: '',
+          image_512: 'https://example.com/profile_512.jpg',
+        },
+      });
+
+      const result = await getUserProfile('U12345', context);
+
+      // Should use real_name as fallback for display_name
+      expect(result.displayName).toBe('Test User');
+    });
+
+    it('should handle missing status information', async () => {
+      // Override the profile.get mock to remove status info
+      mockClient.users.profile.get.mockResolvedValueOnce({
+        ok: true,
+        profile: {
+          display_name: 'Test User',
+          email: 'test@example.com',
+        },
+      });
+
+      const result = await getUserProfile('U12345', context);
+
+      // Check that status fields have default values
+      expect(result.status).toEqual({
+        text: '',
+        emoji: '',
+        expiration: null,
+      });
+    });
+
+    it('should throw an error if user not found', async () => {
+      // Override users.info to return not found
+      mockClient.users.info.mockResolvedValueOnce({
+        ok: false,
+        error: 'user_not_found',
+      });
+
+      await expect(getUserProfile('U99999', context)).rejects.toThrow(/User not found/);
+    });
+
+    it('should throw an error if profile not found', async () => {
+      // Make users.info succeed but profile.get fail
+      mockClient.users.profile.get.mockResolvedValueOnce({
+        ok: false,
+        error: 'profile_not_found',
+      });
+
+      await expect(getUserProfile('U12345', context)).rejects.toThrow(/Profile not found/);
+    });
+
+    it('should throw an error if API request fails', async () => {
+      // Make users.info throw an error
+      mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
+
+      await expect(getUserProfile('U12345', context)).rejects.toThrow(/User profile retrieval failed/);
     });
   });
 });
