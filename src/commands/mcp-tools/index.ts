@@ -9,6 +9,7 @@ import { registerThreadReplyTools } from './thread-replies';
 import { registerUserActivityTools } from './user-activity';
 import { registerSystemDatetimeTools } from './system-datetime';
 import { registerUserSearchTool } from './user-search';
+import { registerChannelSearchTool } from './channel-search';
 
 export function registerAllTools(server: McpServer, context: CommandContext): void {
   registerMyMessagesTools(server, context);
@@ -18,5 +19,6 @@ export function registerAllTools(server: McpServer, context: CommandContext): vo
   registerThreadReplyTools(server, context);
   registerUserActivityTools(server, context);
   registerUserSearchTool(server, context);
+  registerChannelSearchTool(server, context);
   registerSystemDatetimeTools(server);
 }
