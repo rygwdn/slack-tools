@@ -31,7 +31,7 @@
         "@slack/web-api": "^7.0.1",
         "commander": "^13.1.0",
         "keytar": "^7.9.0",
-        "level": "^8.0.1",
+        "level": "^9.0.0",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
         "zod": "^3.24.3"
@@ -39,7 +39,7 @@
     "devDependencies": {
         "@eslint/js": "^9.25.0",
         "@modelcontextprotocol/inspector": "^0.10.2",
-        "@types/node": "^20.17.30",
+        "@types/node": "^22.14.1",
         "@types/sqlite3": "^3.1.11",
         "@vitest/coverage-v8": "^3.1.1",
         "eslint": "^9.25.0",
