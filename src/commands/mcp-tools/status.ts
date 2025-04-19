@@ -39,7 +39,7 @@ export function registerStatusTools(server: McpServer, context: CommandContext):
 
   // Tool for getting status
   server.tool('slack_get_status', {
-    /* No parameters needed - gets current user's status */
+    description: z.string().describe('Gets the current user\'s Slack status including status text and emoji'),
   }, async () => {
     try {
       const status = await getSlackStatus(context);

@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 
 export function registerSystemDatetimeTools(server: McpServer): void {
   server.tool('system_datetime', {
-    /* No parameters needed - returns current system date and time information */
+    description: z.string().describe('Returns the current system date and time in multiple formats including local time, UTC, ISO, and Unix timestamp'),
   }, async () => {
     try {
       const now = new Date();
