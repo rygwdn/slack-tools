@@ -3,26 +3,52 @@ description: Guidelines for interacting with the Slack API
 globs: ["**/slack/**/*.ts", "**/api/**/*.ts"]
 alwaysApply: false
 ---
+# Slack API Integration Guidelines
 
-# Slack API Integration
+## Authentication and Token Management
 
-## Type Definitions
+### Overview
+- Authentication is managed through [src/auth.ts](mdc:src/auth.ts)
+- Token storage and retrieval is handled in [src/tokens.js](mdc:src/tokens.js)
+- Cookie management is implemented in [src/cookies.js](mdc:src/cookies.js)
+- Secure storage uses [src/keychain.js](mdc:src/keychain.js)
 
-- Always import and use types from @slack/web-api instead of creating custom types
-- When extending Slack API types, document the reason and maintain compatibility
-- Use specific types from @slack/web-api/dist/types/response/* for response handling
+### Authentication Flow
+1. First try to retrieve stored auth from keychain
+2. Validate stored auth tokens by making a test API call
+3. If validation fails, clear stored auth and fetch fresh tokens
+4. Store new auth information (tokens + cookie) for future use
 
-## API Usage
+### Key Functions
+- `getSlackTokens()`: Retrieves workspace tokens with validation and fallback
+- `getSlackAuth()`: Retrieves both tokens and cookie with validation and fallback
+- `testSlackAuth()`: Validates auth by testing API access
+- `clearStoredAuth()`: Clears stored authentication data
 
-- Handle rate limiting appropriately
-- Implement proper error handling for all API calls
-- Use pagination when fetching large datasets
-- Cache user and channel information when appropriate
-- Validate input before sending to the API
+### Workspace Filtering
+- Authentication can be filtered by workspace URL or name
+- Use the `workspace` option when calling auth functions
+- If no matches found, all tokens are returned
 
-## Error Handling
+### Best Practices
+- Always handle potential authentication errors
+- Use the cached auth validation when appropriate (1 minute TTL)
+- For commands requiring authentication, use `getSlackAuth()` or `getSlackTokens()`
+- Consider using the `quiet` option to suppress console messages in non-interactive contexts
 
-- Use descriptive error messages
-- Capture and log API errors with relevant context
-- Handle token validation and authentication errors gracefully
-- Provide user-friendly error messages when possible
+## Slack API Usage
+
+### Web API Client
+- Use the official `@slack/web-api` package
+- Create WebClient instances with tokens from `getSlackTokens()`
+- Handle API rate limits and errors appropriately
+
+### Type Definitions
+- Use types from `@slack/web-api` when available
+- Custom types are defined in [src/types.ts](mdc:src/types.ts)
+- Use proper typing for all API requests and responses
+
+### Error Handling
+- Always implement proper error handling for API calls
+- Consider retry logic for transient failures
+- Log useful error information for debugging

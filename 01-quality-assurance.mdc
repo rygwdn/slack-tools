@@ -1,6 +1,6 @@
 ---
-description: Guidelines for quality assurance and code verification
-globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+description:
+globs:
 alwaysApply: true
 ---
 # Quality Assurance Requirements
