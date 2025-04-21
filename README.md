@@ -27,14 +27,14 @@ This will download and execute the latest version without installing it globally
 1. Clone this repository
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 3. Make the tool globally available:
    ```bash
-   npm link
+   pnpm link --global
    ```
 
-After running `npm link`, the `slack-tools` command will be available in your terminal.
+After running `pnpm link --global`, the `slack-tools` command will be available in your terminal.
 
 ### Usage
 

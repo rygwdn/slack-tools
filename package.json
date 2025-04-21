@@ -7,9 +7,7 @@
         "slack-tools": "./dist/cli.js"
     },
     "scripts": {
-        "build": "tsc",
-        "build:bundle": "tsup && chmod +x dist/cli.js",
-        "prepublishOnly": "npm run build:bundle",
+        "build": "tsup",
         "start": "tsx src/cli.ts",
         "test": "vitest run",
         "test:watch": "vitest",
@@ -18,8 +16,7 @@
         "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\"",
         "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-        "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-        "mcp:inspector": "npx @modelcontextprotocol/inspector \"npm run start -- mcp -l\""
+        "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
     },
     "keywords": [
         "slack",
@@ -32,20 +29,18 @@
         "@slack/web-api": "^7.0.1",
         "commander": "^13.1.0",
         "keytar": "^7.9.0",
-        "level": "^9.0.0",
+        "level": "^10.0.0",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
         "zod": "^3.24.3"
     },
     "devDependencies": {
         "@eslint/js": "^9.25.0",
-        "@modelcontextprotocol/inspector": "^0.10.2",
         "@types/node": "^22.14.1",
         "@types/sqlite3": "^3.1.11",
         "@vitest/coverage-v8": "^3.1.1",
         "eslint": "^9.25.0",
         "eslint-config-prettier": "^10.1.2",
-        "happy-dom": "^17.4.4",
         "prettier": "^3.5.3",
         "tsup": "^8.4.0",
         "tsx": "^4.7.0",
@@ -57,5 +52,5 @@
         "dist",
         "README.md"
     ],
-    "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+    "packageManager": "pnpm@8.15.4"
 }
