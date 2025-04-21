@@ -140,8 +140,8 @@ describe('Slack Service', () => {
       const mentionMatches: Match[] = [{ ts: '3', text: 'Mention match' }];
 
       // We need to mock searchSlackMessages since that's the function we're testing that calls it
-      vi.spyOn({ searchSlackMessages }, 'searchSlackMessages')
-        .mockImplementation(async (client, query) => {
+      vi.spyOn({ searchSlackMessages }, 'searchSlackMessages').mockImplementation(
+        async (client, query) => {
           // Return different matches based on the query content
           if (query.includes('from:@testuser')) {
             return searchMatches;
@@ -151,17 +151,22 @@ describe('Slack Service', () => {
             return mentionMatches;
           }
           return [];
-        });
+        },
+      );
 
       // Mock the actual WebClient search.messages for validation
       vi.mocked(mockClient.search.messages).mockImplementation(async ({ query }) => {
         return {
           ok: true,
-          messages: { 
-            matches: query.includes('from:@testuser') ? searchMatches : 
-                    query.includes('is:thread with:@testuser') ? threadMatches : 
-                    query.includes('to:@testuser') ? mentionMatches : []
-          }
+          messages: {
+            matches: query.includes('from:@testuser')
+              ? searchMatches
+              : query.includes('is:thread with:@testuser')
+                ? threadMatches
+                : query.includes('to:@testuser')
+                  ? mentionMatches
+                  : [],
+          },
         };
       });
 
@@ -184,9 +189,9 @@ describe('Slack Service', () => {
       expect(dateUtils.formatDateForSearch).toHaveBeenCalledTimes(2);
 
       // Verify the queries are being constructed correctly
-      const debugCalls = vi.mocked(context.debugLog).mock.calls.map(call => call[0]);
-      expect(debugCalls.some(call => call.includes('from:@testuser'))).toBe(true);
-      expect(debugCalls.some(call => call.includes('to:@testuser'))).toBe(true);
+      const debugCalls = vi.mocked(context.debugLog).mock.calls.map((call) => call[0]);
+      expect(debugCalls.some((call) => call.includes('from:@testuser'))).toBe(true);
+      expect(debugCalls.some((call) => call.includes('to:@testuser'))).toBe(true);
 
       // Verify the combined results
       expect(result.messages).toEqual(searchMatches);

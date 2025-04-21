@@ -7,10 +7,29 @@ export function registerMyMessagesTools(server: McpServer, context: CommandConte
   server.tool(
     'slack_my_messages',
     {
-      username: z.string().optional().describe('Username or display name to fetch messages for. If omitted, fetches messages for the current user.'),
-      since: z.string().optional().describe('Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.'),
-      until: z.string().optional().describe('End date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the end of the current day.'),
-      count: z.number().optional().default(200).describe('Maximum number of messages to retrieve (1-1000). Default is 200.'),
+      username: z
+        .string()
+        .optional()
+        .describe(
+          'Username or display name to fetch messages for. If omitted, fetches messages for the current user.',
+        ),
+      since: z
+        .string()
+        .optional()
+        .describe(
+          'Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.',
+        ),
+      until: z
+        .string()
+        .optional()
+        .describe(
+          'End date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the end of the current day.',
+        ),
+      count: z
+        .number()
+        .optional()
+        .default(200)
+        .describe('Maximum number of messages to retrieve (1-1000). Default is 200.'),
     },
     async ({ username, since, until, count }) => {
       try {

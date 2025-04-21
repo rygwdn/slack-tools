@@ -9,7 +9,9 @@ export function registerUserProfileTool(server: McpServer, context: CommandConte
     {
       user_id: z
         .string()
-        .describe('Slack user ID to get profile information for. Must start with "U" followed by alphanumeric characters.'),
+        .describe(
+          'Slack user ID to get profile information for. Must start with "U" followed by alphanumeric characters.',
+        ),
     },
     async ({ user_id }) => {
       try {
@@ -37,21 +39,21 @@ export function registerUserProfileTool(server: McpServer, context: CommandConte
         markdown += `- **Team ID:** ${profile.teamId || 'Unknown'}\n`;
         markdown += `- **Timezone:** ${profile.timezone || 'Unknown'} (${profile.timezoneLabel || ''})\n`;
         markdown += `- **Account Type:** ${profile.isBot ? 'Bot' : 'User'}\n`;
-        
+
         if (profile.isAdmin || profile.isOwner) {
           const roles = [];
           if (profile.isOwner) roles.push('Owner');
           if (profile.isAdmin) roles.push('Admin');
           markdown += `- **Roles:** ${roles.join(', ')}\n`;
         }
-        
+
         if (profile.isRestricted || profile.isUltraRestricted) {
           const restrictions = [];
           if (profile.isRestricted) restrictions.push('Restricted');
           if (profile.isUltraRestricted) restrictions.push('Ultra Restricted');
           markdown += `- **Restrictions:** ${restrictions.join(', ')}\n`;
         }
-        
+
         markdown += `- **Last Updated:** ${profile.updated || 'Unknown'}\n`;
 
         if (profile.avatarUrl) {

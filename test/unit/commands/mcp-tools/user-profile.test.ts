@@ -77,7 +77,7 @@ describe('User Profile MCP Tool', () => {
 
     // Extract the handler function that was passed to server.tool
     const handlerFn = server.tool.mock.calls[0][2];
-    
+
     // Call the handler with a user ID
     const result = await handlerFn({ user_id: 'U12345' });
 
@@ -86,7 +86,7 @@ describe('User Profile MCP Tool', () => {
 
     // Check that the result contains a markdown text response
     expect(result.content[0].type).toBe('text');
-    
+
     // Verify markdown content includes expected fields
     const markdown = result.content[0].text;
     expect(markdown).toContain('## Slack User Profile: Test User');
@@ -102,14 +102,12 @@ describe('User Profile MCP Tool', () => {
 
   it('should handle errors and return error response', async () => {
     // Make getUserProfile throw an error
-    vi.mocked(slackServices.getUserProfile).mockRejectedValueOnce(
-      new Error('User not found')
-    );
+    vi.mocked(slackServices.getUserProfile).mockRejectedValueOnce(new Error('User not found'));
 
     // Register the tool and extract handler
     registerUserProfileTool(server, context);
     const handlerFn = server.tool.mock.calls[0][2];
-    
+
     // Call the handler
     const result = await handlerFn({ user_id: 'U99999' });
 

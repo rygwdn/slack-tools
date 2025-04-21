@@ -17,7 +17,7 @@ describe('MCP Tool Descriptions', () => {
   it('should ensure all MCP tools have descriptions', () => {
     // Mock context
     const context = new CommandContext();
-    
+
     // Create a mock server that tracks registered tools
     const registeredTools = new Map<string, any>();
     const mockServer: any = {
@@ -26,7 +26,7 @@ describe('MCP Tool Descriptions', () => {
         return mockServer;
       }),
     };
-    
+
     // Register all tools
     registerMyMessagesTools(mockServer, context);
     registerSearchTools(mockServer, context);
@@ -38,14 +38,14 @@ describe('MCP Tool Descriptions', () => {
     registerUserSearchTool(mockServer, context);
     registerChannelSearchTool(mockServer, context);
     registerUserProfileTool(mockServer, context);
-    
+
     // Verify that there are tools registered
     expect(registeredTools.size).toBeGreaterThan(0);
-    
+
     // Check each tool for a description
     registeredTools.forEach((toolData, toolName) => {
       const schema = toolData.schema;
-      
+
       // Handle tools with no parameters
       if (Object.keys(schema).length === 0) {
         // Tools with no parameters should have a description property
@@ -54,25 +54,24 @@ describe('MCP Tool Descriptions', () => {
         // For tools with parameters, check if the tool has a global description
         // or if all parameters have descriptions
         const hasToolDescription = 'description' in schema;
-        
+
         // If there's no tool-level description, each parameter should have a description
         if (!hasToolDescription) {
-          const parameterKeys = Object.keys(schema).filter(key => key !== 'description');
-          
+          const parameterKeys = Object.keys(schema).filter((key) => key !== 'description');
+
           // Skip checking parameterKeys if there's a tool description
           // or if this is a special case (like an empty schema)
           if (parameterKeys.length > 0) {
-            parameterKeys.forEach(paramKey => {
+            parameterKeys.forEach((paramKey) => {
               const param = schema[paramKey];
-              
+
               // Check if the parameter has a describe method that was called
               // This is checking for usage of .describe() on Zod types
-              const hasDescription = param._def && 
-                                    param._def.description !== undefined;
-              
+              const hasDescription = param._def && param._def.description !== undefined;
+
               expect(
-                hasDescription, 
-                `Tool "${toolName}" parameter "${paramKey}" should have a description`
+                hasDescription,
+                `Tool "${toolName}" parameter "${paramKey}" should have a description`,
               ).toBe(true);
             });
           }

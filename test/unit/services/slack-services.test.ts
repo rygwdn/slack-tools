@@ -468,7 +468,9 @@ describe('Slack Services', () => {
       // Make users.info throw an error
       mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
 
-      await expect(getUserProfile('U12345', context)).rejects.toThrow(/User profile retrieval failed/);
+      await expect(getUserProfile('U12345', context)).rejects.toThrow(
+        /User profile retrieval failed/,
+      );
     });
   });
 });

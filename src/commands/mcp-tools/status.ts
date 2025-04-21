@@ -10,8 +10,16 @@ export function registerStatusTools(server: McpServer, context: CommandContext):
     'slack_set_status',
     {
       text: z.string().describe('Status text to display (up to 100 characters)'),
-      emoji: z.string().optional().describe('Emoji code to display with status (without colons, e.g. "computer" for :computer:)'),
-      duration: z.number().optional().describe('Duration in minutes before automatically clearing the status'),
+      emoji: z
+        .string()
+        .optional()
+        .describe(
+          'Emoji code to display with status (without colons, e.g. "computer" for :computer:)',
+        ),
+      duration: z
+        .number()
+        .optional()
+        .describe('Duration in minutes before automatically clearing the status'),
     },
     async ({ text, emoji, duration }) => {
       try {
@@ -38,28 +46,34 @@ export function registerStatusTools(server: McpServer, context: CommandContext):
   );
 
   // Tool for getting status
-  server.tool('slack_get_status', {
-    description: z.string().describe('Gets the current user\'s Slack status including status text and emoji'),
-  }, async () => {
-    try {
-      const status = await getSlackStatus(context);
+  server.tool(
+    'slack_get_status',
+    {
+      description: z
+        .string()
+        .describe("Gets the current user's Slack status including status text and emoji"),
+    },
+    async () => {
+      try {
+        const status = await getSlackStatus(context);
 
-      // Format the status as markdown
-      const markdown = formatStatusOutput(status);
+        // Format the status as markdown
+        const markdown = formatStatusOutput(status);
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: markdown,
-          },
-        ],
-      };
-    } catch (error) {
-      return {
-        content: [{ type: 'text', text: `Error: ${error}` }],
-        isError: true,
-      };
-    }
-  });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: markdown,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: `Error: ${error}` }],
+          isError: true,
+        };
+      }
+    },
+  );
 }

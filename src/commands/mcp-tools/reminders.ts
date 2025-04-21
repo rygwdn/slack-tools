@@ -17,7 +17,9 @@ export function registerReminderTools(server: McpServer, context: CommandContext
       user: z
         .string()
         .optional()
-        .describe('Slack user ID to create the reminder for. If omitted, creates reminder for the current user. Must start with "U" followed by alphanumeric characters.'),
+        .describe(
+          'Slack user ID to create the reminder for. If omitted, creates reminder for the current user. Must start with "U" followed by alphanumeric characters.',
+        ),
     },
     async ({ text, time, user }) => {
       try {

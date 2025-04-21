@@ -65,11 +65,11 @@ export async function searchSlackMessages(
   context: CommandContext,
 ): Promise<Match[]> {
   context.debugLog(`Original search query: ${query}`);
-  
+
   // Enhance the search query with proper user formatting
   const enhancedQuery = await enhanceSearchQuery(client, query, context);
   context.debugLog(`Executing search with enhanced query: ${enhancedQuery}`);
-  
+
   try {
     const searchResults = await client.search.messages({
       query: enhancedQuery,

@@ -305,14 +305,14 @@ export async function getUserProfile(userId: string, context: CommandContext) {
 
     // First get basic user info
     const userInfo = await client.users.info({ user: userId });
-    
+
     if (!userInfo.ok || !userInfo.user) {
       throw new Error(`User not found: ${userId}`);
     }
 
     // Then get detailed profile
     const userProfile = await client.users.profile.get({ user: userId });
-    
+
     if (!userProfile.ok || !userProfile.profile) {
       throw new Error(`Profile not found for user: ${userId}`);
     }
@@ -322,7 +322,8 @@ export async function getUserProfile(userId: string, context: CommandContext) {
       userId: userId,
       username: userInfo.user.name,
       realName: userInfo.user.real_name,
-      displayName: userProfile.profile.display_name || userInfo.user.real_name || userInfo.user.name,
+      displayName:
+        userProfile.profile.display_name || userInfo.user.real_name || userInfo.user.name,
       email: userProfile.profile.email,
       phone: userProfile.profile.phone,
       title: userProfile.profile.title,
@@ -333,8 +334,8 @@ export async function getUserProfile(userId: string, context: CommandContext) {
       status: {
         text: userProfile.profile.status_text || '',
         emoji: userProfile.profile.status_emoji || '',
-        expiration: userProfile.profile.status_expiration 
-          ? new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString() 
+        expiration: userProfile.profile.status_expiration
+          ? new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString()
           : null,
       },
       isBot: userInfo.user.is_bot || false,
@@ -342,7 +343,9 @@ export async function getUserProfile(userId: string, context: CommandContext) {
       isOwner: userInfo.user.is_owner || false,
       isRestricted: userInfo.user.is_restricted || false,
       isUltraRestricted: userInfo.user.is_ultra_restricted || false,
-      updated: userInfo.user.updated ? new Date(Number(userInfo.user.updated) * 1000).toISOString() : null,
+      updated: userInfo.user.updated
+        ? new Date(Number(userInfo.user.updated) * 1000).toISOString()
+        : null,
     };
   } catch (error) {
     throw new Error(`User profile retrieval failed: ${error}`);

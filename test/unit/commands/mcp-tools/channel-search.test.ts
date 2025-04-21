@@ -67,11 +67,11 @@ import { registerChannelSearchTool } from '../../../../src/commands/mcp-tools/ch
 describe('Channel Search MCP Tool', () => {
   let context: CommandContext;
   let mockServer: any;
-  let toolHandler: (params: {query: string}) => Promise<any>;
-  
+  let toolHandler: (params: { query: string }) => Promise<any>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock the MCP server
     mockServer = {
       tool: vi.fn((name, schema, handler) => {
@@ -81,10 +81,10 @@ describe('Channel Search MCP Tool', () => {
         return mockServer;
       }),
     };
-    
+
     context = new CommandContext();
     context.workspace = 'test-workspace';
-    
+
     // Register the tool
     registerChannelSearchTool(mockServer, context);
   });
@@ -93,18 +93,18 @@ describe('Channel Search MCP Tool', () => {
     expect(mockServer.tool).toHaveBeenCalledWith(
       'slack_channel_search',
       expect.anything(),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('should search for channels properly', async () => {
     // Call the handler
     const result = await toolHandler({ query: 'team' });
-    
+
     // Verify the result structure
     expect(result).toHaveProperty('content');
     expect(Array.isArray(result.content)).toBe(true);
-    
+
     // Verify the markdown content
     const markdownContent = result.content[0].text;
     expect(markdownContent).toContain('Channel Search Results');
@@ -118,7 +118,7 @@ describe('Channel Search MCP Tool', () => {
 
   it('should handle empty query properly', async () => {
     const result = await toolHandler({ query: '' });
-    
+
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Please provide a search term');
   });
@@ -126,49 +126,52 @@ describe('Channel Search MCP Tool', () => {
   it('should handle no matches gracefully', async () => {
     // Mock implementation for this test only
     const { getSlackClient } = await import('../../../../src/slack-api');
-    vi.mocked(getSlackClient).mockImplementationOnce(() => ({
-      conversations: {
-        list: vi.fn(() => Promise.resolve({ ok: true, channels: [] })),
-      },
-    } as any));
-    
+    vi.mocked(getSlackClient).mockImplementationOnce(
+      () =>
+        ({
+          conversations: {
+            list: vi.fn(() => Promise.resolve({ ok: true, channels: [] })),
+          },
+        }) as any,
+    );
+
     const result = await toolHandler({ query: 'nonexistent' });
-    
+
     expect(result.content[0].text).toContain('No channels found');
   });
 
   it('should sort results properly', async () => {
     const result = await toolHandler({ query: 'team' });
-    
+
     const markdownContent = result.content[0].text;
-    
+
     // Test that both team channels appear in the results
     expect(markdownContent).toContain('dev-team');
     expect(markdownContent).toContain('private-team');
-    
+
     // Verify that sorting is working (we know dev-team has more members)
     const devPosition = markdownContent.indexOf('dev-team');
     const privatePosition = markdownContent.indexOf('private-team');
-    
+
     // Since dev-team has more members (15 vs 8), it should come first
     expect(devPosition).toBeLessThan(privatePosition);
   });
 
   it('should include proper search formats in results', async () => {
     const result = await toolHandler({ query: 'general' });
-    
+
     const markdownContent = result.content[0].text;
-    
+
     expect(markdownContent).toContain('in:general');
     expect(markdownContent).toContain('in:<#C12345>');
     expect(markdownContent).toContain('Search Format');
     expect(markdownContent).toContain('ID Search Format');
   });
-  
+
   it('should handle channel ID links in the query', async () => {
     // Test with a Slack channel link format
     const result = await toolHandler({ query: '<#C12345|general>' });
-    
+
     // The search should find the channel by ID
     const markdownContent = result.content[0].text;
     expect(markdownContent).toContain('#general');

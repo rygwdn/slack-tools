@@ -7,9 +7,22 @@ export function registerThreadReplyTools(server: McpServer, context: CommandCont
   server.tool(
     'slack_get_thread_replies',
     {
-      channel: z.string().describe('Slack channel ID where the thread is located (starts with C, D, or G followed by alphanumeric characters)'),
-      ts: z.string().describe('Timestamp of the parent message in Unix epoch time format (e.g., "1234567890.123456")'),
-      limit: z.number().optional().describe('Maximum number of replies to fetch (1-1000). If not specified, defaults to all replies.'),
+      channel: z
+        .string()
+        .describe(
+          'Slack channel ID where the thread is located (starts with C, D, or G followed by alphanumeric characters)',
+        ),
+      ts: z
+        .string()
+        .describe(
+          'Timestamp of the parent message in Unix epoch time format (e.g., "1234567890.123456")',
+        ),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum number of replies to fetch (1-1000). If not specified, defaults to all replies.',
+        ),
     },
     async ({ channel, ts, limit }) => {
       try {

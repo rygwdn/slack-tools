@@ -79,7 +79,11 @@ describe('User Utils', () => {
         ],
       });
 
-      const result = await resolveUserForSearch(mockWebClient as any, 'johndoe', mockContext as any);
+      const result = await resolveUserForSearch(
+        mockWebClient as any,
+        'johndoe',
+        mockContext as any,
+      );
 
       expect(result).toBe('<@U12345678>');
       expect(mockWebClient.users.list).toHaveBeenCalled();
@@ -220,7 +224,11 @@ describe('User Utils', () => {
         ],
       });
 
-      const result = await resolveUserForSearch(mockWebClient as any, '@johndoe', mockContext as any);
+      const result = await resolveUserForSearch(
+        mockWebClient as any,
+        '@johndoe',
+        mockContext as any,
+      );
 
       expect(result).toBe('<@U12345678>');
     });

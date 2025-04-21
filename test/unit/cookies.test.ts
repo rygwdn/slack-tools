@@ -24,9 +24,9 @@ describe('cookies', () => {
         name: 'd',
         value: 'xoxd-test-token',
       });
-      
+
       const result = await cookiesModule.getCookie();
-      
+
       expect(result).toEqual({
         name: 'd',
         value: 'xoxd-test-token',
@@ -39,9 +39,9 @@ describe('cookies', () => {
         name: 'd',
         value: 'xoxd-test-token',
       });
-      
+
       const result = await cookiesModule.getCookie();
-      
+
       expect(result).toEqual({
         name: 'd',
         value: 'xoxd-test-token',
@@ -51,33 +51,33 @@ describe('cookies', () => {
     it('should throw an error when cookie does not contain xoxd-', async () => {
       // Mock the error for invalid token
       vi.mocked(cookiesModule.getCookie).mockRejectedValue(
-        new Error('Decrypted cookie value does not have the required xoxd- prefix')
+        new Error('Decrypted cookie value does not have the required xoxd- prefix'),
       );
-      
+
       await expect(cookiesModule.getCookie()).rejects.toThrow(
-        'Decrypted cookie value does not have the required xoxd- prefix'
+        'Decrypted cookie value does not have the required xoxd- prefix',
       );
     });
 
     it('should throw an error when no cookies are found', async () => {
       // Mock the error for no cookies
       vi.mocked(cookiesModule.getCookie).mockRejectedValue(
-        new Error('Could not find any Slack "d" cookies in cookies database')
+        new Error('Could not find any Slack "d" cookies in cookies database'),
       );
-      
+
       await expect(cookiesModule.getCookie()).rejects.toThrow(
-        'Could not find any Slack "d" cookies in cookies database'
+        'Could not find any Slack "d" cookies in cookies database',
       );
     });
 
     it('should throw an error when multiple different tokens are found', async () => {
       // Mock the error for multiple tokens
       vi.mocked(cookiesModule.getCookie).mockRejectedValue(
-        new Error('Found 2 different Slack tokens in cookies. Please clear unused cookies.')
+        new Error('Found 2 different Slack tokens in cookies. Please clear unused cookies.'),
       );
-      
+
       await expect(cookiesModule.getCookie()).rejects.toThrow(
-        'Found 2 different Slack tokens in cookies'
+        'Found 2 different Slack tokens in cookies',
       );
     });
 
@@ -87,9 +87,9 @@ describe('cookies', () => {
         name: 'd',
         value: 'xoxd-same-token',
       });
-      
+
       const result = await cookiesModule.getCookie();
-      
+
       expect(result).toEqual({
         name: 'd',
         value: 'xoxd-same-token',

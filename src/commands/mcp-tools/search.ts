@@ -8,12 +8,16 @@ export function registerSearchTools(server: McpServer, context: CommandContext):
   server.tool(
     'slack_search',
     {
-      query: z.string().describe(
-        'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.'
-      ),
-      count: z.number().optional().default(100).describe(
-        'Maximum number of results to return (1-1000). Default is 100.'
-      ),
+      query: z
+        .string()
+        .describe(
+          'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.',
+        ),
+      count: z
+        .number()
+        .optional()
+        .default(100)
+        .describe('Maximum number of results to return (1-1000). Default is 100.'),
     },
     async ({ query, count }) => {
       try {
