@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CommandContext } from '../context';
-import { registerAllTools } from './mcp-tools';
+import { registerAllTools } from './mcp-tools/register-tools';
 
 export function registerMcpCommand(program: Command, context: CommandContext): void {
   program

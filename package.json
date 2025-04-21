@@ -4,7 +4,7 @@
     "description": "Tools for interacting with Slack's local data",
     "type": "module",
     "bin": {
-        "slack-tools": "./dist/cli.js"
+        "slack-tools": "./dist/src/cli.js"
     },
     "scripts": {
         "build": "tsc",

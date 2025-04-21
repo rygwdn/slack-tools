@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { registerCommands } from './commands';
+import { registerCommands } from './commands/register-commands';
 import { getLastWorkspace, setLastWorkspace } from './cache';
 import { CommandContext } from './context';
 
