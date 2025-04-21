@@ -169,7 +169,7 @@ describe('MCP Command', () => {
 
       expect(McpServer).toHaveBeenCalledWith({
         name: 'slack-tools-server',
-        version: '1.0.0',
+        version: '1.0.1',
       });
     });
 
