@@ -10,6 +10,20 @@ This tool provides programmatic access to the [Slack](https://slack.com/) ecosys
 
 ### Installation
 
+You can use this tool in several ways:
+
+#### Using npx (no installation required)
+
+Run the tool directly using npx:
+
+```bash
+npx github:rygwdn/slack-tools [options] [command]
+```
+
+This will download and execute the latest version without installing it globally.
+
+#### Local Installation
+
 1. Clone this repository
 2. Install dependencies:
    ```bash
