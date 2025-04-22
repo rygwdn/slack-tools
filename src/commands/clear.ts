@@ -1,15 +1,15 @@
 import { Command } from 'commander';
-import { clearStoredTokens } from '../cache';
+import { clearStoredAuth } from '../keychain.js';
 
 export function registerClearCommand(program: Command): void {
   program
     .command('clear')
-    .description('Clear stored tokens from keychain')
+    .description('Clear stored authentication from keychain')
     .action(async () => {
       try {
-        console.log('Clearing stored tokens from keychain...');
-        await clearStoredTokens();
-        console.log('Tokens cleared successfully.');
+        console.error('Clearing stored authentication from keychain...');
+        await clearStoredAuth();
+        console.error('Authentication cleared successfully.');
       } catch (error) {
         console.error('Error:', error);
         process.exit(1);

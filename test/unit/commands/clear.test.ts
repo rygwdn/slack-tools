@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { registerClearCommand } from '../../../src/commands/clear';
+import { registerClearCommand } from '../../../src/commands/clear.js';
 import { Command } from 'commander';
 
-// Mock cache functions
-vi.mock('../../../src/cache', () => ({
-  clearStoredTokens: vi.fn(),
+// Mock keychain functions
+vi.mock('../../../src/keychain.js', () => ({
+  clearStoredAuth: vi.fn(),
 }));
 
 // Import mocked functions
-import { clearStoredTokens } from '../../../src/cache';
+import { clearStoredAuth } from '../../../src/keychain.js';
 
 describe('Clear Command', () => {
   let program: Command;
@@ -20,7 +20,6 @@ describe('Clear Command', () => {
     program = new Command();
 
     // Mock console methods
-    vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
   });
@@ -41,9 +40,9 @@ describe('Clear Command', () => {
       expect(commandSpy).toHaveBeenCalledWith('clear');
     });
 
-    it('should clear tokens when executed', async () => {
-      // Mock clearStoredTokens to succeed
-      vi.mocked(clearStoredTokens).mockResolvedValueOnce(undefined);
+    it('should clear authentication when executed', async () => {
+      // Mock clearStoredAuth to succeed
+      vi.mocked(clearStoredAuth).mockResolvedValueOnce(undefined);
 
       // Setup command execution
       let actionCallback: (() => Promise<void>) | null = null;
@@ -61,18 +60,18 @@ describe('Clear Command', () => {
       expect(actionCallback).not.toBeNull();
       await actionCallback!();
 
-      // Check if tokens were cleared
-      expect(clearStoredTokens).toHaveBeenCalled();
+      // Check if auth was cleared
+      expect(clearStoredAuth).toHaveBeenCalled();
 
       // Check console output
-      expect(console.log).toHaveBeenCalledWith('Clearing stored tokens from keychain...');
-      expect(console.log).toHaveBeenCalledWith('Tokens cleared successfully.');
+      expect(console.error).toHaveBeenCalledWith('Clearing stored authentication from keychain...');
+      expect(console.error).toHaveBeenCalledWith('Authentication cleared successfully.');
     });
 
-    it('should handle errors when clearing tokens fails', async () => {
-      // Mock clearStoredTokens to fail
-      const clearError = new Error('Failed to clear tokens');
-      vi.mocked(clearStoredTokens).mockRejectedValueOnce(clearError);
+    it('should handle errors when clearing authentication fails', async () => {
+      // Mock clearStoredAuth to fail
+      const clearError = new Error('Failed to clear authentication');
+      vi.mocked(clearStoredAuth).mockRejectedValueOnce(clearError);
 
       // Setup command execution
       let actionCallback: (() => Promise<void>) | null = null;

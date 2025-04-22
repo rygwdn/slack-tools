@@ -5,7 +5,7 @@ import {
   loadSlackCache,
   saveSlackCache,
   SLACK_CACHE_TTL,
-} from '../../src/cache';
+} from '../../src/cache.js';
 
 // Mock filesystem operations
 vi.mock('fs', () => ({
@@ -19,13 +19,6 @@ vi.mock('fs', () => ({
 // Mock os.homedir
 vi.mock('os', () => ({
   homedir: vi.fn(() => '/mock/home'),
-}));
-
-// Mock keychain functions
-vi.mock('../../src/keychain', () => ({
-  getStoredTokens: vi.fn(),
-  storeTokens: vi.fn(),
-  clearStoredTokens: vi.fn(),
 }));
 
 // Import the fs module after mocking it

@@ -25,7 +25,7 @@ export interface SlackCookie {
 
 export interface SlackAuth {
   tokens: WorkspaceTokens;
-  cookie: SlackCookie;
+  cookie: SlackCookie | null;
 }
 
 // Configuration cache structure
@@ -36,5 +36,4 @@ export interface CacheConfig {
 // For filtering auth by workspace
 export interface WorkspaceAuthOptions {
   workspace?: string;
-  quiet?: boolean;
 }

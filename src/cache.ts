@@ -1,12 +1,7 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import {
-  getStoredTokens as getKeychainTokens,
-  storeTokens as storeKeychainTokens,
-  clearStoredTokens as clearKeychainTokens,
-} from './keychain';
-import type { WorkspaceTokens, CacheConfig } from './types';
+import type { CacheConfig } from './types.js';
 
 const CONFIG_DIR = join(homedir(), '.slack-tools');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -68,19 +63,6 @@ export async function setLastWorkspace(workspace: string): Promise<void> {
   const config = await loadConfig();
   config.lastWorkspace = workspace;
   await saveConfig(config);
-}
-
-// Re-export keychain functions
-export async function getStoredTokens(): Promise<WorkspaceTokens | null> {
-  return getKeychainTokens();
-}
-
-export async function storeTokens(tokens: WorkspaceTokens): Promise<void> {
-  return storeKeychainTokens(tokens);
-}
-
-export async function clearStoredTokens(): Promise<void> {
-  return clearKeychainTokens();
 }
 
 /**
