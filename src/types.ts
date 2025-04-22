@@ -1,3 +1,5 @@
+import { CommandContext } from './context';
+
 export interface WorkspaceToken {
   token: string;
   name: string;
@@ -36,4 +38,5 @@ export interface CacheConfig {
 // For filtering auth by workspace
 export interface WorkspaceAuthOptions {
   workspace?: string;
+  context?: CommandContext;
 }

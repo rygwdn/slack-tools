@@ -55,7 +55,7 @@ program.hook('preAction', async (thisCommand) => {
       commandContext.lastWorkspaceUsed = true;
       commandContext.debugLog(`Using last workspace: ${lastWorkspace}`);
     } else {
-      console.warn('No last workspace found. Please specify a workspace using --workspace.');
+      console.error('No last workspace found. Please specify a workspace using --workspace.');
       commandContext.debugLog('No last workspace found in cache');
     }
   }

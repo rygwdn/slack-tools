@@ -71,9 +71,9 @@ export class CommandContext {
   debugLog(message: any, ...args: any[]): void {
     if (this._debug) {
       if (args.length > 0) {
-        console.log('[DEBUG]', message, ...args);
+        console.error('[DEBUG]', message, ...args);
       } else {
-        console.log('[DEBUG]', message);
+        console.error('[DEBUG]', message);
       }
     }
   }

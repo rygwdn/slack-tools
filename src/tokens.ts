@@ -2,6 +2,7 @@ import { Level } from 'level';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import type { WorkspaceTokens, SlackConfig } from './types';
+import { CommandContext } from './context';
 
 /**
  * Get the path to Slack's LevelDB storage based on the platform
@@ -33,11 +34,11 @@ function getLevelDBPath(): string {
 
 /**
  * Extract personal tokens from the Slack desktop app's local storage.
- * @param quiet Whether to suppress output messages
+ * @param context Command context for debugging
  * @returns Promise<WorkspaceTokens> Object containing workspace tokens
  * @throws Error if the database is locked or tokens cannot be found
  */
-export async function getTokens(quiet = false): Promise<WorkspaceTokens> {
+export async function getTokens(context?: CommandContext): Promise<WorkspaceTokens> {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
 
@@ -72,7 +73,7 @@ export async function getTokens(quiet = false): Promise<WorkspaceTokens> {
 
     return tokens;
   } catch (error) {
-    // Always log errors to console.error regardless of quiet mode
+    // Always log errors to console.error regardless of mode
     console.error('Error:', error);
 
     // Check for the specific LEVEL_LOCKED error code
@@ -90,8 +91,8 @@ export async function getTokens(quiet = false): Promise<WorkspaceTokens> {
     }
     throw error;
   } finally {
-    if (!quiet) {
-      console.log('Closing database');
+    if (context?.debug) {
+      context.debugLog('Closing database');
     }
     if (db.status === 'open') {
       await db.close();

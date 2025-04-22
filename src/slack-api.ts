@@ -13,7 +13,7 @@ export async function getWorkspaceToken(
   workspaceUrl: string;
   cookie: { name: string; value: string };
 }> {
-  const auth = await getSlackAuth({ quiet: !context.debug });
+  const auth = await getSlackAuth({ context });
 
   context.debugLog('Available workspaces:', Object.keys(auth.tokens).join(', '));
   context.debugLog('Looking for workspace:', workspaceName);

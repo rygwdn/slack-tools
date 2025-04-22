@@ -61,7 +61,7 @@ async function validateAuth(auth: SlackAuth) {
  * @throws Error if no valid auth is available
  */
 export async function getSlackAuth(options: WorkspaceAuthOptions = {}): Promise<SlackAuth> {
-  const { workspace } = options;
+  const { workspace, context } = options;
 
   const alreadyTestedAuth = authTestedThisSession;
   authTestedThisSession = true;
@@ -79,7 +79,7 @@ export async function getSlackAuth(options: WorkspaceAuthOptions = {}): Promise<
 
   const newAuth = {
     cookie: await getCookie(),
-    tokens: await getTokens(),
+    tokens: await getTokens(context),
   };
 
   await validateAuth(newAuth);
