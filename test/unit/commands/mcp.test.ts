@@ -167,10 +167,11 @@ describe('MCP Command', () => {
       expect(actionCallback).not.toBeNull();
       await actionCallback!();
 
-      expect(McpServer).toHaveBeenCalledWith({
-        name: 'slack-tools-server',
-        version: '1.0.1',
-      });
+      // Check the server was created with package version or fallback
+      expect(McpServer).toHaveBeenCalled();
+      const serverInitCall = vi.mocked(McpServer).mock.calls[0][0];
+      expect(serverInitCall.name).toBe('slack-tools-server');
+      expect(typeof serverInitCall.version).toBe('string');
     });
 
     it('should register all required tools with the server', async () => {

@@ -16,9 +16,12 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
         process.exit(1);
       }
 
+      // Import package.json version from the process
+      const packageVersion = process.env.npm_package_version || '1.0.2';
+      
       const server = new McpServer({
         name: 'slack-tools-server',
-        version: '1.0.2',
+        version: packageVersion,
       });
 
       // Register all tools from the mcp-tools directory

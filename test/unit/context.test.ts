@@ -76,13 +76,13 @@ describe('CommandContext', () => {
     it('should log if debug is true', () => {
       context.debug = true;
       context.debugLog('test message');
-      expect(console.log).toHaveBeenCalledWith('[DEBUG]', 'test message');
+      expect(console.error).toHaveBeenCalledWith('[DEBUG]', 'test message');
     });
 
     it('should log multiple arguments if provided', () => {
       context.debug = true;
       context.debugLog('test message', 'arg1', 'arg2');
-      expect(console.log).toHaveBeenCalledWith('[DEBUG]', 'test message', 'arg1', 'arg2');
+      expect(console.error).toHaveBeenCalledWith('[DEBUG]', 'test message', 'arg1', 'arg2');
     });
   });
 });

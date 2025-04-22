@@ -35,7 +35,8 @@ describe('slack-api', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     // Mock the auth response
     vi.mocked(getSlackAuth).mockResolvedValue({
       tokens: mockTokens,
@@ -64,8 +65,8 @@ describe('slack-api', () => {
         cookie: mockCookie,
       });
 
-      // Verify auth was called
-      expect(getSlackAuth).toHaveBeenCalledWith({ quiet: false });
+      // Verify auth was called with context
+      expect(getSlackAuth).toHaveBeenCalledWith({ context });
     });
 
     it('should find a workspace by name (case insensitive)', async () => {
@@ -84,7 +85,7 @@ describe('slack-api', () => {
       );
 
       // Debug information should be logged
-      expect(console.log).toHaveBeenCalledWith('[DEBUG]', 'All available workspaces:');
+      expect(console.error).toHaveBeenCalledWith('[DEBUG]', 'All available workspaces:');
     });
   });
 
