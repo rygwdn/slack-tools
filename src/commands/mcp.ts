@@ -18,7 +18,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       const server = new McpServer({
         name: 'slack-tools-server',
-        version: '1.0.1',
+        version: '1.0.2',
       });
 
       // Register all tools from the mcp-tools directory
