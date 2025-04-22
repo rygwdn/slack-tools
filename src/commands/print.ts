@@ -1,6 +1,9 @@
 import { Command } from 'commander';
-import { getSlackAuth } from '../auth';
+import { findWorkspaceToken } from '../slack-api';
 import { CommandContext } from '../context';
+import { getStoredAuth } from '../keychain.js';
+import { getCookie } from '../cookies.js';
+import { getTokens } from '../tokens.js';
 
 export function registerPrintCommand(program: Command, context: CommandContext): void {
   program
@@ -13,45 +16,80 @@ export function registerPrintCommand(program: Command, context: CommandContext):
           console.log('Getting Slack credentials...');
         }
 
-        // For print command, we want to work even without a workspace selected
-        // But if a workspace is set, we'll use it to filter results
-        const auth = await getSlackAuth({
-          workspace: context.hasWorkspace ? context.workspace : undefined,
-          quiet: cmdOptions.quiet,
-        });
+        // If no workspace is specified, we'll default to one to get credentials
+        const defaultWorkspace = context.hasWorkspace ? context.workspace : 'default';
 
-        if (Object.keys(auth.tokens).length === 0) {
-          console.error('Error: No tokens found.');
-          if (context.hasWorkspace) {
-            console.error(`No workspace matching "${context.workspace}" was found.`);
-          }
-          process.exit(1);
+        // Get the auth object first
+        const storedAuth = await getStoredAuth();
+        if (!cmdOptions.quiet && !storedAuth) {
+          console.log('No stored auth found, fetching fresh credentials...');
         }
 
-        if (!cmdOptions.quiet) {
-          console.log('\nFound tokens for workspaces:\n');
-        }
+        const auth = storedAuth || {
+          cookie: await getCookie(),
+          tokens: await getTokens(context),
+        };
 
-        for (const [url, details] of Object.entries(auth.tokens)) {
-          if (cmdOptions.quiet) {
-            console.log(`${details.token}`);
+        try {
+          const { token, cookie, workspaceUrl } = findWorkspaceToken(
+            auth,
+            defaultWorkspace,
+            context,
+          );
+
+          if (!cmdOptions.quiet) {
+            console.log('\nFound token for workspace:\n');
+            console.log(`Workspace URL: ${workspaceUrl}`);
+            console.log(`Token: ${token}\n`);
+
+            console.log('Found cookie:');
+            console.log(`${cookie.name}: ${cookie.value}\n`);
           } else {
-            console.log(`${details.name} (${url})`);
-            console.log(`Token: ${details.token}\n`);
+            console.log(token);
+            console.log(cookie.value);
           }
-        }
+        } catch (error) {
+          // If the specified workspace isn't found and we're using a default,
+          // we'll just use any available token
+          if (!context.hasWorkspace) {
+            try {
+              // Try with an empty string to get any available workspace
+              const firstWorkspaceKey = Object.keys(auth.tokens)[0];
 
-        if (cmdOptions.quiet) {
-          console.log(`${auth.cookie.value}`);
-        } else {
-          console.log('Found cookie:');
-          console.log(`${auth.cookie.name}: ${auth.cookie.value}\n`);
+              if (!firstWorkspaceKey) {
+                throw new Error('No workspaces available');
+              }
 
-          // Print guidance about workspace selection if we showed multiple workspaces
-          if (Object.keys(auth.tokens).length > 1 && !context.hasWorkspace) {
-            console.log('\nTip: To filter results for a specific workspace, use one of:');
-            console.log('  - Use -w, --workspace <workspace> to specify a workspace directly');
-            console.log('  - Use -l, --last-workspace to use your most recently used workspace');
+              const { token, cookie, workspaceUrl } = findWorkspaceToken(
+                auth,
+                firstWorkspaceKey, // Use the first workspace key instead of empty string
+                context,
+              );
+
+              if (!cmdOptions.quiet) {
+                console.log('\nFound token for workspace:\n');
+                console.log(`Workspace URL: ${workspaceUrl}`);
+                console.log(`Token: ${token}\n`);
+
+                console.log('Found cookie:');
+                console.log(`${cookie.name}: ${cookie.value}\n`);
+
+                console.log('\nTip: To specify a workspace directly, use:');
+                console.log('  - Use -w, --workspace <workspace> to specify a workspace');
+                console.log(
+                  '  - Use -l, --last-workspace to use your most recently used workspace',
+                );
+              } else {
+                console.log(token);
+                console.log(cookie.value);
+              }
+            } catch (innerError) {
+              console.error('Error getting any workspace token:', innerError);
+              process.exit(1);
+            }
+          } else {
+            console.error(`Error getting workspace "${context.workspace}":`, error);
+            process.exit(1);
           }
         }
       } catch (error) {

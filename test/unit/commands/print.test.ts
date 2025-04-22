@@ -4,16 +4,50 @@ import { CommandContext } from '../../../src/context';
 import { Command } from 'commander';
 
 // Mock dependencies
-vi.mock('../../../src/auth', () => ({
-  getSlackAuth: vi.fn(),
+vi.mock('../../../src/slack-api', () => ({
+  findWorkspaceToken: vi.fn(),
+}));
+
+vi.mock('../../../src/keychain.js', () => ({
+  getStoredAuth: vi.fn(),
+  storeAuth: vi.fn(),
+}));
+
+vi.mock('../../../src/tokens.js', () => ({
+  getTokens: vi.fn(),
+}));
+
+vi.mock('../../../src/cookies.js', () => ({
+  getCookie: vi.fn(),
 }));
 
 // Import the mocked functions
-import { getSlackAuth } from '../../../src/auth';
+import { findWorkspaceToken } from '../../../src/slack-api';
+import { getStoredAuth } from '../../../src/keychain.js';
+import { getTokens } from '../../../src/tokens.js';
+import { getCookie } from '../../../src/cookies.js';
 
 describe('Print Command', () => {
   let context: CommandContext;
   let program: Command;
+
+  // Mock data
+  const mockToken = 'xoxc-token-1';
+  const mockWorkspaceUrl = 'team1.slack.com';
+  const mockCookie = { name: 'd', value: 'cookie-value' };
+  const mockTokenResponse = {
+    token: mockToken,
+    workspaceUrl: mockWorkspaceUrl,
+    cookie: mockCookie,
+  };
+
+  const mockAuth = {
+    tokens: {
+      'team1.slack.com': { token: mockToken, name: 'Team One' },
+      'team2.slack.com': { token: 'xoxc-token-2', name: 'Team Two' },
+    },
+    cookie: mockCookie,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,6 +62,12 @@ describe('Print Command', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    // Default mock implementations
+    vi.mocked(getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(findWorkspaceToken).mockReturnValue(mockTokenResponse);
+    vi.mocked(getTokens).mockResolvedValue(mockAuth.tokens);
+    vi.mocked(getCookie).mockResolvedValue(mockCookie);
   });
 
   afterEach(() => {
@@ -61,27 +101,8 @@ describe('Print Command', () => {
     });
 
     it('should print tokens and cookies when no workspace is selected', async () => {
-      // Mock authentication response
-      const mockAuth = {
-        tokens: {
-          'team1.slack.com': {
-            name: 'Team 1',
-            token: 'xoxc-token-1',
-            cookie: 'd=cookie1',
-          },
-          'team2.slack.com': {
-            name: 'Team 2',
-            token: 'xoxc-token-2',
-            cookie: 'd=cookie2',
-          },
-        },
-        cookie: {
-          name: 'd',
-          value: 'cookie-value',
-        },
-      };
-
-      vi.mocked(getSlackAuth).mockResolvedValueOnce(mockAuth);
+      // Mock findWorkspaceToken response
+      vi.mocked(findWorkspaceToken).mockReturnValueOnce(mockTokenResponse);
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -100,49 +121,23 @@ describe('Print Command', () => {
       expect(actionCallback).not.toBeNull();
       await actionCallback!({ quiet: false });
 
-      // Check if auth was fetched correctly (without workspace filter)
-      expect(getSlackAuth).toHaveBeenCalledWith({
-        workspace: undefined,
-        quiet: false,
-      });
+      // Check if auth was used correctly
+      expect(getStoredAuth).toHaveBeenCalled();
+      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'default', context);
 
       // Check console output
       expect(console.log).toHaveBeenCalledWith('Getting Slack credentials...');
-      expect(console.log).toHaveBeenCalledWith('\nFound tokens for workspaces:\n');
-      expect(console.log).toHaveBeenCalledWith('Team 1 (team1.slack.com)');
-      expect(console.log).toHaveBeenCalledWith('Token: xoxc-token-1\n');
-      expect(console.log).toHaveBeenCalledWith('Team 2 (team2.slack.com)');
-      expect(console.log).toHaveBeenCalledWith('Token: xoxc-token-2\n');
+      expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
+      expect(console.log).toHaveBeenCalledWith(`Workspace URL: ${mockWorkspaceUrl}`);
+      expect(console.log).toHaveBeenCalledWith(`Token: ${mockToken}\n`);
       expect(console.log).toHaveBeenCalledWith('Found cookie:');
       expect(console.log).toHaveBeenCalledWith('d: cookie-value\n');
-
-      // Check tip message for multiple workspaces
-      expect(console.log).toHaveBeenCalledWith(
-        '\nTip: To filter results for a specific workspace, use one of:',
-      );
     });
 
     it('should print tokens for a specific workspace when selected', async () => {
       // Set workspace in context
       Object.defineProperty(context, 'hasWorkspace', { get: () => true });
       context.workspace = 'team1';
-
-      // Mock authentication response for a single workspace
-      const mockAuth = {
-        tokens: {
-          'team1.slack.com': {
-            name: 'Team 1',
-            token: 'xoxc-token-1',
-            cookie: 'd=cookie1',
-          },
-        },
-        cookie: {
-          name: 'd',
-          value: 'cookie-value',
-        },
-      };
-
-      vi.mocked(getSlackAuth).mockResolvedValueOnce(mockAuth);
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -160,43 +155,16 @@ describe('Print Command', () => {
       // Execute the command action
       await actionCallback!({ quiet: false });
 
-      // Check if auth was fetched with workspace filter
-      expect(getSlackAuth).toHaveBeenCalledWith({
-        workspace: 'team1',
-        quiet: false,
-      });
+      // Check if token was fetched for the specific workspace
+      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'team1', context);
 
       // Check workspace-specific output
-      expect(console.log).toHaveBeenCalledWith('Team 1 (team1.slack.com)');
-      expect(console.log).toHaveBeenCalledWith('Token: xoxc-token-1\n');
-
-      // Check that tip message for multiple workspaces is NOT shown
-      const tipCalls = vi
-        .mocked(console.log)
-        .mock.calls.filter(
-          (call) => call[0] && call[0].toString().includes('Tip: To filter results'),
-        );
-      expect(tipCalls.length).toBe(0);
+      expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
+      expect(console.log).toHaveBeenCalledWith(`Workspace URL: ${mockWorkspaceUrl}`);
+      expect(console.log).toHaveBeenCalledWith(`Token: ${mockToken}\n`);
     });
 
     it('should print only token and cookie values in quiet mode', async () => {
-      // Mock authentication response
-      const mockAuth = {
-        tokens: {
-          'team1.slack.com': {
-            name: 'Team 1',
-            token: 'xoxc-token-1',
-            cookie: 'd=cookie1',
-          },
-        },
-        cookie: {
-          name: 'd',
-          value: 'cookie-value',
-        },
-      };
-
-      vi.mocked(getSlackAuth).mockResolvedValueOnce(mockAuth);
-
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
 
@@ -213,32 +181,21 @@ describe('Print Command', () => {
       // Execute the command action with quiet option
       await actionCallback!({ quiet: true });
 
-      // Check if auth was fetched with quiet flag
-      expect(getSlackAuth).toHaveBeenCalledWith({
-        workspace: undefined,
-        quiet: true,
-      });
-
       // Check quiet mode output (only token and cookie values)
-      expect(console.log).toHaveBeenCalledWith('xoxc-token-1');
+      expect(console.log).toHaveBeenCalledWith(mockToken);
       expect(console.log).toHaveBeenCalledWith('cookie-value');
 
       // Check that descriptive messages are NOT shown
       expect(console.log).not.toHaveBeenCalledWith('Getting Slack credentials...');
-      expect(console.log).not.toHaveBeenCalledWith('Found tokens for workspaces:');
     });
 
-    it('should handle error when no tokens are found', async () => {
-      // Mock authentication with no tokens
-      const mockAuth = {
-        tokens: {},
-        cookie: {
-          name: 'd',
-          value: 'cookie-value',
-        },
-      };
-
-      vi.mocked(getSlackAuth).mockResolvedValueOnce(mockAuth);
+    it('should handle error when no workspace is found and try with first available workspace', async () => {
+      // First findWorkspaceToken call throws error for 'default' workspace
+      vi.mocked(findWorkspaceToken)
+        .mockImplementationOnce(() => {
+          throw new Error('Could not find workspace "default"');
+        })
+        .mockReturnValueOnce(mockTokenResponse); // Second call succeeds
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -256,26 +213,24 @@ describe('Print Command', () => {
       // Execute the command action
       await actionCallback!({ quiet: false });
 
-      // Check error handling
-      expect(console.error).toHaveBeenCalledWith('Error: No tokens found.');
-      expect(process.exit).toHaveBeenCalledWith(1);
+      // Check that it tried with default workspace first, then fell back to first workspace
+      expect(findWorkspaceToken).toHaveBeenCalledTimes(2);
+
+      // Check fallback output
+      expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
+      expect(console.log).toHaveBeenCalledWith(`Workspace URL: ${mockWorkspaceUrl}`);
+      expect(console.log).toHaveBeenCalledWith(`Token: ${mockToken}\n`);
     });
 
-    it('should handle error when workspace is not found', async () => {
+    it('should handle error when specific workspace is not found', async () => {
       // Set non-existent workspace in context
       Object.defineProperty(context, 'hasWorkspace', { get: () => true });
       context.workspace = 'nonexistent-team';
 
-      // Mock authentication with no tokens
-      const mockAuth = {
-        tokens: {},
-        cookie: {
-          name: 'd',
-          value: 'cookie-value',
-        },
-      };
-
-      vi.mocked(getSlackAuth).mockResolvedValueOnce(mockAuth);
+      // Mock findWorkspaceToken to throw an error
+      vi.mocked(findWorkspaceToken).mockImplementationOnce(() => {
+        throw new Error('Could not find workspace "nonexistent-team"');
+      });
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -294,17 +249,24 @@ describe('Print Command', () => {
       await actionCallback!({ quiet: false });
 
       // Check workspace-specific error message
-      expect(console.error).toHaveBeenCalledWith('Error: No tokens found.');
       expect(console.error).toHaveBeenCalledWith(
-        'No workspace matching "nonexistent-team" was found.',
+        'Error getting workspace "nonexistent-team":',
+        expect.any(Error),
       );
       expect(process.exit).toHaveBeenCalledWith(1);
     });
 
-    it('should handle general errors', async () => {
-      // Mock authentication error
-      const authError = new Error('Auth failed');
-      vi.mocked(getSlackAuth).mockRejectedValueOnce(authError);
+    it('should handle general errors when both workspace attempts fail', async () => {
+      // Both findWorkspaceToken calls throw errors
+      vi.mocked(findWorkspaceToken).mockImplementation(() => {
+        throw new Error('No workspaces available');
+      });
+
+      // Set up getStoredAuth to return auth but with no tokens
+      vi.mocked(getStoredAuth).mockResolvedValue({
+        tokens: {},
+        cookie: mockCookie,
+      });
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -322,8 +284,11 @@ describe('Print Command', () => {
       // Execute the command action
       await actionCallback!({ quiet: false });
 
-      // Check general error handling
-      expect(console.error).toHaveBeenCalledWith('Error:', authError);
+      // Check error handling
+      expect(console.error).toHaveBeenCalledWith(
+        'Error getting any workspace token:',
+        expect.any(Error),
+      );
       expect(process.exit).toHaveBeenCalledWith(1);
     });
   });

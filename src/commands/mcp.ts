@@ -18,7 +18,7 @@ export function registerMcpCommand(program: Command, context: CommandContext): v
 
       // Import package.json version from the process
       const packageVersion = process.env.npm_package_version || '1.0.2';
-      
+
       const server = new McpServer({
         name: 'slack-tools-server',
         version: packageVersion,

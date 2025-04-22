@@ -48,6 +48,10 @@ export async function getStoredAuth(): Promise<SlackAuth | null> {
       return null;
     }
 
+    if (!cookie) {
+      return null;
+    }
+
     return { tokens, cookie };
   } catch (error) {
     console.error('Failed to read auth from keychain:', error);

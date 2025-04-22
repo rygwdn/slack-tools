@@ -1,19 +1,116 @@
 import { WebClient, LogLevel } from '@slack/web-api';
-import { getSlackAuth } from './auth';
 import { CommandContext } from './context';
+import { getStoredAuth, clearStoredAuth, storeAuth } from './keychain.js';
+import type { SlackAuth, SlackCookie } from './types.js';
+import { getCookie } from './cookies.js';
+import { getTokens } from './tokens.js';
+
+// Track if auth has been tested during this session
+// Exposed for testing purposes
+export let authTestedThisSession = false;
 
 /**
- * Find a workspace token either by exact URL match or name
+ * Reset the auth tested flag (for testing purposes)
  */
-export async function getWorkspaceToken(
+export function resetAuthTestedFlag(value = false): void {
+  authTestedThisSession = value;
+}
+
+/**
+ * Creates a WebClient instance with the provided configuration
+ */
+function createWebClient(token: string, cookie: SlackCookie, context?: CommandContext): WebClient {
+  return new WebClient(token, {
+    headers: {
+      Cookie: `d=${cookie.value}`,
+    },
+    logLevel: context?.debug ? LogLevel.DEBUG : LogLevel.ERROR,
+  });
+}
+
+/**
+ * Validates the auth by testing a token
+ */
+async function validateAuth(auth: SlackAuth, context: CommandContext) {
+  // Get the first token to test
+  const firstToken = Object.values(auth.tokens)[0]?.token;
+  if (!firstToken) {
+    throw new Error('Auth test failed: No token found');
+  }
+
+  try {
+    // Test the token by calling auth.test API
+    const client = createWebClient(firstToken, auth.cookie, context);
+    const response = await client.auth.test();
+
+    if (!response.ok) {
+      throw new Error('Auth test failed: API returned not ok');
+    }
+  } catch (error) {
+    console.error('Auth test API call failed:', error);
+    throw new Error('Auth test failed: API call error');
+  }
+}
+
+/**
+ * Get fresh auth by fetching new tokens and cookie
+ */
+async function getFreshAuth(context: CommandContext): Promise<SlackAuth> {
+  const newAuth = {
+    cookie: await getCookie(),
+    tokens: await getTokens(context),
+  };
+
+  await validateAuth(newAuth, context);
+  await storeAuth(newAuth);
+
+  return newAuth;
+}
+
+/**
+ * Validate stored auth and refresh if necessary
+ * @returns The validated SlackAuth object
+ */
+async function validateAndRefreshAuth(context: CommandContext): Promise<SlackAuth> {
+  const storedAuth = await getStoredAuth();
+
+  if (storedAuth?.cookie && storedAuth?.tokens) {
+    try {
+      await validateAuth(storedAuth, context);
+      // Mark auth as tested
+      authTestedThisSession = true;
+      return storedAuth;
+    } catch (error) {
+      console.error('Auth error encountered, clearing stored credentials and retrying...', error);
+      await clearStoredAuth();
+      const newAuth = await getFreshAuth(context);
+      // Mark auth as tested
+      authTestedThisSession = true;
+      return newAuth;
+    }
+  } else {
+    const newAuth = await getFreshAuth(context);
+    // Mark auth as tested
+    authTestedThisSession = true;
+    return newAuth;
+  }
+}
+
+/**
+ * Find a workspace token either by exact URL match or name from a provided SlackAuth
+ */
+export function findWorkspaceToken(
+  auth: SlackAuth,
   workspaceName: string,
   context: CommandContext,
-): Promise<{
+): {
   token: string;
   workspaceUrl: string;
-  cookie: { name: string; value: string };
-}> {
-  const auth = await getSlackAuth({ context });
+  cookie: SlackCookie;
+} {
+  if (!auth.cookie) {
+    throw new Error('No cookie found in auth');
+  }
 
   context.debugLog('Available workspaces:', Object.keys(auth.tokens).join(', '));
   context.debugLog('Looking for workspace:', workspaceName);
@@ -65,7 +162,13 @@ export async function getSlackClient(
   workspace: string,
   context: CommandContext,
 ): Promise<WebClient> {
-  const { token, cookie, workspaceUrl } = await getWorkspaceToken(workspace, context);
+  // Get auth - validate on first call or use stored auth for subsequent calls
+  const auth = !authTestedThisSession
+    ? await validateAndRefreshAuth(context)
+    : (await getStoredAuth()) || (await getFreshAuth(context));
+
+  // Find the workspace token using the auth
+  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, workspace, context);
 
   context.debugLog(`Using workspace: ${workspaceUrl}`);
 
@@ -75,10 +178,5 @@ export async function getSlackClient(
   }
 
   // Create and return a web client with the token and cookie
-  return new WebClient(token, {
-    headers: {
-      Cookie: `d=${cookie.value}`,
-    },
-    logLevel: context.debug ? LogLevel.DEBUG : LogLevel.ERROR,
-  });
+  return createWebClient(token, cookie, context);
 }

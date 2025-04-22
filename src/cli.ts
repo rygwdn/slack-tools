@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S npx tsx
 
 import { Command } from 'commander';
 import { readFileSync } from 'fs';
