@@ -12,8 +12,14 @@ export function registerUserSearchTool(server: McpServer, context: CommandContex
         .describe(
           'A search term to find Slack users. Can be a display name, username, or partial match.',
         ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .describe('Maximum number of users to return in the results.'),
     },
-    async ({ query }) => {
+    async ({ query, limit }) => {
       try {
         // Get workspace and client
         const workspace = context.workspace;
@@ -30,7 +36,9 @@ export function registerUserSearchTool(server: McpServer, context: CommandContex
         }
 
         // Get list of users
-        const response = await client.users.list({});
+        const response = await client.users.list({
+          limit,
+        });
 
         if (!response.ok || !response.members) {
           return {

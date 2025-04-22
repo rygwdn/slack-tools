@@ -7,9 +7,7 @@ import { registerStatusTools } from './status';
 import { registerReminderTools } from './reminders';
 import { registerThreadReplyTools } from './thread-replies';
 import { registerUserActivityTools } from './user-activity';
-import { registerSystemDatetimeTools } from './system-datetime';
 import { registerUserSearchTool } from './user-search';
-import { registerChannelSearchTool } from './channel-search';
 import { registerUserProfileTool } from './user-profile';
 
 export function registerAllTools(server: McpServer, context: CommandContext): void {
@@ -20,7 +18,5 @@ export function registerAllTools(server: McpServer, context: CommandContext): vo
   registerThreadReplyTools(server, context);
   registerUserActivityTools(server, context);
   registerUserSearchTool(server, context);
-  registerChannelSearchTool(server, context);
   registerUserProfileTool(server, context);
-  registerSystemDatetimeTools(server);
 }

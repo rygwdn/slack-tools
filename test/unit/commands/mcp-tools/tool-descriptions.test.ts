@@ -8,9 +8,7 @@ import { registerStatusTools } from '../../../../src/commands/mcp-tools/status';
 import { registerReminderTools } from '../../../../src/commands/mcp-tools/reminders';
 import { registerThreadReplyTools } from '../../../../src/commands/mcp-tools/thread-replies';
 import { registerUserActivityTools } from '../../../../src/commands/mcp-tools/user-activity';
-import { registerSystemDatetimeTools } from '../../../../src/commands/mcp-tools/system-datetime';
 import { registerUserSearchTool } from '../../../../src/commands/mcp-tools/user-search';
-import { registerChannelSearchTool } from '../../../../src/commands/mcp-tools/channel-search';
 import { registerUserProfileTool } from '../../../../src/commands/mcp-tools/user-profile';
 
 describe('MCP Tool Descriptions', () => {
@@ -34,9 +32,7 @@ describe('MCP Tool Descriptions', () => {
     registerReminderTools(mockServer, context);
     registerThreadReplyTools(mockServer, context);
     registerUserActivityTools(mockServer, context);
-    registerSystemDatetimeTools(mockServer);
     registerUserSearchTool(mockServer, context);
-    registerChannelSearchTool(mockServer, context);
     registerUserProfileTool(mockServer, context);
 
     // Verify that there are tools registered

@@ -48,7 +48,6 @@ type GetThreadRepliesToolHandler = (params: {
   limit?: number;
 }) => Promise<any>;
 type UserActivityToolHandler = (params: { count?: number; user?: string }) => Promise<any>;
-type GetDatetimeToolHandler = (params: Record<string, unknown>) => Promise<any>;
 type ToolHandler =
   | SearchToolHandler
   | SetStatusToolHandler
@@ -56,8 +55,7 @@ type ToolHandler =
   | MyMessagesToolHandler
   | CreateReminderToolHandler
   | GetThreadRepliesToolHandler
-  | UserActivityToolHandler
-  | GetDatetimeToolHandler;
+  | UserActivityToolHandler;
 
 // Mock MCP SDK
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
@@ -100,9 +98,7 @@ vi.mock('../../../src/services/my-messages-service', () => ({
   generateMyMessagesSummary: vi.fn(),
 }));
 
-// Mock for Date to have consistent results in tests
-const mockDate = new Date('2023-05-15T12:30:45.000Z');
-const originalDate = global.Date;
+// Mock setup happens in each test that needs it
 
 describe('MCP Command', () => {
   let context: CommandContext;
@@ -191,7 +187,7 @@ describe('MCP Command', () => {
       await actionCallback!();
 
       // Check if all tools were registered
-      expect(mockMcpServer.tool).toHaveBeenCalledTimes(11);
+      expect(mockMcpServer.tool).toHaveBeenCalledTimes(9);
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'slack_my_messages',
         expect.anything(),
@@ -224,11 +220,6 @@ describe('MCP Command', () => {
       );
       expect(mockMcpServer.tool).toHaveBeenCalledWith(
         'slack_user_activity',
-        expect.anything(),
-        expect.any(Function),
-      );
-      expect(mockMcpServer.tool).toHaveBeenCalledWith(
-        'system_datetime',
         expect.anything(),
         expect.any(Function),
       );
@@ -709,136 +700,6 @@ describe('MCP Command', () => {
     });
   });
 
-  describe('tool: get_datetime', () => {
-    beforeEach(() => {
-      // Mock the Date object for consistent testing
-      global.Date = vi.fn(() => mockDate) as any;
-      (global.Date as any).now = () => mockDate.getTime();
-      (global.Date as any).parse = originalDate.parse;
-      (global.Date as any).UTC = originalDate.UTC;
-      (global.Date as any).prototype = originalDate.prototype;
-    });
-
-    afterEach(() => {
-      // Restore original Date
-      global.Date = originalDate;
-    });
-
-    it('should return current date and time in markdown format', async () => {
-      // Setup mocks for the timezone
-      const mockTimeZone = 'America/New_York';
-
-      // Mock toLocaleString behavior
-      const originalToLocaleString = Date.prototype.toLocaleString;
-      Date.prototype.toLocaleString = vi
-        .fn()
-        .mockImplementationOnce(() => 'May 15, 2023, 08:30:45 AM EDT') // Local time
-        .mockImplementationOnce(() => 'May 15, 2023, 12:30:45 PM UTC'); // UTC time
-
-      // Mock Intl.DateTimeFormat
-      const originalDateTimeFormat = Intl.DateTimeFormat;
-      (Intl as any).DateTimeFormat = vi.fn(() => ({
-        resolvedOptions: () => ({ timeZone: mockTimeZone }),
-      }));
-
-      // Mock toISOString
-      const originalToISOString = Date.prototype.toISOString;
-      Date.prototype.toISOString = vi.fn().mockReturnValue('2023-05-15T12:30:45.000Z');
-
-      // Setup command execution
-      let datetimeHandler: GetDatetimeToolHandler | null = null;
-
-      // Capture the datetime handler
-      vi.mocked(mockMcpServer.tool).mockImplementation(
-        (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'system_datetime') {
-            datetimeHandler = handler as GetDatetimeToolHandler;
-          }
-          return mockMcpServer;
-        },
-      );
-
-      let actionCallback: (() => Promise<void>) | null = null;
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnValue({
-          action: vi.fn((callback) => {
-            actionCallback = callback;
-          }),
-        }),
-      } as any);
-
-      registerMcpCommand(program, context);
-      await actionCallback!();
-
-      // Execute the get_datetime handler
-      expect(datetimeHandler).not.toBeNull();
-      const result = await datetimeHandler!({});
-
-      // Check the result
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-
-      // Format not tested exactly as it depends on toLocaleString behavior
-      // but we can check for expected content
-      const markdown = result.content[0].text;
-      expect(markdown).toContain('## Current Date and Time');
-      expect(markdown).toContain(`**Local (${mockTimeZone})**: May 15, 2023, 08:30:45 AM EDT`);
-      expect(markdown).toContain('**UTC**: May 15, 2023, 12:30:45 PM UTC');
-      expect(markdown).toContain('**ISO**: 2023-05-15T12:30:45.000Z');
-      // Check that there's a Unix timestamp (number), but not the exact value which might vary
-      expect(markdown).toMatch(/\*\*Unix Timestamp\*\*: \d+/);
-
-      // Restore mocked methods
-      Date.prototype.toLocaleString = originalToLocaleString;
-      (Intl as any).DateTimeFormat = originalDateTimeFormat;
-      Date.prototype.toISOString = originalToISOString;
-    });
-
-    it('should handle errors gracefully', async () => {
-      // Create an error-generating condition
-      const originalToLocaleString = Date.prototype.toLocaleString;
-      Date.prototype.toLocaleString = vi.fn().mockImplementation(() => {
-        throw new Error('Timezone error');
-      });
-
-      // Setup command execution
-      let datetimeHandler: GetDatetimeToolHandler | null = null;
-
-      // Capture the datetime handler
-      vi.mocked(mockMcpServer.tool).mockImplementation(
-        (name: string, schema: any, handler: ToolHandler) => {
-          if (name === 'system_datetime') {
-            datetimeHandler = handler as GetDatetimeToolHandler;
-          }
-          return mockMcpServer;
-        },
-      );
-
-      let actionCallback: (() => Promise<void>) | null = null;
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnValue({
-          action: vi.fn((callback) => {
-            actionCallback = callback;
-          }),
-        }),
-      } as any);
-
-      registerMcpCommand(program, context);
-      await actionCallback!();
-
-      // Execute the handler and expect error handling
-      const result = await datetimeHandler!({});
-
-      // Check error response format
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Error: Error: Timezone error');
-      expect(result.isError).toBe(true);
-
-      // Restore mocked method
-      Date.prototype.toLocaleString = originalToLocaleString;
-    });
-  });
 
   describe('tool: create_reminder', () => {
     it('should call createSlackReminder and return markdown results', async () => {

@@ -40,7 +40,7 @@ import { registerUserSearchTool } from '../../../../src/commands/mcp-tools/user-
 describe('User Search MCP Tool', () => {
   let context: CommandContext;
   let mockServer: any;
-  let toolHandler: (params: { query: string }) => Promise<any>;
+  let toolHandler: (params: { query: string; limit: number }) => Promise<any>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,7 +72,7 @@ describe('User Search MCP Tool', () => {
 
   it('should search for users properly', async () => {
     // Call the handler
-    const result = await toolHandler({ query: 'doe' });
+    const result = await toolHandler({ query: 'doe', limit: 10 });
 
     // Verify the result structure
     expect(result).toHaveProperty('content');
@@ -88,7 +88,7 @@ describe('User Search MCP Tool', () => {
   });
 
   it('should handle empty query properly', async () => {
-    const result = await toolHandler({ query: '' });
+    const result = await toolHandler({ query: '', limit: 10 });
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Please provide a search term');
@@ -109,13 +109,13 @@ describe('User Search MCP Tool', () => {
         }) as any,
     );
 
-    const result = await toolHandler({ query: 'nonexistent' });
+    const result = await toolHandler({ query: 'nonexistent', limit: 10 });
 
     expect(result.content[0].text).toContain('No users found');
   });
 
   it('should include proper search formats in results', async () => {
-    const result = await toolHandler({ query: 'doe' });
+    const result = await toolHandler({ query: 'doe', limit: 10 });
 
     const markdownContent = result.content[0].text;
 
