@@ -4,7 +4,7 @@
     "description": "Tools for interacting with Slack's local data",
     "type": "module",
     "bin": {
-        "slack-tools": "./bin/slack-tools.mjs"
+        "slack-tools": "./src/cli.ts"
     },
     "scripts": {
         "start": "tsx src/cli.ts",
@@ -48,7 +48,8 @@
         "vitest": "^3.1.1"
     },
     "files": [
-        "dist",
+        "bin",
+        "src",
         "README.md"
     ],
     "packageManager": "pnpm@8.15.4"
