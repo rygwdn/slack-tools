@@ -46,3 +46,4 @@ temp/
 # pnpm specific
 .pnpm-store/
 .pnpm-debug.log
+\!dist/cli.js
