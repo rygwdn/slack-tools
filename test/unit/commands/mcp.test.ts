@@ -700,7 +700,6 @@ describe('MCP Command', () => {
     });
   });
 
-
   describe('tool: create_reminder', () => {
     it('should call createSlackReminder and return markdown results', async () => {
       // Setup reminder mocks
