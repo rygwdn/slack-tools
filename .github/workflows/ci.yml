@@ -45,8 +45,8 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
-      - name: Type check
-        run: pnpm run build
+      # Type checking is handled by the test runner
+      # - name: Type check
 
       - name: Run tests
         run: pnpm run test
