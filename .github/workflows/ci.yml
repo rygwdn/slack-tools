@@ -46,7 +46,7 @@ jobs:
         run: pnpm run format:check
 
       - name: Type check
-        run: pnpm run build
+        run: npx tsc
 
       - name: Run tests
         run: pnpm run test
