@@ -36,6 +36,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
+        
       - name: Install dependencies
         run: pnpm install
 
