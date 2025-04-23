@@ -52,4 +52,4 @@ jobs:
       # - name: Type check
 
       - name: Run tests
-        run: pnpm run test
+        run: CI=true pnpm run test
