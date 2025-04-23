@@ -15,8 +15,6 @@ export default defineConfig({
     },
     include: ['**/*.test.ts'],
     exclude: ['node_modules', 'dist'],
-    alias: {
-      keytar: process.env.CI ? './test/mocks/keytar.ts' : 'keytar',
-    },
+    setupFiles: ['./test/setup.ts'],
   },
 });
