@@ -46,7 +46,7 @@ jobs:
         run: pnpm run format:check
 
       - name: Type check
-        run: npx tsc --skipLibCheck --skipDefaultLibCheck --noEmit src
+        run: pnpm run build
 
       - name: Run tests
         run: pnpm run test
