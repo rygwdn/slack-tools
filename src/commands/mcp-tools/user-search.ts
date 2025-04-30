@@ -22,7 +22,16 @@ export function registerUserSearchTool(server: McpServer, context: CommandContex
     async ({ query, limit }) => {
       try {
         // Get workspace and client
+        // Ensure we have a valid workspace
+        if (!context.hasWorkspace) {
+          return {
+            content: [{ type: 'text', text: 'Error: No Slack workspace specified.' }],
+            isError: true,
+          };
+        }
+        
         const workspace = context.workspace;
+        context.debugLog(`Using workspace: ${workspace}`);
         const client = await getSlackClient(workspace, context);
 
         // Clean the query
@@ -36,18 +45,32 @@ export function registerUserSearchTool(server: McpServer, context: CommandContex
         }
 
         // Get list of users
-        const response = await client.users.list({
-          limit,
-        });
-
-        if (!response.ok || !response.members) {
+        context.debugLog(`Fetching users from Slack API with limit: ${limit}`);
+        let response;
+        try {
+          response = await client.users.list({
+            limit,
+          });
+          
+          context.debugLog(`API response received: ${response.ok ? 'success' : 'failure'}`);
+          context.debugLog(`Members found: ${response.members?.length || 0}`);
+  
+          if (!response.ok || !response.members) {
+            return {
+              content: [{ type: 'text', text: `Failed to retrieve user list from Slack. Response: ${JSON.stringify(response)}` }],
+              isError: true,
+            };
+          }
+        } catch (apiError) {
+          context.debugLog(`API error: ${apiError}`);
           return {
-            content: [{ type: 'text', text: 'Failed to retrieve user list from Slack.' }],
+            content: [{ type: 'text', text: `Error calling Slack API: ${apiError}` }],
             isError: true,
           };
         }
 
         // Filter users based on search term
+        context.debugLog(`Filtering ${response.members.length} users for query: "${cleanQuery}"`);
         const matchingUsers = response.members.filter((user) => {
           // Skip deleted and bot users
           if (user.deleted || user.is_bot) return false;
@@ -60,6 +83,8 @@ export function registerUserSearchTool(server: McpServer, context: CommandContex
           );
         });
 
+        context.debugLog(`Found ${matchingUsers.length} users matching "${cleanQuery}"`);
+        
         if (matchingUsers.length === 0) {
           return {
             content: [{ type: 'text', text: `No users found matching "${query}".` }],

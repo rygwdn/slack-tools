@@ -6,6 +6,10 @@ import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse
 export interface ThreadMessage extends Match {
   thread_ts?: string;
   threadMessages?: ThreadMessage[];
+  // Indicator if this message has replies
+  hasReplies?: boolean;
+  // Thread permalink for linking directly to thread
+  threadPermalink?: string;
 }
 
 export interface SlackUserInfo {

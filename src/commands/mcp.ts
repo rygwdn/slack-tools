@@ -4,16 +4,26 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CommandContext } from '../context';
 import { registerAllTools } from './mcp-tools/register-tools';
 
+import { getLastWorkspace } from '../cache';
+
 export function registerMcpCommand(program: Command, context: CommandContext): void {
   program
     .command('mcp')
     .description('Start an MCP server with search and status capabilities')
     .action(async () => {
-      // Ensure workspace is set on launch
+      // If workspace is not set, try to use the last one automatically
       if (!context.hasWorkspace) {
-        console.error('Error: Workspace must be specified with --workspace or --last-workspace');
-        console.error('Example: slack-tools mcp --workspace your-workspace');
-        process.exit(1);
+        const lastWorkspace = await getLastWorkspace();
+        if (lastWorkspace) {
+          // Set the workspace in the context
+          context.workspace = lastWorkspace;
+          context.lastWorkspaceUsed = true;
+          context.debugLog(`Automatically using last workspace: ${lastWorkspace}`);
+        } else {
+          console.error('Error: No workspace found. Please specify a workspace with --workspace.');
+          console.error('Example: slack-tools mcp --workspace your-workspace');
+          process.exit(1);
+        }
       }
 
       // Import package.json version from the process

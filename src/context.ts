@@ -5,6 +5,8 @@ export class CommandContext {
   private _workspace?: string;
   private _lastWorkspaceUsed = false;
   private _debug = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _logger?: (message: any, ...args: any[]) => void;
 
   /**
    * Set the workspace value
@@ -63,6 +65,15 @@ export class CommandContext {
   }
 
   /**
+   * Set a custom logger function
+   * @param logger The function to use for logging
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setLogger(logger: (message: any, ...args: any[]) => void): void {
+    this._logger = logger;
+  }
+
+  /**
    * Log debug message if debug mode is enabled
    * @param message The message or object to log
    * @param ...args Additional arguments to log
@@ -70,10 +81,22 @@ export class CommandContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debugLog(message: any, ...args: any[]): void {
     if (this._debug) {
-      if (args.length > 0) {
-        console.error('[DEBUG]', message, ...args);
+      if (this._logger) {
+        // Use custom logger if provided
+        this._logger(message, ...args);
       } else {
-        console.error('[DEBUG]', message);
+        // Default to stderr
+        if (args.length > 0) {
+          process.stderr.write(
+            `[DEBUG] ${message} ${args
+              .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+              .join(' ')}\n`,
+          );
+        } else {
+          process.stderr.write(
+            `[DEBUG] ${typeof message === 'object' ? JSON.stringify(message) : message}\n`,
+          );
+        }
       }
     }
   }

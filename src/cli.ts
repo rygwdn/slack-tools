@@ -57,7 +57,8 @@ program.hook('preAction', async (thisCommand) => {
       commandContext.debugLog('No last workspace found in cache');
     }
   }
-  // Otherwise, no workspace is set - commands will handle this case via the context getter
+  // For MCP command specifically, auto-load the last workspace (the command itself will handle it)
+  // Other commands will handle the missing workspace case on their own
 });
 
 program.parse(process.argv);

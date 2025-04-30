@@ -141,6 +141,30 @@ function organizeMessagesIntoThreads(
 
     // Try to get thread_ts from the message or extract it from permalink
     const threadTs = message.thread_ts || extractThreadTsFromPermalink(message.permalink);
+    
+    // Create a thread permalink if this message has a permalink and thread_ts
+    let threadPermalink = undefined;
+    let isThreadParent = false;
+    
+    // Determine if this message is part of a thread
+    if (message.permalink) {
+      // Check if the permalink contains thread_ts which would indicate a thread
+      if (message.permalink.includes('thread_ts=')) {
+        threadPermalink = message.permalink;
+        // If the thread_ts in permalink matches this message's ts, it's a thread parent
+        isThreadParent = message.permalink.includes(`thread_ts=${message.ts}`);
+      } else if (threadTs) {
+        // If we have thread_ts but it's not in permalink, add it
+        try {
+          const url = new URL(message.permalink);
+          url.searchParams.set('thread_ts', threadTs);
+          threadPermalink = url.toString();
+        } catch {
+          // If URL parsing fails, keep the original permalink
+          threadPermalink = message.permalink;
+        }
+      }
+    }
 
     // If the message has a thread_ts and it's not the thread parent (ts !== thread_ts), it's a reply
     if (threadTs && message.ts !== threadTs) {
@@ -155,13 +179,20 @@ function organizeMessagesIntoThreads(
         const messageWithThreadTs: ThreadMessage = {
           ...message,
           thread_ts: threadTs,
+          threadPermalink,
+          hasReplies: false,
         };
         thread.push(messageWithThreadTs);
         context.debugLog(`Added message to thread: ${message.text?.slice(0, 50)}`);
       }
     } else {
       // If no thread_ts or it's the thread parent, it's a standalone/parent message
-      standaloneMessages.push(message);
+      const messageWithThreadInfo: ThreadMessage = {
+        ...message,
+        threadPermalink,
+        hasReplies: isThreadParent,
+      };
+      standaloneMessages.push(messageWithThreadInfo);
       context.debugLog(
         `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`,
       );
@@ -216,9 +247,15 @@ function groupMessagesByDateAndChannel(
       const threadMessages = threadMap.get(message.ts)!;
       // Filter out the parent message from replies if it exists
       const replies = threadMessages.filter((m) => m.ts !== message.ts);
-      addMessageToDateChannelStructure(message, replies, messagesByDate, context);
+      // Mark that this message has replies
+      const messageWithReplies: ThreadMessage = {
+        ...message,
+        hasReplies: replies.length > 0,
+        threadPermalink: message.threadPermalink || message.permalink
+      };
+      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate, context);
     } else {
-      addMessageToDateChannelStructure(message, [], messagesByDate, context);
+      addMessageToDateChannelStructure({...message, hasReplies: false}, [], messagesByDate, context);
     }
   }
 
@@ -238,18 +275,30 @@ function groupMessagesByDateAndChannel(
     if (parentMessage) {
       // We have the parent, add it with its replies
       const replies = sortedThreadMessages.filter((m) => m.ts !== parentMessage.ts);
-      addMessageToDateChannelStructure(parentMessage, replies, messagesByDate, context);
+      const parentWithReplies: ThreadMessage = {
+        ...parentMessage,
+        hasReplies: replies.length > 0,
+        threadPermalink: parentMessage.threadPermalink || parentMessage.permalink
+      };
+      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate, context);
     } else {
       // Create a synthetic parent from the first message
       const firstMessage = sortedThreadMessages[0];
       context.debugLog(`Thread ${threadTs} missing parent, using first reply as parent`);
-      const syntheticParent = {
+      
+      // Try to get a thread permalink from one of the replies
+      const threadPermalink = sortedThreadMessages.find(m => m.threadPermalink)?.threadPermalink || 
+                             firstMessage.permalink;
+                             
+      const syntheticParent: ThreadMessage = {
         ...firstMessage,
         thread_ts: threadTs,
         ts: threadTs,
         text: firstMessage.text,
         user: firstMessage.user,
         channel: firstMessage.channel,
+        hasReplies: true,
+        threadPermalink
       };
       const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
       addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate, context);
@@ -272,8 +321,21 @@ function formatMessage(message: ThreadMessage, cache: SlackCache, context: Comma
 
   context.debugLog(`Formatting message from ${userName}`);
 
-  // Format the main message
-  markdown += `- [*${timeString}*](${message.permalink || ''}) **${userName}**: `;
+  // Format the main message with thread indicator
+  let threadIndicator = '';
+  if (message.hasReplies) {
+    // If the thread_ts matches this message's ts, it's the start of a thread
+    const isThreadStarter = message.thread_ts === message.ts || 
+                          message.permalink?.includes(`thread_ts=${message.ts}`);
+    
+    if (isThreadStarter) {
+      threadIndicator = ` [💬 Start of Thread](${message.threadPermalink || message.permalink || ''})`;
+    } else {
+      threadIndicator = ` [💬 Part of Thread](${message.threadPermalink || message.permalink || ''})`;
+    }
+  }
+
+  markdown += `- [*${timeString}*](${message.permalink || ''}) **${userName}**${threadIndicator}: `;
 
   // Handle multi-line messages by properly indenting continuation lines
   const formattedText = formatSlackText(message.text || '', cache);
@@ -309,6 +371,8 @@ function formatThreadReplies(replies: ThreadMessage[], cache: SlackCache): strin
       replyUserName = cache.users[reply.user].displayName;
     }
 
+    // Thread replies don't need reaction indicators
+    
     // Indent thread replies with 8 spaces for proper markdown nesting under parent
     markdown += '        - '; // 8 spaces for nesting + the bullet point
     if (reply.permalink) {
