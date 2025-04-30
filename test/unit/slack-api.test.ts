@@ -144,8 +144,7 @@ describe('slack-api', () => {
     });
 
     it('should throw an error if auth has no cookie', () => {
-      // @ts-expect-error - intentionally creating invalid auth for testing
-      const authWithoutCookie = { ...mockAuth, cookie: undefined };
+      const authWithoutCookie = { ...mockAuth, cookie: undefined as any };
       expect(() => findWorkspaceToken(authWithoutCookie, 'team1.slack.com', context)).toThrow(
         'No cookie found in auth',
       );

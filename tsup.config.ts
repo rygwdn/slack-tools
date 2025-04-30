@@ -10,6 +10,9 @@ export default defineConfig({
   sourcemap: true,
   outDir: 'dist',
   treeshake: true,
+  banner: {
+    js: '#!/usr/bin/env node',
+  },
   esbuildOptions(options) {
     options.platform = 'node';
     options.format = 'esm';

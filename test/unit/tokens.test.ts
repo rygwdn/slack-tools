@@ -30,8 +30,11 @@ describe('tokens', () => {
       // Mock Windows platform
       vi.mocked(os.platform).mockReturnValue('win32');
 
+      // Create a mock context
+      const mockContext = { debug: true } as any;
+
       // Expect platform error
-      await expect(getTokens(true)).rejects.toThrow('slacktokens only works on macOS or Linux.');
+      await expect(getTokens(mockContext)).rejects.toThrow('slacktokens only works on macOS or Linux.');
     });
 
     // Skip the other tests that require complex mocking

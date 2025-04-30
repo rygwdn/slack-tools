@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';

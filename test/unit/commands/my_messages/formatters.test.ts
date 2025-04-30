@@ -173,7 +173,7 @@ describe('My Messages Formatters', () => {
     });
 
     it('should handle undefined permalink', () => {
-      const result = extractThreadTsFromPermalink(undefined);
+      const result = extractThreadTsFromPermalink(undefined as unknown as string);
       expect(result).toBeUndefined();
     });
   });
@@ -238,8 +238,8 @@ describe('My Messages Formatters', () => {
       expect(dateHeadings.length).toBe(2); // Should have two date sections
 
       // Find the indices of these date headings
-      const date1Index = result.indexOf(dateHeadings[0]);
-      const date2Index = result.indexOf(dateHeadings[1]);
+      const date1Index = result.indexOf(dateHeadings[0] || '');
+      const date2Index = result.indexOf(dateHeadings[1] || '');
 
       expect(date1Index).toBeGreaterThan(-1);
       expect(date2Index).toBeGreaterThan(-1);
