@@ -5,13 +5,13 @@ import {
   getFriendlyChannelName,
   formatTime,
 } from '../commands/my_messages/formatters';
-import { SlackCache } from '../commands/my_messages/types';
+import { SlackCache, ThreadMessage } from '../commands/my_messages/types';
 
 /**
  * Generate markdown output from search results
  */
 export function generateSearchResultsMarkdown(
-  messages: Match[],
+  messages: (Match | ThreadMessage)[],
   cache: SlackCache,
   userId: string,
   context: CommandContext,
@@ -72,8 +72,29 @@ export function generateSearchResultsMarkdown(
         userName = cache.users[message.user].displayName;
       }
 
-      // Format the message with date, time, username, and link
-      markdown += `- **${dateString}** [${timeString}](${message.permalink || ''}) **${userName}**: `;
+      // Check if message is part of a thread
+      let threadIndicator = '';
+      // Check thread information from permalink URL since thread_ts might not be directly available
+      const messageTs = message.ts || '';
+      const permalink = message.permalink || '';
+      
+      // If the permalink contains thread_ts parameter, it's part of a thread
+      if (permalink.includes('thread_ts=')) {
+        const threadTsMatch = permalink.match(/thread_ts=([^&]+)/);
+        const threadTs = threadTsMatch ? threadTsMatch[1] : '';
+        
+        // If thread_ts in URL matches this message's ts, it's the start of a thread
+        const isThreadStarter = threadTs === messageTs;
+        
+        if (isThreadStarter) {
+          threadIndicator = ` [💬 Start of Thread](${permalink})`;
+        } else {
+          threadIndicator = ` [💬 Part of Thread](${permalink})`;
+        }
+      }
+
+      // Format the message with date, time, username, thread indicator, and link
+      markdown += `- **${dateString}** [${timeString}](${message.permalink || ''}) **${userName}**:${threadIndicator} `;
 
       // Format the message text
       const formattedText = formatSlackText(message.text || '', cache);
