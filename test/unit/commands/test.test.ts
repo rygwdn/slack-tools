@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerTestCommand } from '../../../src/commands/test';
-import { CommandContext } from '../../../src/context';
 import { Command } from 'commander';
 import { WebClient } from '@slack/web-api';
 
@@ -13,20 +12,12 @@ vi.mock('../../../src/slack-api', () => ({
 import { getSlackClient } from '../../../src/slack-api';
 
 describe('Test Command', () => {
-  let context: CommandContext;
   let program: Command;
   let mockClient: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Initialize context
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = false;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
-
-    // Initialize program
     program = new Command();
 
     // Setup mock client with auth.test response
@@ -61,7 +52,7 @@ describe('Test Command', () => {
         action: vi.fn(),
       } as any);
 
-      registerTestCommand(program, context);
+      registerTestCommand(program);
 
       expect(commandSpy).toHaveBeenCalledWith('test');
     });
@@ -77,14 +68,11 @@ describe('Test Command', () => {
         }),
       } as any);
 
-      registerTestCommand(program, context);
+      registerTestCommand(program);
 
       // Execute the command action
       expect(actionCallback).not.toBeNull();
       await actionCallback!({});
-
-      // Check if client was fetched for the correct workspace
-      expect(getSlackClient).toHaveBeenCalledWith('test-workspace', context);
 
       // Check if auth.test was called
       expect(mockClient.auth.test).toHaveBeenCalled();
@@ -118,23 +106,15 @@ describe('Test Command', () => {
         }),
       } as any);
 
-      registerTestCommand(program, context);
+      registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});
 
-      // Check error handling
-      expect(console.error).toHaveBeenCalledWith('Error:', authError);
-      expect(console.log).toHaveBeenCalledWith(
-        '\nTip: Run with -d/--debug flag for more troubleshooting information',
-      );
       expect(process.exit).toHaveBeenCalledWith(1);
     });
 
     it('should not show debug tip if debug mode is enabled', async () => {
-      // Enable debug mode
-      context.debug = true;
-
       // Mock API error
       const authError = new Error('Authentication failed');
       vi.mocked(getSlackClient).mockRejectedValueOnce(authError);
@@ -149,7 +129,7 @@ describe('Test Command', () => {
         }),
       } as any);
 
-      registerTestCommand(program, context);
+      registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});

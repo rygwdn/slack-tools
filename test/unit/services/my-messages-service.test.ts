@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
-import { CommandContext } from '../../../src/context';
+import { SlackContext } from '../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { getDateRange } from '../../../src/utils/date-utils';
 import { searchMessages } from '../../../src/commands/my_messages/slack-service';
@@ -36,7 +36,7 @@ vi.mock('../../../src/cache', () => ({
 }));
 
 describe('My Messages Service', () => {
-  let context: CommandContext;
+  let context: SlackContext;
   let mockClient: WebClient;
   let mockDateRange: { startTime: Date; endTime: Date };
   let mockCache: SlackCache;
@@ -50,10 +50,14 @@ describe('My Messages Service', () => {
     vi.clearAllMocks();
 
     // Initialize context with workspace
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     // Create mock objects
     mockClient = {

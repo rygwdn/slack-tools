@@ -1,43 +1,29 @@
 import { Command } from 'commander';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CommandContext } from '../context';
-import { registerAllTools } from './mcp-tools/register-tools';
+import { FastMCP } from 'fastmcp';
+import { mcp_tools } from './mcp-tools/tools-registry';
+import { version } from '../../package.json';
 
-import { getLastWorkspace } from '../cache';
-
-export function registerMcpCommand(program: Command, context: CommandContext): void {
+export function registerMcpCommand(program: Command): void {
   program
     .command('mcp')
     .description('Start an MCP server with search and status capabilities')
     .action(async () => {
-      // If workspace is not set, try to use the last one automatically
-      if (!context.hasWorkspace) {
-        const lastWorkspace = await getLastWorkspace();
-        if (lastWorkspace) {
-          // Set the workspace in the context
-          context.workspace = lastWorkspace;
-          context.lastWorkspaceUsed = true;
-          context.debugLog(`Automatically using last workspace: ${lastWorkspace}`);
-        } else {
-          console.error('Error: No workspace found. Please specify a workspace with --workspace.');
-          console.error('Example: slack-tools mcp --workspace your-workspace');
-          process.exit(1);
-        }
+      if (!version.match(/^\d+\.\d+\.\d+$/)) {
+        throw new Error('Invalid version format');
       }
 
-      // Import package.json version from the process
-      const packageVersion = process.env.npm_package_version || '1.0.2';
-
-      const server = new McpServer({
+      const server = new FastMCP({
         name: 'slack-tools-server',
-        version: packageVersion,
+        version: version as `${number}.${number}.${number}`,
       });
 
-      // Register all tools from the mcp-tools directory
-      registerAllTools(server, context);
+      for (const tool of mcp_tools) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        server.addTool(tool as any);
+      }
 
-      const transport = new StdioServerTransport();
-      await server.connect(transport);
+      server.start({
+        transportType: 'stdio',
+      });
     });
 }

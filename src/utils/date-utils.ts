@@ -1,3 +1,5 @@
+import { GlobalContext, SlackContext } from '../context';
+
 /**
  * Parses a date string into a Unix timestamp (seconds).
  * Handles various date formats recognizable by Date.parse() and relative times like "in X minutes/hours/days".
@@ -61,10 +63,10 @@ export function parseDateToTimestamp(dateString: string | undefined): number | u
  * @param context Command context for debugging
  * @returns Object with startTime and endTime Date objects
  */
-export async function getDateRange(
-  options: { since?: string; until?: string },
-  context: { debugLog: (message: string, ...args: unknown[]) => void },
-): Promise<{ startTime: Date; endTime: Date }> {
+export async function getDateRange(options: {
+  since?: string;
+  until?: string;
+}): Promise<{ startTime: Date; endTime: Date }> {
   let startTime: Date;
   if (options.since) {
     startTime = new Date(options.since);
@@ -75,7 +77,7 @@ export async function getDateRange(
     const now = new Date();
     startTime = new Date(now);
     startTime.setHours(0, 0, 0, 0);
-    context.debugLog(`Using start date: ${startTime.toISOString()}`);
+    GlobalContext.log.debug(`Using start date: ${startTime.toISOString()}`);
   }
 
   let endTime: Date;
@@ -89,7 +91,7 @@ export async function getDateRange(
     const now = new Date();
     endTime = new Date(now);
     endTime.setHours(23, 59, 59, 999);
-    context.debugLog(`Using end date: ${endTime.toISOString()}`);
+    GlobalContext.log.debug(`Using end date: ${endTime.toISOString()}`);
   }
 
   return { startTime, endTime };

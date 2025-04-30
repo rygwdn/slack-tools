@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSlackEntityCache } from '../../../../src/commands/my_messages/slack-entity-cache';
-import { CommandContext } from '../../../../src/context';
+import { SlackContext } from '../../../../src/context';
 import { SlackCache } from '../../../../src/commands/my_messages/types';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
@@ -117,14 +117,18 @@ function createMockWebClient() {
 }
 
 describe('Slack Entity Cache', () => {
-  let context: CommandContext;
+  let context: SlackContext;
   let mockClient: WebClient;
 
   beforeEach(() => {
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     mockClient = createMockWebClient();
 
@@ -224,7 +228,7 @@ describe('Slack Entity Cache', () => {
       expect(cache.lastUpdated).toBeGreaterThan(0);
 
       // Debug messages should be logged
-      expect(context.debugLog).toHaveBeenCalled();
+      expect(context.log.debug).toHaveBeenCalled();
     });
 
     it('should use existing cache when available', async () => {

@@ -1,0 +1,22 @@
+- remove deprecated functions & files
+- replace call-tools by registering all the mcp tools as subcommands replacing the current duplicates. use a utility function to autogen the command reg from an mcp tool.
+- fold context into session
+
+- auth retrieval isn't working
+  - log where the cookies & tokens are loaded from
+  - have option to refresh auth
+  - load auth from chrome?
+  - manual auth (use proxyman/chrome to find cookie & token)
+  - recommend running with debug logging if auth fails
+
+- make consistent use of markdown formatter tool
+- user search isn't working
+- activity doesn't work.. - looks like it's using a userid?
+- channel names not resolving
+- user resolution should always be from:first.last no @
+  - ensure the query enhancer deals with this
+- ensure cookies are redacted in log output..
+- console.error should go to mcp
+- use UserError where approrpraite
+- add annotations
+- move the z.infer into mcptool. it should be able to take the parameters and shove it into the execute

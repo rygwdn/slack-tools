@@ -34,7 +34,9 @@ describe('tokens', () => {
       const mockContext = { debug: true } as any;
 
       // Expect platform error
-      await expect(getTokens(mockContext)).rejects.toThrow('slacktokens only works on macOS or Linux.');
+      await expect(getTokens(mockContext)).rejects.toThrow(
+        'slacktokens only works on macOS or Linux.',
+      );
     });
 
     // Skip the other tests that require complex mocking

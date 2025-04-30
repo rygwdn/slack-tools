@@ -1,4 +1,6 @@
-import { CommandContext } from './context';
+import { SlackContext } from './context';
+import { Tool } from 'fastmcp';
+import { StandardSchemaV1 } from 'zod/lib/standard-schema';
 
 export interface WorkspaceToken {
   token: string;
@@ -38,5 +40,11 @@ export interface CacheConfig {
 // For filtering auth by workspace
 export interface WorkspaceAuthOptions {
   workspace?: string;
-  context?: CommandContext;
+  context?: SlackContext;
+}
+
+export function tool<Params extends StandardSchemaV1>(
+  tool: Tool<Record<string, never>, Params>,
+): Tool<Record<string, never>, Params> {
+  return tool;
 }

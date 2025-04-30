@@ -1,69 +1,50 @@
 import { describe, it, expect, vi } from 'vitest';
-import { CommandContext } from '../../../../src/context';
-
-// Import all tool registration functions
-import { registerMyMessagesTools } from '../../../../src/commands/mcp-tools/my-messages';
-import { registerSearchTools } from '../../../../src/commands/mcp-tools/search';
-import { registerStatusTools } from '../../../../src/commands/mcp-tools/status';
-import { registerReminderTools } from '../../../../src/commands/mcp-tools/reminders';
-import { registerThreadReplyTools } from '../../../../src/commands/mcp-tools/thread-replies';
-import { registerUserActivityTools } from '../../../../src/commands/mcp-tools/user-activity';
-import { registerUserSearchTool } from '../../../../src/commands/mcp-tools/user-search';
-import { registerUserProfileTool } from '../../../../src/commands/mcp-tools/user-profile';
+import { mcp_tools } from '../../../../src/commands/mcp-tools/tools-registry';
 
 describe('MCP Tool Descriptions', () => {
   it('should ensure all MCP tools have descriptions', () => {
-    // Mock context
-    const context = new CommandContext();
-
     // Create a mock server that tracks registered tools
     const registeredTools = new Map<string, any>();
     const mockServer: any = {
-      tool: vi.fn((name, schema, _handler) => {
-        registeredTools.set(name, { name, schema });
+      addTool: vi.fn((toolDef) => {
+        registeredTools.set(toolDef.name, {
+          name: toolDef.name,
+          schema: toolDef.parameters,
+        });
         return mockServer;
       }),
     };
 
-    // Register all tools
-    registerMyMessagesTools(mockServer, context);
-    registerSearchTools(mockServer, context);
-    registerStatusTools(mockServer, context);
-    registerReminderTools(mockServer, context);
-    registerThreadReplyTools(mockServer, context);
-    registerUserActivityTools(mockServer, context);
-    registerUserSearchTool(mockServer, context);
-    registerUserProfileTool(mockServer, context);
+    // Register all tools directly from the registry
+    for (const tool of mcp_tools) {
+      mockServer.addTool(tool);
+    }
 
     // Verify that there are tools registered
     expect(registeredTools.size).toBeGreaterThan(0);
+    expect(registeredTools.size).toBe(mcp_tools.length);
 
     // Check each tool for a description
     registeredTools.forEach((toolData, toolName) => {
       const schema = toolData.schema;
 
-      // Handle tools with no parameters
-      if (Object.keys(schema).length === 0) {
-        // Tools with no parameters should have a description property
-        expect(schema).toHaveProperty('description');
-      } else {
-        // For tools with parameters, check if the tool has a global description
-        // or if all parameters have descriptions
-        const hasToolDescription = 'description' in schema;
+      // First ensure every tool has a description property
+      const tool = mcp_tools.find((t) => t.name === toolName);
+      expect(tool).toBeDefined();
+      expect(tool?.description).toBeTruthy();
 
-        // If there's no tool-level description, each parameter should have a description
-        if (!hasToolDescription) {
-          const parameterKeys = Object.keys(schema).filter((key) => key !== 'description');
+      // For tools with parameters, check that the parameters have descriptions
+      if (schema && typeof schema === 'object') {
+        // Check if this is a Zod schema with shape property
+        if (schema.shape && typeof schema.shape === 'object') {
+          const parameterKeys = Object.keys(schema.shape);
 
-          // Skip checking parameterKeys if there's a tool description
-          // or if this is a special case (like an empty schema)
           if (parameterKeys.length > 0) {
             parameterKeys.forEach((paramKey) => {
-              const param = schema[paramKey];
+              const param = schema.shape[paramKey];
 
-              // Check if the parameter has a describe method that was called
-              // This is checking for usage of .describe() on Zod types
-              const hasDescription = param._def && param._def.description !== undefined;
+              // Check if the parameter has a description
+              const hasDescription = param && param._def && param._def.description !== undefined;
 
               expect(
                 hasDescription,

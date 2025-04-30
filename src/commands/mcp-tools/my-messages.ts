@@ -1,54 +1,44 @@
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { CommandContext } from '../../context';
 import { generateMyMessagesSummary } from '../../services/my-messages-service';
+import { tool } from '../../types';
+import { GlobalContext } from '../../context';
 
-export function registerMyMessagesTools(server: McpServer, context: CommandContext): void {
-  server.tool(
-    'slack_my_messages',
-    {
-      username: z
-        .string()
-        .optional()
-        .describe(
-          'Username or display name to fetch messages for. If omitted, fetches messages for the current user.',
-        ),
-      since: z
-        .string()
-        .optional()
-        .describe(
-          'Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.',
-        ),
-      until: z
-        .string()
-        .optional()
-        .describe(
-          'End date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the end of the current day.',
-        ),
-      count: z
-        .number()
-        .optional()
-        .default(200)
-        .describe('Maximum number of messages to retrieve (1-1000). Default is 200.'),
-    },
-    async ({ username, since, until, count }) => {
-      try {
-        const result = await generateMyMessagesSummary({ username, since, until, count }, context);
+const myMessagesParams = z.object({
+  username: z
+    .string()
+    .optional()
+    .describe(
+      'Username or display name to fetch messages for. If omitted, fetches messages for the current user.',
+    ),
+  since: z
+    .string()
+    .optional()
+    .describe(
+      'Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.',
+    ),
+  until: z
+    .string()
+    .optional()
+    .describe(
+      'End date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the end of the current day.',
+    ),
+  count: z
+    .number()
+    .int()
+    .default(200) // Will now always have a value after parsing
+    .describe('Maximum number of messages to retrieve (1-1000). Default is 200.'),
+});
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: result.markdown,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Error: ${error}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-}
+export const myMessagesTool = tool({
+  name: 'slack_my_messages',
+  description: 'Fetch and summarize messages sent by the user in Slack within a given time range.',
+  parameters: myMessagesParams,
+  annotations: {},
+  execute: async ({ username, since, until, count }) => {
+    const result = await generateMyMessagesSummary(
+      { username, since, until, count },
+      GlobalContext,
+    );
+    return result.markdown;
+  },
+});

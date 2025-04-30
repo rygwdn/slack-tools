@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { getSlackUserActivity } from '../services/slack-services';
 
-export function registerUserActivityCommand(program: Command, context: CommandContext): void {
+export function registerUserActivityCommand(program: Command, context: SlackContext): void {
   program
     .command('activity')
     .description('Get activity statistics for a Slack user across channels')

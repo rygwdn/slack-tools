@@ -1,30 +1,29 @@
-import { CommandContext } from '../context';
 import { getSlackClient } from '../slack-api';
 import { searchSlackMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
 import { saveSlackCache } from '../cache';
+import { GlobalContext } from '../context';
 
 /**
  * Search for messages in Slack
  */
-export async function performSlackSearch(query: string, count: number, context: CommandContext) {
+export async function performSlackSearch(query: string, count: number) {
   try {
     // Get workspace and client
-    const workspace = context.workspace;
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
 
     // Get user ID
     const authTest = await client.auth.test();
     const userId = authTest.user_id as string;
 
     // Search messages
-    context.debugLog(`Searching messages with query: ${query}`);
-    const messages = await searchSlackMessages(client, query, count, context);
+    GlobalContext.log.debug(`Searching messages with query: ${query}`);
+    const messages = await searchSlackMessages(client, query, count);
 
-    context.debugLog(`Found ${messages.length} matching messages. Fetching details...`);
+    GlobalContext.log.debug(`Found ${messages.length} matching messages. Fetching details...`);
 
     // Get user and channel information
-    const cache = await getSlackEntityCache(client, messages, context);
+    const cache = await getSlackEntityCache(client, messages);
 
     // Update and save the cache
     cache.lastUpdated = Date.now();
@@ -68,37 +67,31 @@ export function calculateExpirationTime(durationMinutes?: number): number {
 /**
  * Set Slack status
  */
-export async function setSlackStatus(
-  text: string,
-  context: CommandContext,
-  emoji?: string,
-  durationMinutes?: number,
-) {
+export async function setSlackStatus(text: string, emoji?: string, durationMinutes?: number) {
   try {
-    const workspace = context.workspace;
-    context.debugLog('Setting status for workspace:', workspace);
+    GlobalContext.log.debug('Setting status for workspace:', GlobalContext.workspace);
 
     // Format emoji
     const formattedEmoji = formatEmoji(emoji || '');
     if (formattedEmoji) {
-      context.debugLog('Using emoji:', formattedEmoji);
+      GlobalContext.log.debug('Using emoji:', formattedEmoji);
     }
 
     // Calculate expiration
     const expirationTime = calculateExpirationTime(durationMinutes);
     if (durationMinutes) {
-      context.debugLog(
+      GlobalContext.log.debug(
         'Status will expire in',
         durationMinutes,
         'minutes at',
         new Date(expirationTime * 1000).toISOString(),
       );
     } else {
-      context.debugLog('Setting permanent status (no expiration)');
+      GlobalContext.log.debug('Setting permanent status (no expiration)');
     }
 
     // Get client and set status
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
     const response = await client.users.profile.set({
       profile: {
         status_text: text,
@@ -107,7 +100,7 @@ export async function setSlackStatus(
       },
     });
 
-    context.debugLog('API response:', response);
+    GlobalContext.log.debug('API response:', response);
 
     return {
       success: true,
@@ -123,10 +116,9 @@ export async function setSlackStatus(
 /**
  * Get current Slack status
  */
-export async function getSlackStatus(context: CommandContext) {
+export async function getSlackStatus() {
   try {
-    const workspace = context.workspace;
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
 
     // Get user profile
     const userProfile = await client.users.profile.get({});
@@ -146,31 +138,25 @@ export async function getSlackStatus(context: CommandContext) {
 /**
  * Create a reminder in Slack
  */
-export async function createSlackReminder(
-  text: string,
-  time: string,
-  context: CommandContext,
-  user?: string,
-) {
+export async function createSlackReminder(text: string, time: string, user?: string) {
   try {
-    const workspace = context.workspace;
-    context.debugLog('Creating reminder for workspace:', workspace);
-    context.debugLog('Reminder text:', text);
-    context.debugLog('Reminder time:', time);
+    GlobalContext.log.debug('Creating reminder for workspace:', GlobalContext.workspace);
+    GlobalContext.log.debug('Reminder text:', text);
+    GlobalContext.log.debug('Reminder time:', time);
 
     if (user) {
-      context.debugLog('Reminder for user:', user);
+      GlobalContext.log.debug('Reminder for user:', user);
     }
 
     // Get client and create reminder
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
     const response = await client.reminders.add({
       text,
       time,
       user,
     });
 
-    context.debugLog('API response:', response);
+    GlobalContext.log.debug('API response:', response);
 
     return {
       success: true,
@@ -184,24 +170,18 @@ export async function createSlackReminder(
 /**
  * Get thread replies for a message
  */
-export async function getSlackThreadReplies(
-  channel: string,
-  ts: string,
-  context: CommandContext,
-  limit?: number,
-) {
+export async function getSlackThreadReplies(channel: string, ts: string, limit?: number) {
   try {
-    const workspace = context.workspace;
-    context.debugLog('Getting thread replies in workspace:', workspace);
-    context.debugLog('Channel:', channel);
-    context.debugLog('Thread timestamp:', ts);
+    GlobalContext.log.debug('Getting thread replies in workspace:', GlobalContext.workspace);
+    GlobalContext.log.debug('Channel:', channel);
+    GlobalContext.log.debug('Thread timestamp:', ts);
 
     if (limit) {
-      context.debugLog('Limit:', limit);
+      GlobalContext.log.debug('Limit:', limit);
     }
 
     // Get client and fetch thread replies
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
     const response = await client.conversations.replies({
       channel,
       ts,
@@ -209,7 +189,7 @@ export async function getSlackThreadReplies(
     });
 
     const messages = response.messages?.filter((msg) => msg.ts !== ts) || [];
-    context.debugLog('Found replies:', messages.length);
+    GlobalContext.log.debug('Found replies:', messages.length);
 
     // Convert conversation replies to a format compatible with entity cache
     // This avoids type conflicts between different Slack API response types
@@ -223,7 +203,7 @@ export async function getSlackThreadReplies(
     }));
 
     // Get user and channel information
-    const cache = await getSlackEntityCache(client, normalizedMessages, context);
+    const cache = await getSlackEntityCache(client, normalizedMessages);
 
     return {
       replies: messages,
@@ -238,34 +218,33 @@ export async function getSlackThreadReplies(
 /**
  * Get user activity statistics
  */
-export async function getSlackUserActivity(count: number, context: CommandContext, user?: string) {
+export async function getSlackUserActivity(count: number, user?: string) {
   try {
-    const workspace = context.workspace;
-    context.debugLog('Getting user activity for workspace:', workspace);
+    GlobalContext.log.debug('Getting user activity for workspace:', GlobalContext.workspace);
 
     if (user) {
-      context.debugLog('User:', user);
+      GlobalContext.log.debug('User:', user);
     }
 
     // Get client
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
 
     // Get user ID if not provided
     let userId = user;
     if (!userId) {
       const authTest = await client.auth.test();
       userId = authTest.user_id as string;
-      context.debugLog('Using current user ID:', userId);
+      GlobalContext.log.debug('Using current user ID:', userId);
     }
 
     // Search for user's messages
     const query = `from:<@${userId}>`;
-    const messages = await searchSlackMessages(client, query, count, context);
+    const messages = await searchSlackMessages(client, query, count);
 
-    context.debugLog(`Found ${messages.length} messages for user`);
+    GlobalContext.log.debug(`Found ${messages.length} messages for user`);
 
     // Get channel information
-    const cache = await getSlackEntityCache(client, messages, context);
+    const cache = await getSlackEntityCache(client, messages);
 
     // Create activity summary by channel
     const channelActivity: Record<string, number> = {};
@@ -298,10 +277,9 @@ export async function getSlackUserActivity(count: number, context: CommandContex
 /**
  * Get detailed user profile information
  */
-export async function getUserProfile(userId: string, context: CommandContext) {
+export async function getUserProfile(userId: string) {
   try {
-    const workspace = context.workspace;
-    const client = await getSlackClient(workspace, context);
+    const client = await getSlackClient();
 
     // First get basic user info
     const userInfo = await client.users.info({ user: userId });

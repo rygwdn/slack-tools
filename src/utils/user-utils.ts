@@ -1,5 +1,5 @@
 import { WebClient } from '@slack/web-api';
-import { CommandContext } from '../context';
+import { GlobalContext } from '../context';
 
 /**
  * Resolves a user identifier (username, display name, or ID) to a valid Slack user ID
@@ -8,7 +8,6 @@ import { CommandContext } from '../context';
 export async function resolveUserForSearch(
   client: WebClient,
   userIdentifier: string,
-  context: CommandContext,
 ): Promise<string> {
   // Handle cases with quoted display names
   const cleanIdentifier = userIdentifier.replace(/^@/, '').replace(/^"(.*)"$/, '$1');
@@ -57,29 +56,25 @@ export async function resolveUserForSearch(
     if (partialMatches.length === 1) {
       return `<@${partialMatches[0].id}>`;
     } else if (partialMatches.length > 1) {
-      context.debugLog(
+      GlobalContext.log.debug(
         `Multiple users found matching "${cleanIdentifier}". Using the first match.`,
       );
       return `<@${partialMatches[0].id}>`;
     }
 
     // If no matches found, return the original value for backward compatibility
-    context.debugLog(`No user found matching "${cleanIdentifier}". Using as-is.`);
-    return `@${cleanIdentifier}`;
+    GlobalContext.log.debug(`No user found matching "${cleanIdentifier}". Using as-is.`);
+    return `${cleanIdentifier}`;
   } catch (error) {
-    context.debugLog(`Error resolving user "${userIdentifier}": ${error}`);
-    return `@${cleanIdentifier}`;
+    GlobalContext.log.debug(`Error resolving user "${userIdentifier}": ${error}`);
+    return `${cleanIdentifier}`;
   }
 }
 
 /**
  * Parses and enhances a Slack search query, replacing user references with proper format.
  */
-export async function enhanceSearchQuery(
-  client: WebClient,
-  query: string,
-  context: CommandContext,
-): Promise<string> {
+export async function enhanceSearchQuery(client: WebClient, query: string): Promise<string> {
   // Regular expression to find "from:", "to:", and "with:" modifiers with usernames
   const userQueryRegex = /(from:|to:|with:)@?(("([^"]+)")|([^\s]+))/g;
 
@@ -96,12 +91,12 @@ export async function enhanceSearchQuery(
     const [fullMatch, modifier, _unused, _quotedName, quotedNameContent, simpleName] = match;
     const userIdentifier = quotedNameContent || simpleName;
 
-    const resolvedUser = await resolveUserForSearch(client, userIdentifier, context);
+    const resolvedUser = await resolveUserForSearch(client, userIdentifier);
     const replacement = `${modifier}${resolvedUser}`;
 
     enhancedQuery = enhancedQuery.replace(fullMatch, replacement);
   }
 
-  context.debugLog(`Enhanced query: "${enhancedQuery}"`);
+  GlobalContext.log.debug(`Enhanced query: "${enhancedQuery}"`);
   return enhancedQuery;
 }

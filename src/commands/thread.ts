@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { getSlackThreadReplies } from '../services/slack-services';
 
-export function registerThreadCommand(program: Command, context: CommandContext): void {
+export function registerThreadCommand(program: Command, context: SlackContext): void {
   program
     .command('thread <channel> <timestamp>')
     .description('Get replies in a Slack thread')

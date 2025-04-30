@@ -7,7 +7,7 @@ import {
   performSlackSearch,
   getUserProfile,
 } from '../../../src/services/slack-services';
-import { CommandContext } from '../../../src/context';
+import { SlackContext } from '../../../src/context';
 import * as slackApi from '../../../src/slack-api';
 import * as slackService from '../../../src/commands/my_messages/slack-service';
 import * as slackEntityCache from '../../../src/commands/my_messages/slack-entity-cache';
@@ -20,15 +20,20 @@ vi.mock('../../../src/commands/my_messages/slack-entity-cache');
 vi.mock('../../../src/cache');
 
 describe('Slack Services', () => {
-  let context: CommandContext;
+  let context: SlackContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Create a new context for each test
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -111,7 +116,7 @@ describe('Slack Services', () => {
     });
 
     it('should set status with text only', async () => {
-      const result = await setSlackStatus('Working', context);
+      const result = await setSlackStatus('Working');
 
       // Check that client.users.profile.set was called with correct parameters
       expect(mockClient.users.profile.set).toHaveBeenCalledWith({
@@ -132,7 +137,7 @@ describe('Slack Services', () => {
     });
 
     it('should set status with emoji', async () => {
-      const result = await setSlackStatus('Working', context, 'computer');
+      const result = await setSlackStatus('Working', 'computer');
 
       // Check proper emoji formatting
       expect(mockClient.users.profile.set).toHaveBeenCalledWith({
@@ -161,7 +166,7 @@ describe('Slack Services', () => {
       global.Date.now = vi.fn(() => mockTimestamp);
 
       try {
-        const result = await setSlackStatus('In a meeting', context, 'calendar', 30);
+        const result = await setSlackStatus('In a meeting', 'calendar', 30);
 
         // Check that expiration was set correctly (30 minutes = 1800 seconds)
         const expectedExpiration = Math.floor(mockTimestamp / 1000) + 30 * 60;
@@ -193,7 +198,7 @@ describe('Slack Services', () => {
       mockClient.users.profile.set.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(setSlackStatus('Failed', context)).rejects.toThrow(
+      await expect(setSlackStatus('Failed')).rejects.toThrow(
         'Status update failed: Error: API Error',
       );
     });
@@ -256,9 +261,7 @@ describe('Slack Services', () => {
       mockClient.users.profile.get.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(getSlackStatus(context)).rejects.toThrow(
-        'Status retrieval failed: Error: API Error',
-      );
+      await expect(getSlackStatus()).rejects.toThrow('Status retrieval failed: Error: API Error');
     });
   });
 
@@ -293,10 +296,10 @@ describe('Slack Services', () => {
     });
 
     it('should search messages and return results with metadata', async () => {
-      const result = await performSlackSearch('test query', 10, context);
+      const result = await performSlackSearch('test query', 10);
 
       // Check that dependencies were called
-      expect(slackApi.getSlackClient).toHaveBeenCalledWith('test-workspace', context);
+      expect(slackApi.getSlackClient).toHaveBeenCalledWith();
       expect(slackService.searchSlackMessages).toHaveBeenCalled();
       expect(slackEntityCache.getSlackEntityCache).toHaveBeenCalled();
       expect(cache.saveSlackCache).toHaveBeenCalled();
@@ -317,9 +320,7 @@ describe('Slack Services', () => {
       );
 
       // Expect the function to throw with the specific error message
-      await expect(performSlackSearch('failed query', 10, context)).rejects.toThrow(
-        /Search failed:/,
-      );
+      await expect(performSlackSearch('failed query', 10)).rejects.toThrow(/Search failed:/);
     });
   });
 
@@ -372,10 +373,10 @@ describe('Slack Services', () => {
 
     it('should retrieve user profile information', async () => {
       const userId = 'U12345';
-      const result = await getUserProfile(userId, context);
+      const result = await getUserProfile(userId);
 
       // Check that client methods were called correctly
-      expect(slackApi.getSlackClient).toHaveBeenCalledWith('test-workspace', context);
+      expect(slackApi.getSlackClient).toHaveBeenCalledWith();
       expect(mockClient.users.info).toHaveBeenCalledWith({ user: userId });
       expect(mockClient.users.profile.get).toHaveBeenCalledWith({ user: userId });
 
@@ -418,7 +419,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await getUserProfile('U12345', context);
+      const result = await getUserProfile('U12345');
 
       // Should use real_name as fallback for display_name
       expect(result.displayName).toBe('Test User');
@@ -468,9 +469,7 @@ describe('Slack Services', () => {
       // Make users.info throw an error
       mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
 
-      await expect(getUserProfile('U12345', context)).rejects.toThrow(
-        /User profile retrieval failed/,
-      );
+      await expect(getUserProfile('U12345')).rejects.toThrow(/User profile retrieval failed/);
     });
   });
 });

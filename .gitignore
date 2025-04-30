@@ -44,6 +44,6 @@ temp/
 # Optional eslint cache
 .eslintcache
 
-# pnpm specific
-.pnpm-store/
-.pnpm-debug.log
+# npm specific
+.npm/
+npm-debug.log

@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { createSlackReminder } from '../services/slack-services';
 
-export function registerReminderCommand(program: Command, context: CommandContext): void {
+export function registerReminderCommand(program: Command, context: SlackContext): void {
   program
     .command('create-reminder <text>')
     .description('Create a new Slack reminder')

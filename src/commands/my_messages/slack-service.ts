@@ -1,6 +1,6 @@
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { CommandContext } from '../../context';
+import { GlobalContext, SlackContext } from '../../context';
 import { formatDateForSearch, getDayAfter, getDayBefore } from '../../utils/date-utils';
 import { enhanceSearchQuery } from '../../utils/user-utils';
 import { SearchResult } from './types';
@@ -18,7 +18,7 @@ export async function searchMessages(
   username: string | undefined,
   dateRange: { startTime: Date; endTime: Date },
   count: number,
-  context: CommandContext,
+  context: SlackContext,
 ): Promise<SearchResult> {
   if (!username) {
     throw new Error('Username is required for searching messages');
@@ -34,18 +34,18 @@ export async function searchMessages(
 
   // Search for messages from the user
   const searchQuery = `from:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.debugLog(`Search query: ${searchQuery}`);
+  context.log.debug(`Search query: ${searchQuery}`);
   const searchResults = await searchSlackMessages(client, searchQuery, count, context);
 
   // Search for thread messages with the user
   // Note: We add @ to be consistent, but our regex doesn't detect with: clauses yet
   const threadQuery = `is:thread with:@${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.debugLog(`Thread query: ${threadQuery}`);
+  context.log.debug(`Thread query: ${threadQuery}`);
   const threadResults = await searchSlackMessages(client, threadQuery, count, context);
 
   // Search for messages that mention the user
   const mentionQuery = `to:${username} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.debugLog(`Mention query: ${mentionQuery}`);
+  context.log.debug(`Mention query: ${mentionQuery}`);
   const mentionResults = await searchSlackMessages(client, mentionQuery, count, context);
 
   return {
@@ -62,13 +62,13 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
-  context: CommandContext,
+  context: SlackContext = GlobalContext,
 ): Promise<Match[]> {
-  context.debugLog(`Original search query: ${query}`);
+  context.log.debug(`Original search query: ${query}`);
 
   // Enhance the search query with proper user formatting
-  const enhancedQuery = await enhanceSearchQuery(client, query, context);
-  context.debugLog(`Executing search with enhanced query: ${enhancedQuery}`);
+  const enhancedQuery = await enhanceSearchQuery(client, query);
+  context.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
 
   try {
     const searchResults = await client.search.messages({
@@ -80,7 +80,7 @@ export async function searchSlackMessages(
 
     return searchResults.messages?.matches || [];
   } catch (error) {
-    context.debugLog(`Search error: ${error}`);
+    context.log.debug(`Search error: ${error}`);
     throw new Error(`Failed to search Slack: ${error}`);
   }
 }

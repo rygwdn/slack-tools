@@ -3,12 +3,11 @@ import {
   searchMessages,
   searchSlackMessages,
 } from '../../../../src/commands/my_messages/slack-service';
-import { CommandContext } from '../../../../src/context';
+import { SlackContext } from '../../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import * as dateUtils from '../../../../src/utils/date-utils';
 
-// Mock dependencies
 vi.mock('../../../../src/utils/date-utils', () => ({
   formatDateForSearch: vi.fn(),
   getDayAfter: vi.fn(),
@@ -16,16 +15,19 @@ vi.mock('../../../../src/utils/date-utils', () => ({
 }));
 
 describe('Slack Service', () => {
-  let context: CommandContext;
+  let context: SlackContext;
   let mockClient: WebClient;
 
   beforeEach(() => {
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
-    // Create a mock WebClient
     mockClient = {
       search: {
         messages: vi.fn(),
@@ -80,7 +82,7 @@ describe('Slack Service', () => {
 
       // Verify the results
       expect(result).toEqual(mockMatches);
-      expect(context.debugLog).toHaveBeenCalled();
+      expect(context.log.debug).toHaveBeenCalled();
     });
 
     it('should handle empty results', async () => {
@@ -128,7 +130,7 @@ describe('Slack Service', () => {
       );
 
       // Verify debug log was called
-      expect(context.debugLog).toHaveBeenCalled();
+      expect(context.log.debug).toHaveBeenCalled();
     });
   });
 
@@ -143,11 +145,11 @@ describe('Slack Service', () => {
       vi.spyOn({ searchSlackMessages }, 'searchSlackMessages').mockImplementation(
         async (client, query) => {
           // Return different matches based on the query content
-          if (query.includes('from:@testuser')) {
+          if (query.includes('from:testuser')) {
             return searchMatches;
-          } else if (query.includes('is:thread with:@testuser')) {
+          } else if (query.includes('is:thread with:testuser')) {
             return threadMatches;
-          } else if (query.includes('to:@testuser')) {
+          } else if (query.includes('to:testuser')) {
             return mentionMatches;
           }
           return [];
@@ -159,11 +161,11 @@ describe('Slack Service', () => {
         return {
           ok: true,
           messages: {
-            matches: query.includes('from:@testuser')
+            matches: query.includes('from:testuser')
               ? searchMatches
-              : query.includes('is:thread with:@testuser')
+              : query.includes('is:thread with:testuser')
                 ? threadMatches
-                : query.includes('to:@testuser')
+                : query.includes('to:testuser')
                   ? mentionMatches
                   : [],
           },
@@ -189,9 +191,9 @@ describe('Slack Service', () => {
       expect(dateUtils.formatDateForSearch).toHaveBeenCalledTimes(2);
 
       // Verify the queries are being constructed correctly
-      const debugCalls = vi.mocked(context.debugLog).mock.calls.map((call) => call[0]);
-      expect(debugCalls.some((call) => call.includes('from:@testuser'))).toBe(true);
-      expect(debugCalls.some((call) => call.includes('to:@testuser'))).toBe(true);
+      const debugCalls = vi.mocked(context.log.debug).mock.calls.map((call) => call[0]);
+      expect(debugCalls.some((call) => call.includes('from:testuser'))).toBe(true);
+      expect(debugCalls.some((call) => call.includes('to:testuser'))).toBe(true);
 
       // Verify the combined results
       expect(result.messages).toEqual(searchMatches);

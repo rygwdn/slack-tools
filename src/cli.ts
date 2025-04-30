@@ -4,7 +4,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerCommands } from './commands/register-commands';
 import { getLastWorkspace, setLastWorkspace } from './cache';
-import { CommandContext } from './context';
+import { GlobalContext } from './context';
+// import { CommandOptions } from './context';
 
 // Get current file directory (ES module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -23,42 +24,26 @@ program
   .option('-l, --last-workspace', 'Use the last used workspace')
   .option('-d, --debug', 'Enable debug mode for detailed logging');
 
-// Create command context object to be shared with all commands
-const commandContext = new CommandContext();
-
-// Register all commands with context
-registerCommands(program, commandContext);
+registerCommands(program);
 
 // Update workspace in context before running command
 program.hook('preAction', async (thisCommand) => {
   const options = thisCommand.opts();
 
-  // Set debug mode if flag is present
-  if (options.debug) {
-    commandContext.debug = true;
-    commandContext.debugLog('Debug mode enabled');
-  }
+  GlobalContext.debug = options.debug;
 
-  // If workspace is explicitly specified, use it and save as default
   if (options.workspace) {
-    commandContext.workspace = options.workspace;
-    commandContext.debugLog(`Using workspace: ${options.workspace}`);
     await setLastWorkspace(options.workspace);
-  }
-  // If --last-workspace flag is used, load the last workspace
-  else if (options.lastWorkspace) {
+    GlobalContext.workspace = options.workspace;
+  } else if (options.lastWorkspace) {
     const lastWorkspace = await getLastWorkspace();
     if (lastWorkspace) {
-      commandContext.workspace = lastWorkspace;
-      commandContext.lastWorkspaceUsed = true;
-      commandContext.debugLog(`Using last workspace: ${lastWorkspace}`);
+      GlobalContext.workspace = lastWorkspace;
     } else {
       console.error('No last workspace found. Please specify a workspace using --workspace.');
-      commandContext.debugLog('No last workspace found in cache');
+      process.exit(1);
     }
   }
-  // For MCP command specifically, auto-load the last workspace (the command itself will handle it)
-  // Other commands will handle the missing workspace case on their own
 });
 
 program.parse(process.argv);

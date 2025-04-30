@@ -5,16 +5,20 @@ import {
   getDayBefore,
   getDateRange,
 } from '../../../../src/utils/date-utils';
-import { CommandContext } from '../../../../src/context';
+import { GlobalContext, SlackContext } from '../../../../src/context';
 
 describe('My Messages Command Utils', () => {
-  let context: CommandContext;
+  let context: SlackContext;
 
   beforeEach(() => {
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     // Mock the Date constructor to return a predictable date
     const mockDate = new Date('2023-07-15T12:00:00Z');
@@ -28,7 +32,7 @@ describe('My Messages Command Utils', () => {
 
   describe('getDateRange', () => {
     it('should use today as default when no dates provided', async () => {
-      const result = await getDateRange({}, context);
+      const result = await getDateRange({});
 
       // Verify that start time is set to beginning of day (local time)
       expect(result.startTime.getDate()).toBe(15); // Day should be 15th regardless of timezone
@@ -46,13 +50,11 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMinutes()).toBe(59);
       expect(result.endTime.getSeconds()).toBe(59);
       expect(result.endTime.getMilliseconds()).toBe(999);
-
-      expect(context.debugLog).toHaveBeenCalledTimes(2);
     });
 
     it('should use provided since date', async () => {
       const since = '2023-07-10';
-      const result = await getDateRange({ since }, context);
+      const result = await getDateRange({ since });
 
       // Verify startTime is set to the provided date (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -73,13 +75,11 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMinutes()).toBe(59);
       expect(result.endTime.getSeconds()).toBe(59);
       expect(result.endTime.getMilliseconds()).toBe(999);
-
-      expect(context.debugLog).toHaveBeenCalledTimes(1);
     });
 
     it('should use provided until date', async () => {
       const until = '2023-07-20';
-      const result = await getDateRange({ until }, context);
+      const result = await getDateRange({ until });
 
       // Verify startTime is set to beginning of the current day (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -98,14 +98,12 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMinutes()).toBe(59);
       expect(result.endTime.getSeconds()).toBe(59);
       expect(result.endTime.getMilliseconds()).toBe(999);
-
-      expect(context.debugLog).toHaveBeenCalledTimes(1);
     });
 
     it('should use both provided dates', async () => {
       const since = '2023-07-10';
       const until = '2023-07-20';
-      const result = await getDateRange({ since, until }, context);
+      const result = await getDateRange({ since, until });
 
       // Verify startTime is set to the provided start date (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -125,8 +123,6 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMinutes()).toBe(59);
       expect(result.endTime.getSeconds()).toBe(59);
       expect(result.endTime.getMilliseconds()).toBe(999);
-
-      expect(context.debugLog).toHaveBeenCalledTimes(0);
     });
 
     it('should throw for invalid since date', async () => {

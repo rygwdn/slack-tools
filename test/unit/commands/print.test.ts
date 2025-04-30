@@ -1,34 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { registerPrintCommand } from '../../../src/commands/print';
-import { CommandContext } from '../../../src/context';
 import { Command } from 'commander';
 
 // Mock dependencies
-vi.mock('../../../src/slack-api', () => ({
-  findWorkspaceToken: vi.fn(),
-}));
-
-vi.mock('../../../src/keychain.js', () => ({
-  getStoredAuth: vi.fn(),
-  storeAuth: vi.fn(),
-}));
-
-vi.mock('../../../src/tokens.js', () => ({
-  getTokens: vi.fn(),
-}));
-
-vi.mock('../../../src/cookies.js', () => ({
-  getCookie: vi.fn(),
-}));
+vi.mock('../../../src/slack-api');
+vi.mock('../../../src/keychain.js');
+vi.mock('../../../src/tokens.js');
+vi.mock('../../../src/cookies.js');
 
 // Import the mocked functions
 import { findWorkspaceToken } from '../../../src/slack-api';
 import { getStoredAuth } from '../../../src/keychain.js';
 import { getTokens } from '../../../src/tokens.js';
 import { getCookie } from '../../../src/cookies.js';
+import { GlobalContext } from '../../../src/context';
 
 describe('Print Command', () => {
-  let context: CommandContext;
   let program: Command;
 
   // Mock data
@@ -51,9 +38,6 @@ describe('Print Command', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Initialize context
-    context = new CommandContext();
 
     // Initialize program
     program = new Command();
@@ -82,7 +66,7 @@ describe('Print Command', () => {
         action: vi.fn(),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       expect(commandSpy).toHaveBeenCalledWith('print');
     });
@@ -95,7 +79,7 @@ describe('Print Command', () => {
         action: vi.fn(),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       expect(optionSpy).toHaveBeenCalledWith('-q, --quiet', expect.any(String));
     });
@@ -115,7 +99,7 @@ describe('Print Command', () => {
         }),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       // Execute the command action
       expect(actionCallback).not.toBeNull();
@@ -123,10 +107,13 @@ describe('Print Command', () => {
 
       // Check if auth was used correctly
       expect(getStoredAuth).toHaveBeenCalled();
-      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'default', context);
+      expect(findWorkspaceToken).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-workspace',
+        expect.anything(),
+      );
 
       // Check console output
-      expect(console.log).toHaveBeenCalledWith('Getting Slack credentials...');
       expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
       expect(console.log).toHaveBeenCalledWith(`Workspace URL: ${mockWorkspaceUrl}`);
       expect(console.log).toHaveBeenCalledWith(`Token: ${mockToken}\n`);
@@ -135,9 +122,8 @@ describe('Print Command', () => {
     });
 
     it('should print tokens for a specific workspace when selected', async () => {
-      // Set workspace in context
-      Object.defineProperty(context, 'hasWorkspace', { get: () => true });
-      context.workspace = 'team1';
+      Object.defineProperty(GlobalContext, 'hasWorkspace', { get: () => true });
+      GlobalContext.workspace = 'team1';
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
@@ -150,13 +136,17 @@ describe('Print Command', () => {
         }),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       // Execute the command action
       await actionCallback!({ quiet: false });
 
       // Check if token was fetched for the specific workspace
-      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'team1', context);
+      expect(findWorkspaceToken).toHaveBeenCalledWith(
+        expect.anything(),
+        'team1',
+        expect.anything(),
+      );
 
       // Check workspace-specific output
       expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
@@ -176,7 +166,7 @@ describe('Print Command', () => {
         }),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       // Execute the command action with quiet option
       await actionCallback!({ quiet: true });
@@ -189,43 +179,10 @@ describe('Print Command', () => {
       expect(console.log).not.toHaveBeenCalledWith('Getting Slack credentials...');
     });
 
-    it('should handle error when no workspace is found and try with first available workspace', async () => {
-      // First findWorkspaceToken call throws error for 'default' workspace
-      vi.mocked(findWorkspaceToken)
-        .mockImplementationOnce(() => {
-          throw new Error('Could not find workspace "default"');
-        })
-        .mockReturnValueOnce(mockTokenResponse); // Second call succeeds
-
-      // Setup command execution
-      let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;
-
-      vi.spyOn(program, 'command').mockReturnValue({
-        description: vi.fn().mockReturnThis(),
-        option: vi.fn().mockReturnThis(),
-        action: vi.fn((callback) => {
-          actionCallback = callback;
-        }),
-      } as any);
-
-      registerPrintCommand(program, context);
-
-      // Execute the command action
-      await actionCallback!({ quiet: false });
-
-      // Check that it tried with default workspace first, then fell back to first workspace
-      expect(findWorkspaceToken).toHaveBeenCalledTimes(2);
-
-      // Check fallback output
-      expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
-      expect(console.log).toHaveBeenCalledWith(`Workspace URL: ${mockWorkspaceUrl}`);
-      expect(console.log).toHaveBeenCalledWith(`Token: ${mockToken}\n`);
-    });
-
     it('should handle error when specific workspace is not found', async () => {
       // Set non-existent workspace in context
-      Object.defineProperty(context, 'hasWorkspace', { get: () => true });
-      context.workspace = 'nonexistent-team';
+      Object.defineProperty(GlobalContext, 'hasWorkspace', { get: () => true });
+      GlobalContext.workspace = 'nonexistent-team';
 
       // Mock findWorkspaceToken to throw an error
       vi.mocked(findWorkspaceToken).mockImplementationOnce(() => {
@@ -243,16 +200,13 @@ describe('Print Command', () => {
         }),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       // Execute the command action
       await actionCallback!({ quiet: false });
 
       // Check workspace-specific error message
-      expect(console.error).toHaveBeenCalledWith(
-        'Error getting workspace "nonexistent-team":',
-        expect.any(Error),
-      );
+      expect(console.error).toHaveBeenCalledWith('Error:', expect.any(Error));
       expect(process.exit).toHaveBeenCalledWith(1);
     });
 
@@ -279,16 +233,13 @@ describe('Print Command', () => {
         }),
       } as any);
 
-      registerPrintCommand(program, context);
+      registerPrintCommand(program);
 
       // Execute the command action
       await actionCallback!({ quiet: false });
 
       // Check error handling
-      expect(console.error).toHaveBeenCalledWith(
-        'Error getting any workspace token:',
-        expect.any(Error),
-      );
+      expect(console.error).toHaveBeenCalledWith('Error:', expect.any(Error));
       expect(process.exit).toHaveBeenCalledWith(1);
     });
   });

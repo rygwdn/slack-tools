@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { formatEmoji, setSlackStatus } from '../services/slack-services';
 
-export function registerStatusCommand(program: Command, context: CommandContext): void {
+export function registerStatusCommand(program: Command, context: SlackContext): void {
   program
     .command('status <text>')
     .description('Set your Slack status')

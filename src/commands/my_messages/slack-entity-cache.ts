@@ -1,6 +1,6 @@
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { CommandContext } from '../../context';
+import { GlobalContext, SlackContext } from '../../context';
 import { SlackCache } from './types';
 import { loadSlackCache, saveSlackCache } from '../../cache';
 
@@ -48,7 +48,7 @@ async function fetchAndCacheUsers(
   client: WebClient,
   userIds: string[],
   cache: SlackCache,
-  context: CommandContext,
+  context: SlackContext,
   isCacheLoaded: boolean,
 ): Promise<void> {
   for (const userId of userIds) {
@@ -60,11 +60,11 @@ async function fetchAndCacheUsers(
           isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot'),
         };
         if (isCacheLoaded) {
-          context.debugLog(`Added missing user to cache: ${cache.users[userId].displayName}`);
+          context.log.debug(`Added missing user to cache: ${cache.users[userId].displayName}`);
         }
       }
     } catch (error) {
-      context.debugLog(`Could not fetch info for user ${userId}:`, error);
+      context.log.debug(`Could not fetch info for user ${userId}:`, error);
     }
   }
 }
@@ -76,7 +76,7 @@ async function fetchDmUserInfo(
   client: WebClient,
   userId: string,
   cache: SlackCache,
-  context: CommandContext,
+  context: SlackContext,
   isCacheLoaded: boolean,
 ): Promise<void> {
   if (!cache.users[userId]) {
@@ -88,11 +88,11 @@ async function fetchDmUserInfo(
           isBot: !!userResponse.user.is_bot || (userResponse.user.name || '').includes('bot'),
         };
         if (isCacheLoaded) {
-          context.debugLog(`Added missing DM user to cache: ${cache.users[userId].displayName}`);
+          context.log.debug(`Added missing DM user to cache: ${cache.users[userId].displayName}`);
         }
       }
     } catch (error) {
-      context.debugLog(`Could not fetch info for DM user ${userId}:`, error);
+      context.log.debug(`Could not fetch info for DM user ${userId}:`, error);
     }
   }
 }
@@ -103,13 +103,13 @@ async function fetchDmUserInfo(
 async function fetchChannelMembers(
   client: WebClient,
   channelId: string,
-  context: CommandContext,
+  context: SlackContext,
 ): Promise<string[] | undefined> {
   try {
     const result = await client.conversations.members({ channel: channelId });
     return result.members || [];
   } catch (error) {
-    context.debugLog(`Could not fetch members for channel ${channelId}:`, error);
+    context.log.debug(`Could not fetch members for channel ${channelId}:`, error);
     return undefined;
   }
 }
@@ -121,7 +121,7 @@ async function fetchAndCacheChannels(
   client: WebClient,
   channelIds: string[],
   cache: SlackCache,
-  context: CommandContext,
+  context: SlackContext,
   isCacheLoaded: boolean,
   userIds: Set<string>,
 ): Promise<void> {
@@ -151,11 +151,11 @@ async function fetchAndCacheChannels(
           members,
         };
         if (isCacheLoaded) {
-          context.debugLog(`Added missing channel to cache: ${channelName}`);
+          context.log.debug(`Added missing channel to cache: ${channelName}`);
         }
       }
     } catch (error) {
-      context.debugLog(`Could not fetch info for channel ${channelId}:`, error);
+      context.log.debug(`Could not fetch info for channel ${channelId}:`, error);
     }
   }
 }
@@ -179,7 +179,7 @@ async function initializeCache(): Promise<SlackCache> {
 export async function getSlackEntityCache(
   client: WebClient,
   messages: Match[],
-  context: CommandContext,
+  context: SlackContext = GlobalContext,
 ): Promise<SlackCache> {
   // Initialize or load existing cache
   const cache = await initializeCache();
@@ -194,12 +194,12 @@ export async function getSlackEntityCache(
 
   // Log cache status
   if (isCacheLoaded) {
-    context.debugLog('Using cached user and channel information with updates for missing entries');
-    context.debugLog(
+    context.log.debug('Using cached user and channel information with updates for missing entries');
+    context.log.debug(
       `Found ${missingUserIds.length} users and ${missingChannelIds.length} channels missing from cache`,
     );
   } else {
-    context.debugLog('No cache found, fetching all user and channel information');
+    context.log.debug('No cache found, fetching all user and channel information');
   }
 
   // Fetch missing user information

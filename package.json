@@ -6,7 +6,7 @@
     "slack-tools-mcp": "dist/cli.mjs"
   },
   "scripts": {
-    "start": "tsx src/cli.ts",
+    "start": "tsup && node dist/cli.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -28,14 +28,14 @@
   "author": "rygwdn",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.1",
     "@slack/web-api": "^7.0.1",
     "commander": "^13.1.0",
+    "fastmcp": "^1.23.1",
+    "glob": "^11.0.2",
     "keytar": "^7.9.0",
     "level": "^10.0.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
-    "tsx": "^4.7.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {

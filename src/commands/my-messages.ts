@@ -1,10 +1,10 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { MyMessagesCommandOptions } from './my_messages/types';
 import { generateMyMessagesSummary } from '../services/my-messages-service';
 
-export function registerMyMessagesCommand(program: Command, context: CommandContext): void {
+export function registerMyMessagesCommand(program: Command, context: SlackContext): void {
   program
     .command('my-messages')
     .description(
@@ -21,7 +21,7 @@ export function registerMyMessagesCommand(program: Command, context: CommandCont
         const workspace = context.workspace;
 
         const count = parseInt(options.count, 10);
-        context.debugLog(`Generating daily summary for workspace: ${workspace}`);
+        context.log.debug(`Generating daily summary for workspace: ${workspace}`);
 
         // Use the shared service to generate the my messages summary
         const result = await generateMyMessagesSummary(

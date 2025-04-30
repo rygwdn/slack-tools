@@ -7,18 +7,22 @@ import {
   extractThreadTsFromPermalink,
   generateMarkdown,
 } from '../../../../src/commands/my_messages/formatters';
-import { CommandContext } from '../../../../src/context';
+import { SlackContext } from '../../../../src/context';
 import { SlackCache, ThreadMessage } from '../../../../src/commands/my_messages/types';
 
 describe('My Messages Formatters', () => {
-  let context: CommandContext;
+  let context: SlackContext;
   let mockCache: SlackCache;
 
   beforeEach(() => {
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     mockCache = {
       channels: {

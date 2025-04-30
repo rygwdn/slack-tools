@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import { performSlackSearch } from '../services/slack-services';
 import { generateSearchResultsMarkdown } from '../services/formatting-service';
 
@@ -9,7 +9,7 @@ export interface SearchCommandOptions {
   output?: string;
 }
 
-export function registerSearchCommand(program: Command, context: CommandContext): void {
+export function registerSearchCommand(program: Command, context: SlackContext): void {
   program
     .command('search <query>')
     .description('Search Slack messages and output results as markdown')
@@ -18,7 +18,7 @@ export function registerSearchCommand(program: Command, context: CommandContext)
     .action(async (query: string, options: SearchCommandOptions) => {
       try {
         const count = parseInt(options.count, 10);
-        context.debugLog(`Searching Slack for: "${query}"`);
+        context.log.debug(`Searching Slack for: "${query}"`);
 
         // Use the extracted search function
         const searchResult = await performSlackSearch(query, count, context);
@@ -30,7 +30,7 @@ export function registerSearchCommand(program: Command, context: CommandContext)
           users: searchResult.users,
         };
 
-        context.debugLog('Formatting report...');
+        context.log.debug('Formatting report...');
 
         // Process and format messages with our simplified formatter
         const markdown = generateSearchResultsMarkdown(messages, cache, userId, context);

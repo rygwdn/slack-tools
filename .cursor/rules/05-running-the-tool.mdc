@@ -10,16 +10,16 @@ alwaysApply: false
 1. Clone the repository
 2. Install dependencies:
    ```bash
-   pnpm install
+   npm install
    ```
 3. Make the tool globally available:
    ```bash
-   pnpm link --global
+   npm link
    ```
 
 ## Command Execution
 
-- Always run slack-tools commands via `pnpm tsx src/cli.ts` or the installed CLI command `slack-tools`
+- Always run slack-tools commands via `npm run start --` or the installed CLI command `slack-tools`
 - Make sure the Slack app is closed when running commands (required to access the LevelDB database)
 - When adding new commands, follow the same structure as existing commands in src/commands/
 - Register all new commands in src/commands/index.ts

@@ -9,25 +9,25 @@ Before any task is considered complete, the following quality checks must be run
 
 1. **ESLint** - Check for code style and potential errors:
    ```bash
-   pnpm run lint
+   npm run lint
    ```
    Fix any linting errors before submitting:
    ```bash
-   pnpm run lint:fix
+   npm run lint:fix
    ```
 
 2. **Prettier** - Format all code consistently:
    ```bash
-   pnpm run format
+   npm run format
    ```
    Verify formatting is correct:
    ```bash
-   pnpm run format:check
+   npm run format:check
    ```
 
 3. **TypeScript Build** - Ensure all type checks pass:
    ```bash
-   pnpm run build
+   npm run build
    ```
 
 **Note:** No task should be considered complete until all the above checks have passed without errors.
@@ -35,8 +35,8 @@ Before any task is considered complete, the following quality checks must be run
 ## Development Workflow
 
 1. Make your code changes
-2. Run linting: `pnpm run lint`
-3. Fix any linting issues: `pnpm run lint:fix`
-4. Format your code: `pnpm run format`
-5. Ensure TypeScript builds without errors: `pnpm run build`
+2. Run linting: `npm run lint`
+3. Fix any linting issues: `npm run lint:fix`
+4. Format your code: `npm run format`
+5. Ensure TypeScript builds without errors: `npm run build`
 6. Commit your changes only after all checks pass

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CommandContext } from '../../../../src/context';
 
 // Mock the slack-api module before importing the module being tested
 vi.mock('../../../../src/slack-api', () => ({
@@ -35,63 +34,38 @@ vi.mock('../../../../src/slack-api', () => ({
 }));
 
 // Import the module after mocking its dependencies
-import { registerUserSearchTool } from '../../../../src/commands/mcp-tools/user-search';
+import { userSearchTool } from '../../../../src/commands/mcp-tools/user-search';
 
 describe('User Search MCP Tool', () => {
-  let context: CommandContext;
-  let mockServer: any;
-  let toolHandler: (params: { query: string; limit: number }) => Promise<any>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock the MCP server
-    mockServer = {
-      tool: vi.fn((name, schema, handler) => {
-        if (name === 'slack_user_search') {
-          toolHandler = handler;
-        }
-        return mockServer;
-      }),
-    };
-
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-
-    // Register the tool
-    registerUserSearchTool(mockServer, context);
   });
 
-  it('should register the slack_user_search tool', () => {
-    expect(mockServer.tool).toHaveBeenCalledWith(
-      'slack_user_search',
-      expect.anything(),
-      expect.any(Function),
-    );
+  it('should have the correct tool definition', () => {
+    // Check the tool properties
+    expect(userSearchTool.name).toBe('slack_user_search');
+    expect(userSearchTool.description).toBeTruthy();
+    expect(userSearchTool.parameters).toBeDefined();
+    expect(userSearchTool.execute).toBeInstanceOf(Function);
   });
 
   it('should search for users properly', async () => {
-    // Call the handler
-    const result = await toolHandler({ query: 'doe', limit: 10 });
-
-    // Verify the result structure
-    expect(result).toHaveProperty('content');
-    expect(Array.isArray(result.content)).toBe(true);
+    // Call the execute function directly
+    const result = await userSearchTool.execute({ query: 'doe', limit: 10 }, vi.fn()() as any);
 
     // Verify the markdown content
-    const markdownContent = result.content[0].text;
-    expect(markdownContent).toContain('User Search Results');
-    expect(markdownContent).toContain('@johndoe');
-    expect(markdownContent).toContain('John Doe');
-    expect(markdownContent).toContain('@janedoe');
-    expect(markdownContent).toContain('Jane Doe');
+    expect(result).toContain('User Search Results');
+    expect(result).toContain('@johndoe');
+    expect(result).toContain('John Doe');
+    expect(result).toContain('@janedoe');
+    expect(result).toContain('Jane Doe');
   });
 
   it('should handle empty query properly', async () => {
-    const result = await toolHandler({ query: '', limit: 10 });
+    // Call the execute function directly
+    const result = await userSearchTool.execute({ query: '', limit: 10 }, vi.fn()() as any);
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Please provide a search term');
+    expect(result).toContain('Please provide a search term');
   });
 
   it('should handle no matches gracefully', async () => {
@@ -109,18 +83,21 @@ describe('User Search MCP Tool', () => {
         }) as any,
     );
 
-    const result = await toolHandler({ query: 'nonexistent', limit: 10 });
+    // Call the execute function directly
+    const result = await userSearchTool.execute(
+      { query: 'nonexistent', limit: 10 },
+      vi.fn()() as any,
+    );
 
-    expect(result.content[0].text).toContain('No users found');
+    expect(result).toContain('No users found');
   });
 
   it('should include proper search formats in results', async () => {
-    const result = await toolHandler({ query: 'doe', limit: 10 });
-
-    const markdownContent = result.content[0].text;
+    // Call the execute function directly
+    const result = await userSearchTool.execute({ query: 'doe', limit: 10 }, vi.fn()() as any);
 
     // Check for display names with spaces (quoted format)
-    expect(markdownContent).toContain('from:"John Doe"');
-    expect(markdownContent).toContain('from:"Jane Doe"');
+    expect(result).toContain('from:"John Doe"');
+    expect(result).toContain('from:"Jane Doe"');
   });
 });

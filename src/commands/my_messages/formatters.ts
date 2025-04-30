@@ -1,6 +1,6 @@
 import { SlackCache, ThreadMessage } from './types';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { CommandContext } from '../../context';
+import { SlackContext } from '../../context';
 
 export function getFriendlyChannelName(
   channelId: string,
@@ -95,7 +95,7 @@ function shouldIncludeChannel(
   messages: ThreadMessage[],
   cache: SlackCache,
   userId: string,
-  context: CommandContext,
+  context: SlackContext,
 ): boolean {
   // Keep the channel if:
   // 1. I sent any message in the channel (including thread replies)
@@ -115,7 +115,7 @@ function shouldIncludeChannel(
     const isBot = dmUser?.isBot || false;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
-      context.debugLog(
+      context.log.debug(
         `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`,
       );
     }
@@ -128,24 +128,24 @@ function shouldIncludeChannel(
 // Helper function to organize messages into threads
 function organizeMessagesIntoThreads(
   messages: Match[],
-  context: CommandContext,
+  context: SlackContext,
 ): { threadMap: Map<string, ThreadMessage[]>; standaloneMessages: ThreadMessage[] } {
   const threadMap = new Map<string, ThreadMessage[]>();
   const standaloneMessages: ThreadMessage[] = [];
 
   for (const message of messages) {
     if (!isValidThreadMessage(message)) {
-      context.debugLog('Skipping message without timestamp');
+      context.log.debug('Skipping message without timestamp');
       continue;
     }
 
     // Try to get thread_ts from the message or extract it from permalink
     const threadTs = message.thread_ts || extractThreadTsFromPermalink(message.permalink);
-    
+
     // Create a thread permalink if this message has a permalink and thread_ts
     let threadPermalink = undefined;
     let isThreadParent = false;
-    
+
     // Determine if this message is part of a thread
     if (message.permalink) {
       // Check if the permalink contains thread_ts which would indicate a thread
@@ -183,7 +183,7 @@ function organizeMessagesIntoThreads(
           hasReplies: false,
         };
         thread.push(messageWithThreadTs);
-        context.debugLog(`Added message to thread: ${message.text?.slice(0, 50)}`);
+        context.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
       }
     } else {
       // If no thread_ts or it's the thread parent, it's a standalone/parent message
@@ -193,7 +193,7 @@ function organizeMessagesIntoThreads(
         hasReplies: isThreadParent,
       };
       standaloneMessages.push(messageWithThreadInfo);
-      context.debugLog(
+      context.log.debug(
         `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`,
       );
     }
@@ -207,7 +207,7 @@ function addMessageToDateChannelStructure(
   message: ThreadMessage,
   threadMessages: ThreadMessage[] = [],
   dateChannelMap: Map<string, Map<string, ThreadMessage[]>>,
-  context: CommandContext,
+  context: SlackContext,
 ): void {
   const date = new Date(Number(message.ts) * 1000);
   const dateKey = date.toISOString().split('T')[0];
@@ -224,7 +224,9 @@ function addMessageToDateChannelStructure(
 
   const messagesForChannel = channelsForDate.get(channelId)!;
   if (threadMessages.length > 0) {
-    context.debugLog(`Adding message with ${threadMessages.length} thread replies to ${channelId}`);
+    context.log.debug(
+      `Adding message with ${threadMessages.length} thread replies to ${channelId}`,
+    );
   }
   messagesForChannel.push({
     ...message,
@@ -236,7 +238,7 @@ function addMessageToDateChannelStructure(
 function groupMessagesByDateAndChannel(
   standaloneMessages: ThreadMessage[],
   threadMap: Map<string, ThreadMessage[]>,
-  context: CommandContext,
+  context: SlackContext,
 ): Map<string, Map<string, ThreadMessage[]>> {
   const messagesByDate = new Map<string, Map<string, ThreadMessage[]>>();
 
@@ -251,11 +253,16 @@ function groupMessagesByDateAndChannel(
       const messageWithReplies: ThreadMessage = {
         ...message,
         hasReplies: replies.length > 0,
-        threadPermalink: message.threadPermalink || message.permalink
+        threadPermalink: message.threadPermalink || message.permalink,
       };
       addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate, context);
     } else {
-      addMessageToDateChannelStructure({...message, hasReplies: false}, [], messagesByDate, context);
+      addMessageToDateChannelStructure(
+        { ...message, hasReplies: false },
+        [],
+        messagesByDate,
+        context,
+      );
     }
   }
 
@@ -278,18 +285,19 @@ function groupMessagesByDateAndChannel(
       const parentWithReplies: ThreadMessage = {
         ...parentMessage,
         hasReplies: replies.length > 0,
-        threadPermalink: parentMessage.threadPermalink || parentMessage.permalink
+        threadPermalink: parentMessage.threadPermalink || parentMessage.permalink,
       };
       addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate, context);
     } else {
       // Create a synthetic parent from the first message
       const firstMessage = sortedThreadMessages[0];
-      context.debugLog(`Thread ${threadTs} missing parent, using first reply as parent`);
-      
+      context.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
+
       // Try to get a thread permalink from one of the replies
-      const threadPermalink = sortedThreadMessages.find(m => m.threadPermalink)?.threadPermalink || 
-                             firstMessage.permalink;
-                             
+      const threadPermalink =
+        sortedThreadMessages.find((m) => m.threadPermalink)?.threadPermalink ||
+        firstMessage.permalink;
+
       const syntheticParent: ThreadMessage = {
         ...firstMessage,
         thread_ts: threadTs,
@@ -298,7 +306,7 @@ function groupMessagesByDateAndChannel(
         user: firstMessage.user,
         channel: firstMessage.channel,
         hasReplies: true,
-        threadPermalink
+        threadPermalink,
       };
       const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
       addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate, context);
@@ -309,7 +317,7 @@ function groupMessagesByDateAndChannel(
 }
 
 // Helper function to format a single message
-function formatMessage(message: ThreadMessage, cache: SlackCache, context: CommandContext): string {
+function formatMessage(message: ThreadMessage, cache: SlackCache, context: SlackContext): string {
   let markdown = '';
   const timestamp = new Date(Number(message.ts) * 1000);
   const timeString = formatTime(timestamp);
@@ -319,15 +327,15 @@ function formatMessage(message: ThreadMessage, cache: SlackCache, context: Comma
     userName = cache.users[message.user].displayName;
   }
 
-  context.debugLog(`Formatting message from ${userName}`);
+  context.log.debug(`Formatting message from ${userName}`);
 
   // Format the main message with thread indicator
   let threadIndicator = '';
   if (message.hasReplies) {
     // If the thread_ts matches this message's ts, it's the start of a thread
-    const isThreadStarter = message.thread_ts === message.ts || 
-                          message.permalink?.includes(`thread_ts=${message.ts}`);
-    
+    const isThreadStarter =
+      message.thread_ts === message.ts || message.permalink?.includes(`thread_ts=${message.ts}`);
+
     if (isThreadStarter) {
       threadIndicator = ` [💬 Start of Thread](${message.threadPermalink || message.permalink || ''})`;
     } else {
@@ -372,7 +380,7 @@ function formatThreadReplies(replies: ThreadMessage[], cache: SlackCache): strin
     }
 
     // Thread replies don't need reaction indicators
-    
+
     // Indent thread replies with 8 spaces for proper markdown nesting under parent
     markdown += '        - '; // 8 spaces for nesting + the bullet point
     if (reply.permalink) {
@@ -404,11 +412,11 @@ export function generateMarkdown(
   messages: Match[],
   cache: SlackCache,
   userId: string,
-  context: CommandContext,
+  context: SlackContext,
 ): string {
   let markdown = '';
 
-  context.debugLog(`Processing ${messages.length} total messages`);
+  context.log.debug(`Processing ${messages.length} total messages`);
 
   // Organize messages into threads
   const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages, context);
@@ -450,7 +458,7 @@ export function generateMarkdown(
 
         // Add thread replies if any
         if (message.threadMessages?.length) {
-          context.debugLog(
+          context.log.debug(
             `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`,
           );
           markdown += formatThreadReplies(message.threadMessages, cache);

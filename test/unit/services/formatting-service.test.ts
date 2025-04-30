@@ -4,7 +4,7 @@ import {
   formatStatusOutput,
   formatStatusUpdateOutput,
 } from '../../../src/services/formatting-service';
-import { CommandContext } from '../../../src/context';
+import { SlackContext } from '../../../src/context';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 
 // Mock the formatters from my_messages command
@@ -20,14 +20,18 @@ vi.mock('../../../src/commands/my_messages/formatters', () => ({
 }));
 
 describe('Formatting Service', () => {
-  let context: CommandContext;
+  let context: SlackContext;
   let mockCache: any;
 
   beforeEach(() => {
-    context = new CommandContext();
-    context.workspace = 'test-workspace';
-    context.debug = true;
-    vi.spyOn(context, 'debugLog').mockImplementation(() => {});
+    context = {
+      workspace: 'test-workspace',
+      debug: true,
+      hasWorkspace: true,
+      log: {
+        debug: vi.fn(),
+      },
+    };
 
     mockCache = {
       channels: {

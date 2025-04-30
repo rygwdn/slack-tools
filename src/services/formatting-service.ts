@@ -1,5 +1,5 @@
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { CommandContext } from '../context';
+import { SlackContext } from '../context';
 import {
   formatSlackText,
   getFriendlyChannelName,
@@ -14,16 +14,16 @@ export function generateSearchResultsMarkdown(
   messages: (Match | ThreadMessage)[],
   cache: SlackCache,
   userId: string,
-  context: CommandContext,
+  context: SlackContext,
 ): string {
   let markdown = '';
 
   if (messages.length === 0) {
-    context.debugLog('No search results found');
+    context.log.debug('No search results found');
     return '# Search Results\n\nNo messages found matching your search criteria.\n';
   }
 
-  context.debugLog(`Processing ${messages.length} search results`);
+  context.log.debug(`Processing ${messages.length} search results`);
 
   // Group messages by channel
   const messagesByChannel = new Map<string, Match[]>();
@@ -77,15 +77,15 @@ export function generateSearchResultsMarkdown(
       // Check thread information from permalink URL since thread_ts might not be directly available
       const messageTs = message.ts || '';
       const permalink = message.permalink || '';
-      
+
       // If the permalink contains thread_ts parameter, it's part of a thread
       if (permalink.includes('thread_ts=')) {
         const threadTsMatch = permalink.match(/thread_ts=([^&]+)/);
         const threadTs = threadTsMatch ? threadTsMatch[1] : '';
-        
+
         // If thread_ts in URL matches this message's ts, it's the start of a thread
         const isThreadStarter = threadTs === messageTs;
-        
+
         if (isThreadStarter) {
           threadIndicator = ` [💬 Start of Thread](${permalink})`;
         } else {
