@@ -3,7 +3,7 @@
   "version": "1.0.3",
   "description": "Tools for interacting with Slack's local data",
   "bin": {
-    "slack-tools": "dist/cli.js"
+    "slack-tools": "dist/cli.mjs"
   },
   "scripts": {
     "start": "tsx src/cli.ts",
@@ -25,31 +25,33 @@
   ],
   "author": "rygwdn",
   "license": "MIT",
-  "devDependencies": {
-    "@eslint/js": "^9.25.0",
+  "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
     "@slack/web-api": "^7.0.1",
+    "commander": "^13.1.0",
+    "keytar": "^7.9.0",
+    "level": "^10.0.0",
+    "sqlite": "^5.1.1", 
+    "sqlite3": "^5.1.7",
+    "tsx": "^4.7.0",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
     "@types/node": "^22.14.1",
     "@types/sqlite3": "^3.1.11",
     "@vitest/coverage-v8": "^3.1.1",
-    "commander": "^13.1.0",
     "eslint": "^9.25.0",
     "eslint-config-prettier": "^10.1.2",
-    "keytar": "^7.9.0",
-    "level": "^10.0.0",
     "prettier": "^3.5.3",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
     "tsup": "^8.4.0",
-    "tsx": "^4.7.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",
-    "vitest": "^3.1.1",
-    "zod": "^3.24.3"
+    "vitest": "^3.1.1"
   },
   "files": [
+    "src",
     "dist",
     "README.md"
-  ],
-  "packageManager": "pnpm@8.15.4"
+  ]
 }
