@@ -1,6 +1,6 @@
 {
     "name": "slack-tools",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Tools for interacting with Slack's local data",
     "type": "module",
     "bin": {
