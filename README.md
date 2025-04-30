@@ -1,10 +1,10 @@
-# Slack Tools
+# Slack Tools MCP
 
-A TypeScript library for interacting with Slack's local data, including token extraction from the desktop app.
+A TypeScript library for interacting with Slack's local data, including token extraction from the desktop app and Model Context Protocol (MCP) support for AI assistants.
 
 ## Description
 
-This tool provides programmatic access to the [Slack](https://slack.com/) ecosystem by extracting authentication tokens from the Slack desktop app's local storage and uses the official Slack Web API package for making API calls. This project is not endorsed or authorized by Slack Technologies LLC.
+This tool provides programmatic access to the [Slack](https://slack.com/) ecosystem by extracting authentication tokens from the Slack desktop app's local storage and uses the official Slack Web API package for making API calls. It also includes full MCP support for integrating with AI assistants like Claude. This project is not endorsed or authorized by Slack Technologies LLC.
 
 ## Installation and Usage
 
@@ -45,12 +45,12 @@ The MCP server provides the following tools:
 - **slack_get_status** - Retrieve your current Slack status
 - **slack_my_messages** - Generate summaries of your Slack activity
 - **slack_create_reminder** - Create Slack reminders with custom text and timing
-- **slack_list_reminders** - List and filter Slack reminders by status, due dates, and completion dates
 - **slack_user_activity** - Get activity statistics for a user across channels
 - **slack_get_thread_replies** - Retrieve replies in a message thread
-- **system_datetime** - Get the current date and time in both system timezone and UTC
+- **slack_user_search** - Find Slack users by name or username
+- **slack_get_user_profile** - Get detailed profile information for a Slack user
 
-This command is especially useful for integrating Slack with AI assistants like Claude that support the MCP protocol. All tool responses are formatted in markdown for easy readability.
+This command is especially useful for integrating Slack with AI assistants like Claude that support the Model Context Protocol. All tool responses are formatted in markdown for easy readability.
 
 **Note:** A workspace must be specified when using this command.
 
@@ -155,12 +155,36 @@ npx -y github:rygwdn/slack-tools activity -w Build --user U01234ABCDE
 npx -y github:rygwdn/slack-tools activity -w Build --count 500
 ```
 
-### Today Command
+### Search Command
+
+Search Slack messages and output results as markdown:
+
+```bash
+npx -y github:rygwdn/slack-tools search -w <workspace> [options] <query>
+```
+
+Options:
+- `-c, --count <number>` - Number of messages to fetch (default: 100)
+- `-o, --output <file>` - Output markdown to a file
+
+Examples:
+```bash
+# Search for messages containing "project update"
+npx -y github:rygwdn/slack-tools search -w Build "project update"
+
+# Search for messages from a specific user
+npx -y github:rygwdn/slack-tools search -w Build "from:@username project"
+
+# Search with more results and save to file
+npx -y github:rygwdn/slack-tools search -w Build "deadline" --count 200 --output search-results.md
+```
+
+### My Messages Command
 
 Generate a summary of your Slack activity:
 
 ```bash
-npx -y github:rygwdn/slack-tools today -w <workspace> [options]
+npx -y github:rygwdn/slack-tools my-messages -w <workspace> [options]
 ```
 
 Options:
@@ -173,25 +197,29 @@ Options:
 Examples:
 ```bash
 # Get today's activity summary
-npx -y github:rygwdn/slack-tools today -w Build
+npx -y github:rygwdn/slack-tools my-messages -w Build
 
 # Get activity for a specific date range
-npx -y github:rygwdn/slack-tools today -w Build -s 2023-03-01 -e 2023-03-31
+npx -y github:rygwdn/slack-tools my-messages -w Build -s 2023-03-01 -e 2023-03-31
 
 # Save the summary to a file
-npx -y github:rygwdn/slack-tools today -w Build -o activity-report.md
+npx -y github:rygwdn/slack-tools my-messages -w Build -o activity-report.md
 ```
 
 ## Requirements
 
-- Node.js 14.0.0 or higher
-- macOS or Linux operating system
+- Node.js 18.0.0 or higher
+- macOS or Linux operating system (Windows not supported)
 - Slack desktop app installed
 
 ## Notes
 
 - The Slack app must be closed when running this tool to access the LevelDB database
 - Each Slack Workspace has its own personal token
+- Running with MCP mode is particularly useful for AI assistants that support the Model Context Protocol
+- All markdown output can be saved to files for easy viewing and sharing
+
+> ⚠️ **AI-Assisted Development**: This project has been extensively developed with the assistance of AI tools like Claude. While we've made every effort to ensure quality, you may occasionally encounter code patterns or documentation styles that reflect these AI tools' involvement in the development process.
 
 ## License
 

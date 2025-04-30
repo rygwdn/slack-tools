@@ -16,8 +16,8 @@ const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 
 const program = new Command();
 
 program
-  .name('slack-tools')
-  .description('CLI for extracting Slack tokens and cookies and making API calls')
+  .name('slack-tools-mcp')
+  .description('CLI for extracting Slack tokens and cookies and making API calls with MCP support')
   .version(packageJson.version)
   .option('-w, --workspace <workspace>', 'Specify Slack workspace URL or name')
   .option('-l, --last-workspace', 'Use the last used workspace')

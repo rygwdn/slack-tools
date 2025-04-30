@@ -1,9 +1,9 @@
 {
-  "name": "slack-tools",
+  "name": "slack-tools-mcp",
   "version": "1.0.3",
-  "description": "Tools for interacting with Slack's local data",
+  "description": "Tools for interacting with Slack's local data with Model Context Protocol support",
   "bin": {
-    "slack-tools": "dist/cli.mjs"
+    "slack-tools-mcp": "dist/cli.mjs"
   },
   "scripts": {
     "start": "tsx src/cli.ts",
@@ -21,7 +21,9 @@
   },
   "keywords": [
     "slack",
-    "tokens"
+    "tokens",
+    "mcp",
+    "model-context-protocol"
   ],
   "author": "rygwdn",
   "license": "MIT",
