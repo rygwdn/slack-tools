@@ -3,9 +3,8 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerCommands } from './commands/register-commands';
-import { getLastWorkspace, setLastWorkspace } from './cache';
+import { getLastWorkspace } from './cache';
 import { GlobalContext } from './context';
-// import { CommandOptions } from './context';
 
 // Get current file directory (ES module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -33,17 +32,23 @@ program.hook('preAction', async (thisCommand) => {
   GlobalContext.debug = options.debug;
 
   if (options.workspace) {
-    await setLastWorkspace(options.workspace);
     GlobalContext.workspace = options.workspace;
   } else if (options.lastWorkspace) {
     const lastWorkspace = await getLastWorkspace();
     if (lastWorkspace) {
       GlobalContext.workspace = lastWorkspace;
     } else {
-      console.error('No last workspace found. Please specify a workspace using --workspace.');
-      process.exit(1);
+      program.error('No last workspace found. Please specify a workspace using --workspace.');
     }
+  }
+
+  if (!GlobalContext.workspace) {
+    program.error('No workspace found. Please specify a workspace using --workspace.');
   }
 });
 
-program.parse(process.argv);
+if (process.argv.some((arg) => program.commands.some((command) => command.name() === arg))) {
+  program.parse(process.argv);
+} else {
+  program.parse([...process.argv, 'mcp']);
+}

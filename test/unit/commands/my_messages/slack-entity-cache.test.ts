@@ -141,7 +141,7 @@ describe('Slack Entity Cache', () => {
         },
       ];
 
-      const cache = await getSlackEntityCache(mockClient, messages, GlobalContext);
+      const cache = await getSlackEntityCache(mockClient, messages);
 
       // Verify users were extracted and fetched
       expect(cache.users).toHaveProperty('U123');
@@ -180,7 +180,7 @@ describe('Slack Entity Cache', () => {
         },
       ];
 
-      const cache = await getSlackEntityCache(mockClient, messages, GlobalContext);
+      const cache = await getSlackEntityCache(mockClient, messages);
 
       // Verify users were extracted correctly despite different format
       expect(cache.users).toHaveProperty('U123');
@@ -211,7 +211,7 @@ describe('Slack Entity Cache', () => {
       ];
 
       // Should not throw errors
-      const cache = await getSlackEntityCache(mockClient, messages, GlobalContext);
+      const cache = await getSlackEntityCache(mockClient, messages);
 
       // Cache should still be created
       expect(cache).toBeDefined();
@@ -245,7 +245,7 @@ describe('Slack Entity Cache', () => {
         },
       ];
 
-      const cache = await getSlackEntityCache(mockClient, messages, GlobalContext);
+      const cache = await getSlackEntityCache(mockClient, messages);
 
       // Should keep cached entries
       expect(cache.users['U123'].displayName).toBe('Cached User');
@@ -275,7 +275,7 @@ describe('Slack Entity Cache', () => {
       // We need to make sure all members from the conversations.members call
       // are fetched (U123, U456, U789), even if they're not mentioned in the message
 
-      const cache = await getSlackEntityCache(mockClient, messages, GlobalContext);
+      const cache = await getSlackEntityCache(mockClient, messages);
 
       // Verify MPIM channel
       expect(cache.channels['G123'].type).toBe('mpim');

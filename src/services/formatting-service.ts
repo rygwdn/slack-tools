@@ -1,5 +1,5 @@
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { SlackContext } from '../context';
+import { GlobalContext } from '../context';
 import {
   formatSlackText,
   getFriendlyChannelName,
@@ -14,16 +14,15 @@ export function generateSearchResultsMarkdown(
   messages: (Match | ThreadMessage)[],
   cache: SlackCache,
   userId: string,
-  context: SlackContext,
 ): string {
   let markdown = '';
 
   if (messages.length === 0) {
-    context.log.debug('No search results found');
+    GlobalContext.log.debug('No search results found');
     return '# Search Results\n\nNo messages found matching your search criteria.\n';
   }
 
-  context.log.debug(`Processing ${messages.length} search results`);
+  GlobalContext.log.debug(`Processing ${messages.length} search results`);
 
   // Group messages by channel
   const messagesByChannel = new Map<string, Match[]>();

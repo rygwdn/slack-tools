@@ -6,7 +6,7 @@
     "slack-tools-mcp": "dist/cli.mjs"
   },
   "scripts": {
-    "start": "tsup && node dist/cli.mjs",
+    "cli": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

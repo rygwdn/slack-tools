@@ -5,7 +5,6 @@ import {
   formatStatusUpdateOutput,
 } from '../../../src/services/formatting-service';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { GlobalContext } from '../../../src/context';
 
 // Mock the formatters from my_messages command
 vi.mock('../../../src/commands/my_messages/formatters', () => ({
@@ -41,7 +40,7 @@ describe('Formatting Service', () => {
   describe('generateSearchResultsMarkdown', () => {
     it('should return a message when no results are found', () => {
       const messages: Match[] = [];
-      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123', GlobalContext);
+      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123');
 
       expect(result).toContain('# Search Results');
       expect(result).toContain('No messages found matching your search criteria.');
@@ -75,7 +74,7 @@ describe('Formatting Service', () => {
         },
       ];
 
-      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123', GlobalContext);
+      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123');
 
       // Check for header and channel grouping
       expect(result).toContain('# Search Results');
@@ -108,7 +107,7 @@ describe('Formatting Service', () => {
         },
       ];
 
-      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123', GlobalContext);
+      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123');
 
       // The messages should be sorted by timestamp
       const earlierIndex = result.indexOf('Earlier message');
@@ -127,7 +126,7 @@ describe('Formatting Service', () => {
         },
       ];
 
-      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123', GlobalContext);
+      const result = generateSearchResultsMarkdown(messages, mockCache, 'U123');
 
       expect(result).toContain('Message without user');
       expect(result).toContain('Unknown User');

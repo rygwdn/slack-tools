@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
-import { GlobalContext } from '../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { getDateRange } from '../../../src/utils/date-utils';
 import { searchMessages } from '../../../src/commands/my_messages/slack-service';
@@ -97,7 +96,7 @@ describe('My Messages Service', () => {
 
   it('should generate a my messages summary with default options', async () => {
     // Call the function
-    const result = await generateMyMessagesSummary({ count: 200 }, GlobalContext);
+    const result = await generateMyMessagesSummary({ count: 200 });
 
     // Check if all the required functions were called
     expect(getSlackClient).toHaveBeenCalledWith();
@@ -107,15 +106,9 @@ describe('My Messages Service', () => {
       expect.any(String),
       mockDateRange,
       200,
-      GlobalContext,
     );
-    expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, mockAllMessages, GlobalContext);
-    expect(generateMarkdown).toHaveBeenCalledWith(
-      mockAllMessages,
-      mockCache,
-      'U123',
-      GlobalContext,
-    );
+    expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, mockAllMessages);
+    expect(generateMarkdown).toHaveBeenCalledWith(mockAllMessages, mockCache, 'U123');
     expect(saveSlackCache).toHaveBeenCalledWith(
       expect.objectContaining({ lastUpdated: expect.any(Number) }),
     );
@@ -140,7 +133,7 @@ describe('My Messages Service', () => {
     };
 
     // Call the function
-    const result = await generateMyMessagesSummary(customOptions, GlobalContext);
+    const result = await generateMyMessagesSummary(customOptions);
 
     // Check if all the required functions were called with custom options
     expect(getDateRange).toHaveBeenCalledWith(customOptions);
@@ -149,7 +142,6 @@ describe('My Messages Service', () => {
       expect.any(String),
       mockDateRange,
       50,
-      GlobalContext,
     );
 
     // Check the returned result
@@ -162,8 +154,6 @@ describe('My Messages Service', () => {
     vi.mocked(getDateRange).mockRejectedValueOnce(testError);
 
     // Call the function and expect it to throw
-    await expect(generateMyMessagesSummary({ count: 200 }, GlobalContext)).rejects.toThrow(
-      testError,
-    );
+    await expect(generateMyMessagesSummary({ count: 200 })).rejects.toThrow(testError);
   });
 });

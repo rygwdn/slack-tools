@@ -33,9 +33,11 @@ Global options:
 
 ### MCP Command
 
-Start a Model Context Protocol (MCP) server for AI assistants to interact with Slack:
+The MCP server is the default command when no command is specified. Start a Model Context Protocol (MCP) server for AI assistants to interact with Slack:
 
 ```bash
+# These commands are equivalent
+npx -y github:rygwdn/slack-tools -w <workspace>
 npx -y github:rygwdn/slack-tools mcp -w <workspace>
 ```
 
@@ -57,7 +59,7 @@ This command is especially useful for integrating Slack with AI assistants like 
 Example:
 ```bash
 # Start MCP server with a specific workspace
-npx -y github:rygwdn/slack-tools mcp -w Build
+npx -y github:rygwdn/slack-tools -w Build
 ```
 
 ### Status Command

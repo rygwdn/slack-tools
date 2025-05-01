@@ -10,15 +10,20 @@ import { threadRepliesTool } from './mcp-tools/thread-replies';
 import { userActivityTool } from './mcp-tools/user-activity';
 import { userSearchTool } from './mcp-tools/user-search';
 import { userProfileTool } from './mcp-tools/user-profile';
+import { getSlackClient } from '../slack-api';
 
 export function registerMcpCommand(program: Command): void {
   program
     .command('mcp')
+    .alias('')
     .description('Start an MCP server with search and status capabilities')
     .action(async () => {
       if (!version.match(/^\d+\.\d+\.\d+$/)) {
         throw new Error('Invalid version format');
       }
+
+      // validate the auth
+      await getSlackClient();
 
       const server = new FastMCP({
         name: 'slack-tools-server',

@@ -29,7 +29,7 @@ export const userSearchTool = tool({
   parameters: userSearchParams,
   annotations: {},
   execute: async ({ query, limit }) => {
-    const client = await getSlackClient(GlobalContext);
+    const client = await getSlackClient();
 
     const cleanQuery = query.trim().replace(/^@/, '');
 

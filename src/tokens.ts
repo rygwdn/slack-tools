@@ -2,7 +2,7 @@ import { Level } from 'level';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import type { WorkspaceTokens, SlackConfig } from './types';
-import { GlobalContext, SlackContext } from './context';
+import { GlobalContext } from './context';
 import { existsSync } from 'node:fs';
 
 /**
@@ -38,7 +38,7 @@ function getLevelDBPath(): string {
  * @returns Promise<WorkspaceTokens> Object containing workspace tokens
  * @throws Error if the database is locked or tokens cannot be found
  */
-export async function getTokens(context?: SlackContext): Promise<WorkspaceTokens> {
+export async function getTokens(): Promise<WorkspaceTokens> {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
 
@@ -94,8 +94,8 @@ export async function getTokens(context?: SlackContext): Promise<WorkspaceTokens
     }
     throw error;
   } finally {
-    if (context?.debug) {
-      context.log.debug('Closing database');
+    if (GlobalContext.debug) {
+      GlobalContext.log.debug('Closing database');
     }
     if (db.status === 'open') {
       await db.close();

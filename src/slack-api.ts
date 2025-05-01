@@ -3,24 +3,32 @@ import { getStoredAuth, clearStoredAuth, storeAuth } from './keychain.js';
 import type { SlackAuth, SlackCookie } from './types.js';
 import { getCookie } from './cookies.js';
 import { getTokens } from './tokens.js';
-import { GlobalContext, SlackContext } from './context';
+import { GlobalContext } from './context.js';
+import { setLastWorkspace } from './cache.js';
+import { redactLog } from './utils/log-utils.js';
 
-function createWebClient(token: string, cookie: SlackCookie, context: SlackContext): WebClient {
+function createWebClient(token: string, cookie: SlackCookie): WebClient {
   return new WebClient(token, {
     headers: {
       Cookie: `d=${cookie.value}`,
     },
-    rejectRateLimitedCalls: true,
     logger: {
-      ...context.log,
+      debug: (message: string, ...args: unknown[]) =>
+        GlobalContext.log.debug(...redactLog(message, ...args)),
+      info: (message: string, ...args: unknown[]) =>
+        GlobalContext.log.info(...redactLog(message, ...args)),
+      warn: (message: string, ...args: unknown[]) =>
+        GlobalContext.log.warn(...redactLog(message, ...args)),
+      error: (message: string, ...args: unknown[]) =>
+        GlobalContext.log.error(...redactLog(message, ...args)),
       setLevel: () => {},
-      getLevel: () => (context.debug ? LogLevel.DEBUG : LogLevel.ERROR),
+      getLevel: () => (GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR),
       setName: () => {},
     },
   });
 }
 
-async function validateAuth(auth: SlackAuth, context: SlackContext) {
+async function validateAuth(auth: SlackAuth) {
   // Get the first token to test
   const firstToken = Object.values(auth.tokens)[0]?.token;
   if (!firstToken) {
@@ -28,47 +36,48 @@ async function validateAuth(auth: SlackAuth, context: SlackContext) {
   }
 
   try {
-    const client = createWebClient(firstToken, auth.cookie, context);
+    const client = createWebClient(firstToken, auth.cookie);
     const response = await client.auth.test();
 
     if (!response.ok) {
       throw new Error('Auth test failed: API returned not ok');
     }
 
-    context.currentUser = response;
+    GlobalContext.currentUser = response;
+    setLastWorkspace(GlobalContext.workspace);
   } catch (error) {
     console.error('Auth test API call failed:', error);
     throw new Error('Auth test failed: API call error');
   }
 }
 
-async function getFreshAuth(context: SlackContext): Promise<SlackAuth> {
+async function getFreshAuth(): Promise<SlackAuth> {
   const newAuth = {
     cookie: await getCookie(),
-    tokens: await getTokens(context),
+    tokens: await getTokens(),
   };
 
-  await validateAuth(newAuth, context);
+  await validateAuth(newAuth);
   await storeAuth(newAuth);
 
   return newAuth;
 }
 
-async function validateAndRefreshAuth(context: SlackContext): Promise<SlackAuth> {
+async function validateAndRefreshAuth(): Promise<SlackAuth> {
   const storedAuth = await getStoredAuth();
 
   if (storedAuth?.cookie && storedAuth?.tokens) {
     try {
-      await validateAuth(storedAuth, context);
+      await validateAuth(storedAuth);
       return storedAuth;
     } catch (error) {
       console.error('Auth error encountered, clearing stored credentials and retrying...', error);
       await clearStoredAuth();
-      const newAuth = await getFreshAuth(context);
+      const newAuth = await getFreshAuth();
       return newAuth;
     }
   } else {
-    const newAuth = await getFreshAuth(context);
+    const newAuth = await getFreshAuth();
     return newAuth;
   }
 }
@@ -76,7 +85,6 @@ async function validateAndRefreshAuth(context: SlackContext): Promise<SlackAuth>
 export function findWorkspaceToken(
   auth: SlackAuth,
   workspaceName: string,
-  context: typeof GlobalContext,
 ): {
   token: string;
   workspaceUrl: string;
@@ -86,14 +94,16 @@ export function findWorkspaceToken(
     throw new Error('No cookie found in auth');
   }
 
-  context.log.debug('Available workspaces:', Object.keys(auth.tokens).join(', '));
-  context.log.debug('Looking for workspace:', workspaceName);
+  GlobalContext.log.debug('Available workspaces:', Object.keys(auth.tokens).join(', '));
+  GlobalContext.log.debug('Looking for workspace:', workspaceName);
 
   // First try exact match with URL
   if (auth.tokens[workspaceName]) {
     const token = auth.tokens[workspaceName].token;
-    context.log.debug(`Found token for workspace URL: ${workspaceName}`);
-    context.log.debug(`Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`);
+    GlobalContext.log.debug(`Found token for workspace URL: ${workspaceName}`);
+    GlobalContext.log.debug(
+      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`,
+    );
     return {
       token,
       workspaceUrl: workspaceName,
@@ -108,9 +118,11 @@ export function findWorkspaceToken(
 
   if (wsEntry) {
     const token = wsEntry[1].token;
-    context.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
-    context.log.debug(`Workspace URL: ${wsEntry[0]}`);
-    context.log.debug(`Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`);
+    GlobalContext.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
+    GlobalContext.log.debug(`Workspace URL: ${wsEntry[0]}`);
+    GlobalContext.log.debug(
+      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`,
+    );
     return {
       token,
       workspaceUrl: wsEntry[0],
@@ -118,9 +130,9 @@ export function findWorkspaceToken(
     };
   }
 
-  context.log.debug('All available workspaces:');
+  GlobalContext.log.debug('All available workspaces:');
   Object.entries(auth.tokens).forEach(([url, details]) => {
-    context.log.debug(`- ${details.name} (${url})`);
+    GlobalContext.log.debug(`- ${details.name} (${url})`);
   });
 
   throw new Error(
@@ -132,13 +144,13 @@ export function findWorkspaceToken(
  * Get a Slack WebClient instance configured with the appropriate token and cookies for a workspace
  * Use this function to get a client that can be used to make any Slack API call
  */
-export async function getSlackClient(context: SlackContext = GlobalContext): Promise<WebClient> {
+export async function getSlackClient(): Promise<WebClient> {
   // Get auth - validate on first call or use stored auth for subsequent calls
-  const auth = !context.currentUser
-    ? await validateAndRefreshAuth(context)
-    : (await getStoredAuth()) || (await getFreshAuth(context));
+  const auth = !GlobalContext.currentUser
+    ? await validateAndRefreshAuth()
+    : (await getStoredAuth()) || (await getFreshAuth());
 
-  if (!context.workspace) {
+  if (!GlobalContext.workspace) {
     console.error('Error: No workspace specified. Please specify a workspace using:');
     console.error('  - Use -w, --workspace <workspace> to specify a workspace directly');
     console.error('  - Use -l, --last-workspace to use your most recently used workspace');
@@ -146,9 +158,9 @@ export async function getSlackClient(context: SlackContext = GlobalContext): Pro
   }
 
   // Find the workspace token using the auth
-  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, context.workspace, context);
+  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
 
-  context.log.debug(`Using workspace: ${workspaceUrl}`);
+  GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
 
   // Validate token has the correct prefix
   if (!token.startsWith('xoxc-')) {
@@ -156,5 +168,5 @@ export async function getSlackClient(context: SlackContext = GlobalContext): Pro
   }
 
   // Create and return a web client with the token and cookie
-  return createWebClient(token, cookie, context);
+  return createWebClient(token, cookie);
 }

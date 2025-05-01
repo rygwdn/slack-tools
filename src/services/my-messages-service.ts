@@ -1,4 +1,4 @@
-import { SlackContext } from '../context';
+import { GlobalContext } from '../context';
 import { getSlackClient } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
@@ -42,18 +42,17 @@ export interface MyMessagesSummaryResult {
  */
 export async function generateMyMessagesSummary(
   options: MyMessagesOptions,
-  context: SlackContext,
 ): Promise<MyMessagesSummaryResult> {
   const dateRange = await getDateRange(options);
   const client = await getSlackClient();
-  if (!context.currentUser?.user_id) {
+  if (!GlobalContext.currentUser?.user_id) {
     throw new Error('No current user found');
   }
 
-  const userId = context.currentUser.user_id;
+  const userId = GlobalContext.currentUser.user_id;
 
-  context.log.debug(`Generating my messages summary for user: ${userId}`);
-  context.log.debug(
+  GlobalContext.log.debug(`Generating my messages summary for user: ${userId}`);
+  GlobalContext.log.debug(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
   );
 
@@ -63,22 +62,21 @@ export async function generateMyMessagesSummary(
     `<@${userId}>`,
     dateRange,
     options.count,
-    context,
   );
   const allMessages = [...messages, ...threadMessages, ...mentionMessages];
 
-  context.log.debug(
+  GlobalContext.log.debug(
     `Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`,
   );
-  context.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
+  GlobalContext.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
 
   // Get user and channel information
-  const cache = await getSlackEntityCache(client, allMessages, context);
+  const cache = await getSlackEntityCache(client, allMessages);
 
-  context.log.debug('Formatting report...');
+  GlobalContext.log.debug('Formatting report...');
 
   // Process and format messages
-  const markdown = generateMarkdown(allMessages, cache, userId, context);
+  const markdown = generateMarkdown(allMessages, cache, userId);
 
   // Update cache last updated time
   cache.lastUpdated = Date.now();

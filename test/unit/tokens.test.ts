@@ -28,11 +28,7 @@ describe('tokens', () => {
       // Mock Windows platform
       vi.mocked(os.platform).mockReturnValue('win32');
 
-      // Create a mock context
-      const mockContext = { debug: true } as any;
-
-      // Expect platform error
-      await expect(getTokens(mockContext)).rejects.toThrow('only works on macOS');
+      await expect(getTokens()).rejects.toThrow('only works on macOS');
     });
   });
 });

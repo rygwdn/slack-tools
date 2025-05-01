@@ -60,7 +60,7 @@ describe('Slack Service', () => {
       // Execute the search
       const query = 'test query';
       const count = 50;
-      const result = await searchSlackMessages(mockClient, query, count, GlobalContext);
+      const result = await searchSlackMessages(mockClient, query, count);
 
       // Verify the API was called correctly
       expect(mockClient.search.messages).toHaveBeenCalledWith({
@@ -87,7 +87,7 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockResolvedValueOnce(mockResponse);
 
       // Execute the search
-      const result = await searchSlackMessages(mockClient, 'test query', 50, GlobalContext);
+      const result = await searchSlackMessages(mockClient, 'test query', 50);
 
       // Verify we get an empty array, not undefined
       expect(result).toEqual([]);
@@ -103,7 +103,7 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockResolvedValueOnce(mockResponse);
 
       // Execute the search
-      const result = await searchSlackMessages(mockClient, 'test query', 50, GlobalContext);
+      const result = await searchSlackMessages(mockClient, 'test query', 50);
 
       // Verify we get an empty array when matches is undefined
       expect(result).toEqual([]);
@@ -115,9 +115,7 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockRejectedValueOnce(new Error(errorMessage));
 
       // Execute the search and expect it to throw
-      await expect(
-        searchSlackMessages(mockClient, 'test query', 50, GlobalContext),
-      ).rejects.toThrow(errorMessage);
+      await expect(searchSlackMessages(mockClient, 'test query', 50)).rejects.toThrow(errorMessage);
 
       // Verify debug log was called
       expect(GlobalContext.log.debug).toHaveBeenCalled();
@@ -167,13 +165,7 @@ describe('Slack Service', () => {
       const endTime = new Date('2023-01-01');
 
       // Execute the search
-      const result = await searchMessages(
-        mockClient,
-        'testuser',
-        { startTime, endTime },
-        50,
-        GlobalContext,
-      );
+      const result = await searchMessages(mockClient, 'testuser', { startTime, endTime }, 50);
 
       // Verify the API calls
       expect(dateUtils.getDayBefore).toHaveBeenCalledWith(startTime);

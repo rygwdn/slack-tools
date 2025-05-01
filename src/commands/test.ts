@@ -11,7 +11,7 @@ export function registerTestCommand(program: Command): void {
         console.log('Testing auth for workspace:', GlobalContext.workspace);
 
         // Get a configured Slack client for the workspace
-        const client = await getSlackClient(GlobalContext);
+        const client = await getSlackClient();
 
         // Use the client directly to call auth.test
         console.log('Calling auth.test API endpoint');

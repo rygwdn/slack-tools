@@ -27,7 +27,7 @@ export const searchTool = tool({
     'Perform a search in Slack using standard Slack search syntax and return matching messages.',
   parameters: searchParams,
   annotations: {},
-  execute: async ({ query, count }, { session }) => {
+  execute: async ({ query, count }) => {
     const results = await performSlackSearch(query, count);
 
     // Format the results as markdown
@@ -37,6 +37,6 @@ export const searchTool = tool({
       users: results.users,
     };
 
-    return generateSearchResultsMarkdown(results.messages, cache, results.userId, session!.context);
+    return generateSearchResultsMarkdown(results.messages, cache, results.userId);
   },
 });

@@ -14,9 +14,9 @@ import { open } from 'sqlite';
 import crypto from 'crypto';
 import { Level } from 'level';
 import { existsSync } from 'node:fs';
+import { homedir } from 'os';
 import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
-import { homedir } from 'os';
 
 var SERVICE_NAME = "slack-tools";
 var COOKIE_KEY = "slack-cookie";
@@ -94,7 +94,6 @@ var GlobalContext = {
   },
   currentUser: void 0,
   log: {
-    ...console,
     debug: (...args) => {
       if (GlobalContext.debug) {
         console.debug(...args);
@@ -249,7 +248,7 @@ function getLevelDBPath() {
   }
   throw new Error("Could not find Slack's Local Storage directory");
 }
-async function getTokens(context) {
+async function getTokens() {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
   try {
@@ -287,85 +286,169 @@ async function getTokens(context) {
     }
     throw error;
   } finally {
-    if (context?.debug) {
-      context.log.debug("Closing database");
+    if (GlobalContext.debug) {
+      GlobalContext.log.debug("Closing database");
     }
     if (db.status === "open") {
       await db.close();
     }
   }
 }
+var CONFIG_DIR = join(homedir(), ".slack-tools");
+var CONFIG_FILE = join(CONFIG_DIR, "config.json");
+var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
+var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
+var DEFAULT_CONFIG = {
+  lastWorkspace: null
+};
+async function ensureConfigDir() {
+  try {
+    await promises.mkdir(CONFIG_DIR, { recursive: true });
+  } catch (error) {
+    console.error("Failed to create config directory:", error);
+    throw new Error(`Could not create cache directory: ${error.message}`);
+  }
+}
+async function loadConfig() {
+  await ensureConfigDir();
+  try {
+    const data = await promises.readFile(CONFIG_FILE, "utf8");
+    return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return DEFAULT_CONFIG;
+    }
+    console.error("Failed to load config:", error);
+    return DEFAULT_CONFIG;
+  }
+}
+async function saveConfig(config) {
+  await ensureConfigDir();
+  try {
+    await promises.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (error) {
+    console.error("Failed to save config:", error);
+    throw new Error(`Could not save cache configuration: ${error.message}`);
+  }
+}
+async function getLastWorkspace() {
+  const config = await loadConfig();
+  return config.lastWorkspace;
+}
+async function setLastWorkspace(workspace) {
+  const config = await loadConfig();
+  config.lastWorkspace = workspace;
+  await saveConfig(config);
+}
+async function loadSlackCache(cacheFile = SLACK_CACHE_FILE, ttl = SLACK_CACHE_TTL) {
+  try {
+    await ensureConfigDir();
+    const data = await promises.readFile(cacheFile, "utf-8");
+    const cache = JSON.parse(data);
+    if (Date.now() - cache.lastUpdated < ttl) {
+      return cache;
+    }
+  } catch {
+  }
+  return null;
+}
+async function saveSlackCache(cache, cacheFile = SLACK_CACHE_FILE) {
+  await ensureConfigDir();
+  await promises.writeFile(cacheFile, JSON.stringify(cache, null, 2));
+}
+
+// src/utils/log-utils.ts
+function redactMatch(match) {
+  return `${match.substring(0, 5)}...${match.substring(match.length - 5)}`;
+}
+function redact(message) {
+  if (typeof message !== "string") {
+    return message;
+  }
+  let redactedMessage = message;
+  redactedMessage = redactedMessage.replace(/xoxc-[0-9a-zA-Z-]+/g, redactMatch);
+  redactedMessage = redactedMessage.replace(/d=[a-zA-Z0-9%_\-.]+/g, redactMatch);
+  return redactedMessage;
+}
+function redactLog(...args) {
+  return args.map(redact);
+}
 
 // src/slack-api.ts
-function createWebClient(token, cookie, context) {
+function createWebClient(token, cookie) {
   return new WebClient(token, {
     headers: {
       Cookie: `d=${cookie.value}`
     },
-    rejectRateLimitedCalls: true,
     logger: {
-      ...context.log,
+      debug: (message, ...args) => GlobalContext.log.debug(...redactLog(message, ...args)),
+      info: (message, ...args) => GlobalContext.log.info(...redactLog(message, ...args)),
+      warn: (message, ...args) => GlobalContext.log.warn(...redactLog(message, ...args)),
+      error: (message, ...args) => GlobalContext.log.error(...redactLog(message, ...args)),
       setLevel: () => {
       },
-      getLevel: () => context.debug ? LogLevel.DEBUG : LogLevel.ERROR,
+      getLevel: () => GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR,
       setName: () => {
       }
     }
   });
 }
-async function validateAuth(auth, context) {
+async function validateAuth(auth) {
   const firstToken = Object.values(auth.tokens)[0]?.token;
   if (!firstToken) {
     throw new Error("Auth test failed: No token found");
   }
   try {
-    const client = createWebClient(firstToken, auth.cookie, context);
+    const client = createWebClient(firstToken, auth.cookie);
     const response = await client.auth.test();
     if (!response.ok) {
       throw new Error("Auth test failed: API returned not ok");
     }
-    context.currentUser = response;
+    GlobalContext.currentUser = response;
+    setLastWorkspace(GlobalContext.workspace);
   } catch (error) {
     console.error("Auth test API call failed:", error);
     throw new Error("Auth test failed: API call error");
   }
 }
-async function getFreshAuth(context) {
+async function getFreshAuth() {
   const newAuth = {
     cookie: await getCookie(),
-    tokens: await getTokens(context)
+    tokens: await getTokens()
   };
-  await validateAuth(newAuth, context);
+  await validateAuth(newAuth);
   await storeAuth(newAuth);
   return newAuth;
 }
-async function validateAndRefreshAuth(context) {
+async function validateAndRefreshAuth() {
   const storedAuth = await getStoredAuth();
   if (storedAuth?.cookie && storedAuth?.tokens) {
     try {
-      await validateAuth(storedAuth, context);
+      await validateAuth(storedAuth);
       return storedAuth;
     } catch (error) {
       console.error("Auth error encountered, clearing stored credentials and retrying...", error);
       await clearStoredAuth();
-      const newAuth = await getFreshAuth(context);
+      const newAuth = await getFreshAuth();
       return newAuth;
     }
   } else {
-    const newAuth = await getFreshAuth(context);
+    const newAuth = await getFreshAuth();
     return newAuth;
   }
 }
-function findWorkspaceToken(auth, workspaceName, context) {
+function findWorkspaceToken(auth, workspaceName) {
   if (!auth.cookie) {
     throw new Error("No cookie found in auth");
   }
-  context.log.debug("Available workspaces:", Object.keys(auth.tokens).join(", "));
-  context.log.debug("Looking for workspace:", workspaceName);
+  GlobalContext.log.debug("Available workspaces:", Object.keys(auth.tokens).join(", "));
+  GlobalContext.log.debug("Looking for workspace:", workspaceName);
   if (auth.tokens[workspaceName]) {
     const token = auth.tokens[workspaceName].token;
-    context.log.debug(`Found token for workspace URL: ${workspaceName}`);
-    context.log.debug(`Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`);
+    GlobalContext.log.debug(`Found token for workspace URL: ${workspaceName}`);
+    GlobalContext.log.debug(
+      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`
+    );
     return {
       token,
       workspaceUrl: workspaceName,
@@ -377,37 +460,39 @@ function findWorkspaceToken(auth, workspaceName, context) {
   );
   if (wsEntry) {
     const token = wsEntry[1].token;
-    context.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
-    context.log.debug(`Workspace URL: ${wsEntry[0]}`);
-    context.log.debug(`Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`);
+    GlobalContext.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
+    GlobalContext.log.debug(`Workspace URL: ${wsEntry[0]}`);
+    GlobalContext.log.debug(
+      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`
+    );
     return {
       token,
       workspaceUrl: wsEntry[0],
       cookie: auth.cookie
     };
   }
-  context.log.debug("All available workspaces:");
+  GlobalContext.log.debug("All available workspaces:");
   Object.entries(auth.tokens).forEach(([url, details]) => {
-    context.log.debug(`- ${details.name} (${url})`);
+    GlobalContext.log.debug(`- ${details.name} (${url})`);
   });
   throw new Error(
     `Could not find workspace "${workspaceName}". Use 'slack-tools print' to see available workspaces.`
   );
 }
-async function getSlackClient(context = GlobalContext) {
-  const auth = !context.currentUser ? await validateAndRefreshAuth(context) : await getStoredAuth() || await getFreshAuth(context);
-  if (!context.workspace) {
+async function getSlackClient() {
+  const auth = !GlobalContext.currentUser ? await validateAndRefreshAuth() : await getStoredAuth() || await getFreshAuth();
+  if (!GlobalContext.workspace) {
     console.error("Error: No workspace specified. Please specify a workspace using:");
     console.error("  - Use -w, --workspace <workspace> to specify a workspace directly");
     console.error("  - Use -l, --last-workspace to use your most recently used workspace");
     process.exit(1);
   }
-  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, context.workspace, context);
-  context.log.debug(`Using workspace: ${workspaceUrl}`);
+  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
+  GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
   if (!token.startsWith("xoxc-")) {
     throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${token}`);
   }
-  return createWebClient(token, cookie, context);
+  return createWebClient(token, cookie);
 }
 
 // src/commands/print.ts
@@ -420,12 +505,11 @@ function registerPrintCommand(program2) {
       }
       const auth = storedAuth || {
         cookie: await getCookie(),
-        tokens: await getTokens(GlobalContext)
+        tokens: await getTokens()
       };
       const { token, cookie, workspaceUrl } = findWorkspaceToken(
         auth,
-        GlobalContext.workspace || Object.keys(auth.tokens)[0],
-        GlobalContext
+        GlobalContext.workspace || Object.keys(auth.tokens)[0]
       );
       if (!cmdOptions.quiet) {
         console.log("\nFound token for workspace:\n");
@@ -451,7 +535,7 @@ function registerTestCommand(program2) {
   program2.command("test").description("Test authentication with Slack API").action(async (_options) => {
     try {
       console.log("Testing auth for workspace:", GlobalContext.workspace);
-      const client = await getSlackClient(GlobalContext);
+      const client = await getSlackClient();
       console.log("Calling auth.test API endpoint");
       const response = await client.auth.test();
       console.log("Full API response:", response);
@@ -528,8 +612,11 @@ async function resolveUserForSearch(client, userIdentifier) {
       return `<@${userByEmail.user.id}>`;
     }
   }
-  GlobalContext.log.warn(`No user found matching "${cleanIdentifier}". Using as-is.`);
-  return `${cleanIdentifier}`;
+  const simplifiedIdentifier = cleanIdentifier.replace(/^"(.*)"$/, "$1").replace(/[^\w]+/g, ".").toLowerCase();
+  GlobalContext.log.warn(
+    `No user found matching "${cleanIdentifier}". Using "${simplifiedIdentifier}".`
+  );
+  return simplifiedIdentifier;
 }
 async function enhanceSearchQuery(client, query) {
   const userQueryRegex = /(from:|to:|with:)@?(("([^"]+)")|([^\s]+))/g;
@@ -550,30 +637,30 @@ async function enhanceSearchQuery(client, query) {
 }
 
 // src/commands/my_messages/slack-service.ts
-async function searchMessages(client, userId, dateRange, count, context) {
+async function searchMessages(client, userId, dateRange, count) {
   const dayBeforeStart = getDayBefore(dateRange.startTime);
   const dayAfterEnd = getDayAfter(dateRange.endTime);
   const dayBeforeStartFormatted = formatDateForSearch(dayBeforeStart);
   const dayAfterEndFormatted = formatDateForSearch(dayAfterEnd);
   const searchQuery = `from:${userId} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.log.debug(`Search query: ${searchQuery}`);
-  const searchResults = await searchSlackMessages(client, searchQuery, count, context);
+  GlobalContext.log.debug(`Search query: ${searchQuery}`);
+  const searchResults = await searchSlackMessages(client, searchQuery, count);
   const threadQuery = `is:thread with:@${userId} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.log.debug(`Thread query: ${threadQuery}`);
-  const threadResults = await searchSlackMessages(client, threadQuery, count, context);
+  GlobalContext.log.debug(`Thread query: ${threadQuery}`);
+  const threadResults = await searchSlackMessages(client, threadQuery, count);
   const mentionQuery = `to:${userId} after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
-  context.log.debug(`Mention query: ${mentionQuery}`);
-  const mentionResults = await searchSlackMessages(client, mentionQuery, count, context);
+  GlobalContext.log.debug(`Mention query: ${mentionQuery}`);
+  const mentionResults = await searchSlackMessages(client, mentionQuery, count);
   return {
     messages: searchResults,
     threadMessages: threadResults,
     mentionMessages: mentionResults
   };
 }
-async function searchSlackMessages(client, query, count, context = GlobalContext) {
-  context.log.debug(`Original search query: ${query}`);
+async function searchSlackMessages(client, query, count) {
+  GlobalContext.log.debug(`Original search query: ${query}`);
   const enhancedQuery = await enhanceSearchQuery(client, query);
-  context.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
+  GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
   const searchResults = await client.search.messages({
     query: enhancedQuery,
     sort: "timestamp",
@@ -581,68 +668,6 @@ async function searchSlackMessages(client, query, count, context = GlobalContext
     count
   });
   return searchResults.messages?.matches || [];
-}
-var CONFIG_DIR = join(homedir(), ".slack-tools");
-var CONFIG_FILE = join(CONFIG_DIR, "config.json");
-var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
-var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
-var DEFAULT_CONFIG = {
-  lastWorkspace: null
-};
-async function ensureConfigDir() {
-  try {
-    await promises.mkdir(CONFIG_DIR, { recursive: true });
-  } catch (error) {
-    console.error("Failed to create config directory:", error);
-    throw new Error(`Could not create cache directory: ${error.message}`);
-  }
-}
-async function loadConfig() {
-  await ensureConfigDir();
-  try {
-    const data = await promises.readFile(CONFIG_FILE, "utf8");
-    return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return DEFAULT_CONFIG;
-    }
-    console.error("Failed to load config:", error);
-    return DEFAULT_CONFIG;
-  }
-}
-async function saveConfig(config) {
-  await ensureConfigDir();
-  try {
-    await promises.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
-  } catch (error) {
-    console.error("Failed to save config:", error);
-    throw new Error(`Could not save cache configuration: ${error.message}`);
-  }
-}
-async function getLastWorkspace() {
-  const config = await loadConfig();
-  return config.lastWorkspace;
-}
-async function setLastWorkspace(workspace) {
-  const config = await loadConfig();
-  config.lastWorkspace = workspace;
-  await saveConfig(config);
-}
-async function loadSlackCache(cacheFile = SLACK_CACHE_FILE, ttl = SLACK_CACHE_TTL) {
-  try {
-    await ensureConfigDir();
-    const data = await promises.readFile(cacheFile, "utf-8");
-    const cache = JSON.parse(data);
-    if (Date.now() - cache.lastUpdated < ttl) {
-      return cache;
-    }
-  } catch {
-  }
-  return null;
-}
-async function saveSlackCache(cache, cacheFile = SLACK_CACHE_FILE) {
-  await ensureConfigDir();
-  await promises.writeFile(cacheFile, JSON.stringify(cache, null, 2));
 }
 
 // src/commands/my_messages/slack-entity-cache.ts
@@ -667,7 +692,7 @@ function extractEntitiesFromMessages(messages) {
   }
   return { userIds, channelIds };
 }
-async function fetchAndCacheUsers(client, userIds, cache, context, isCacheLoaded) {
+async function fetchAndCacheUsers(client, userIds, cache, isCacheLoaded) {
   for (const userId of userIds) {
     try {
       const userResponse = await client.users.info({ user: userId });
@@ -677,15 +702,17 @@ async function fetchAndCacheUsers(client, userIds, cache, context, isCacheLoaded
           isBot: !!userResponse.user.is_bot || (userResponse.user.name || "").includes("bot")
         };
         if (isCacheLoaded) {
-          context.log.debug(`Added missing user to cache: ${cache.users[userId].displayName}`);
+          GlobalContext.log.debug(
+            `Added missing user to cache: ${cache.users[userId].displayName}`
+          );
         }
       }
     } catch (error) {
-      context.log.debug(`Could not fetch info for user ${userId}:`, error);
+      GlobalContext.log.debug(`Could not fetch info for user ${userId}:`, error);
     }
   }
 }
-async function fetchDmUserInfo(client, userId, cache, context, isCacheLoaded) {
+async function fetchDmUserInfo(client, userId, cache, isCacheLoaded) {
   if (!cache.users[userId]) {
     try {
       const userResponse = await client.users.info({ user: userId });
@@ -695,24 +722,26 @@ async function fetchDmUserInfo(client, userId, cache, context, isCacheLoaded) {
           isBot: !!userResponse.user.is_bot || (userResponse.user.name || "").includes("bot")
         };
         if (isCacheLoaded) {
-          context.log.debug(`Added missing DM user to cache: ${cache.users[userId].displayName}`);
+          GlobalContext.log.debug(
+            `Added missing DM user to cache: ${cache.users[userId].displayName}`
+          );
         }
       }
     } catch (error) {
-      context.log.debug(`Could not fetch info for DM user ${userId}:`, error);
+      GlobalContext.log.debug(`Could not fetch info for DM user ${userId}:`, error);
     }
   }
 }
-async function fetchChannelMembers(client, channelId, context) {
+async function fetchChannelMembers(client, channelId) {
   try {
     const result = await client.conversations.members({ channel: channelId });
     return result.members || [];
   } catch (error) {
-    context.log.debug(`Could not fetch members for channel ${channelId}:`, error);
+    GlobalContext.log.debug(`Could not fetch members for channel ${channelId}:`, error);
     return void 0;
   }
 }
-async function fetchAndCacheChannels(client, channelIds, cache, context, isCacheLoaded, userIds) {
+async function fetchAndCacheChannels(client, channelIds, cache, isCacheLoaded, userIds) {
   for (const channelId of channelIds) {
     try {
       const conversationResponse = await client.conversations.info({ channel: channelId });
@@ -724,11 +753,11 @@ async function fetchAndCacheChannels(client, channelIds, cache, context, isCache
           const otherUserId = "user" in channel ? channel.user : void 0;
           if (otherUserId) {
             userIds.add(otherUserId);
-            await fetchDmUserInfo(client, otherUserId, cache, context, isCacheLoaded);
+            await fetchDmUserInfo(client, otherUserId, cache, isCacheLoaded);
             members = [otherUserId];
           }
         } else if (channel.is_mpim) {
-          members = await fetchChannelMembers(client, channelId, context);
+          members = await fetchChannelMembers(client, channelId);
         }
         cache.channels[channelId] = {
           displayName: channelName,
@@ -736,11 +765,11 @@ async function fetchAndCacheChannels(client, channelIds, cache, context, isCache
           members
         };
         if (isCacheLoaded) {
-          context.log.debug(`Added missing channel to cache: ${channelName}`);
+          GlobalContext.log.debug(`Added missing channel to cache: ${channelName}`);
         }
       }
     } catch (error) {
-      context.log.debug(`Could not fetch info for channel ${channelId}:`, error);
+      GlobalContext.log.debug(`Could not fetch info for channel ${channelId}:`, error);
     }
   }
 }
@@ -751,22 +780,24 @@ async function initializeCache() {
     lastUpdated: 0
   };
 }
-async function getSlackEntityCache(client, messages, context = GlobalContext) {
+async function getSlackEntityCache(client, messages) {
   const cache = await initializeCache();
   const isCacheLoaded = cache.lastUpdated > 0;
   const { userIds, channelIds } = extractEntitiesFromMessages(messages);
   const missingUserIds = Array.from(userIds).filter((id) => !cache.users[id]);
   const missingChannelIds = Array.from(channelIds).filter((id) => !cache.channels[id]);
   if (isCacheLoaded) {
-    context.log.debug("Using cached user and channel information with updates for missing entries");
-    context.log.debug(
+    GlobalContext.log.debug(
+      "Using cached user and channel information with updates for missing entries"
+    );
+    GlobalContext.log.debug(
       `Found ${missingUserIds.length} users and ${missingChannelIds.length} channels missing from cache`
     );
   } else {
-    context.log.debug("No cache found, fetching all user and channel information");
+    GlobalContext.log.debug("No cache found, fetching all user and channel information");
   }
-  await fetchAndCacheUsers(client, missingUserIds, cache, context, isCacheLoaded);
-  await fetchAndCacheChannels(client, missingChannelIds, cache, context, isCacheLoaded, userIds);
+  await fetchAndCacheUsers(client, missingUserIds, cache, isCacheLoaded);
+  await fetchAndCacheChannels(client, missingChannelIds, cache, isCacheLoaded, userIds);
   cache.lastUpdated = Date.now();
   await saveSlackCache(cache);
   return cache;
@@ -828,7 +859,7 @@ function extractThreadTsFromPermalink(permalink) {
     return void 0;
   }
 }
-function shouldIncludeChannel(channelId, messages, cache, userId, context) {
+function shouldIncludeChannel(channelId, messages, cache, userId) {
   const hasMyMessage = messages.some((msg) => {
     const hasMyDirectMessage = msg.user === userId;
     const hasMyThreadReply = msg.threadMessages?.some((reply) => reply.user === userId) ?? false;
@@ -841,7 +872,7 @@ function shouldIncludeChannel(channelId, messages, cache, userId, context) {
     const isBot = dmUser?.isBot || false;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
-      context.log.debug(
+      GlobalContext.log.debug(
         `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`
       );
     }
@@ -849,12 +880,12 @@ function shouldIncludeChannel(channelId, messages, cache, userId, context) {
   }
   return true;
 }
-function organizeMessagesIntoThreads(messages, context) {
+function organizeMessagesIntoThreads(messages) {
   const threadMap = /* @__PURE__ */ new Map();
   const standaloneMessages = [];
   for (const message of messages) {
     if (!isValidThreadMessage(message)) {
-      context.log.debug("Skipping message without timestamp");
+      GlobalContext.log.debug("Skipping message without timestamp");
       continue;
     }
     const threadTs = message.thread_ts || extractThreadTsFromPermalink(message.permalink);
@@ -887,7 +918,7 @@ function organizeMessagesIntoThreads(messages, context) {
           hasReplies: false
         };
         thread.push(messageWithThreadTs);
-        context.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
+        GlobalContext.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
       }
     } else {
       const messageWithThreadInfo = {
@@ -896,14 +927,14 @@ function organizeMessagesIntoThreads(messages, context) {
         hasReplies: isThreadParent
       };
       standaloneMessages.push(messageWithThreadInfo);
-      context.log.debug(
+      GlobalContext.log.debug(
         `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`
       );
     }
   }
   return { threadMap, standaloneMessages };
 }
-function addMessageToDateChannelStructure(message, threadMessages = [], dateChannelMap, context) {
+function addMessageToDateChannelStructure(message, threadMessages = [], dateChannelMap) {
   const date = new Date(Number(message.ts) * 1e3);
   const dateKey = date.toISOString().split("T")[0];
   const channelId = message.channel?.id || "unknown";
@@ -916,7 +947,7 @@ function addMessageToDateChannelStructure(message, threadMessages = [], dateChan
   }
   const messagesForChannel = channelsForDate.get(channelId);
   if (threadMessages.length > 0) {
-    context.log.debug(
+    GlobalContext.log.debug(
       `Adding message with ${threadMessages.length} thread replies to ${channelId}`
     );
   }
@@ -925,7 +956,7 @@ function addMessageToDateChannelStructure(message, threadMessages = [], dateChan
     threadMessages
   });
 }
-function groupMessagesByDateAndChannel(standaloneMessages, threadMap, context) {
+function groupMessagesByDateAndChannel(standaloneMessages, threadMap) {
   const messagesByDate = /* @__PURE__ */ new Map();
   for (const message of standaloneMessages) {
     if (message.ts && threadMap.has(message.ts)) {
@@ -936,14 +967,9 @@ function groupMessagesByDateAndChannel(standaloneMessages, threadMap, context) {
         hasReplies: replies.length > 0,
         threadPermalink: message.threadPermalink || message.permalink
       };
-      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate);
     } else {
-      addMessageToDateChannelStructure(
-        { ...message, hasReplies: false },
-        [],
-        messagesByDate,
-        context
-      );
+      addMessageToDateChannelStructure({ ...message, hasReplies: false }, [], messagesByDate);
     }
   }
   for (const [threadTs, threadMessages] of threadMap.entries()) {
@@ -959,10 +985,10 @@ function groupMessagesByDateAndChannel(standaloneMessages, threadMap, context) {
         hasReplies: replies.length > 0,
         threadPermalink: parentMessage.threadPermalink || parentMessage.permalink
       };
-      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate);
     } else {
       const firstMessage = sortedThreadMessages[0];
-      context.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
+      GlobalContext.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
       const threadPermalink = sortedThreadMessages.find((m) => m.threadPermalink)?.threadPermalink || firstMessage.permalink;
       const syntheticParent = {
         ...firstMessage,
@@ -975,12 +1001,12 @@ function groupMessagesByDateAndChannel(standaloneMessages, threadMap, context) {
         threadPermalink
       };
       const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
-      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate);
     }
   }
   return messagesByDate;
 }
-function formatMessage(message, cache, context) {
+function formatMessage(message, cache) {
   let markdown = "";
   const timestamp = new Date(Number(message.ts) * 1e3);
   const timeString = formatTime(timestamp);
@@ -988,7 +1014,7 @@ function formatMessage(message, cache, context) {
   if (message.user && cache.users[message.user]) {
     userName = cache.users[message.user].displayName;
   }
-  context.log.debug(`Formatting message from ${userName}`);
+  GlobalContext.log.debug(`Formatting message from ${userName}`);
   let threadIndicator = "";
   if (message.hasReplies) {
     const isThreadStarter = message.thread_ts === message.ts || message.permalink?.includes(`thread_ts=${message.ts}`);
@@ -1035,11 +1061,11 @@ function formatThreadReplies(replies, cache) {
   }
   return markdown;
 }
-function generateMarkdown(messages, cache, userId, context) {
+function generateMarkdown(messages, cache, userId) {
   let markdown = "";
-  context.log.debug(`Processing ${messages.length} total messages`);
-  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages, context);
-  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap, context);
+  GlobalContext.log.debug(`Processing ${messages.length} total messages`);
+  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages);
+  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap);
   const sortedDates = Array.from(messagesByDate.keys()).sort();
   for (const dateKey of sortedDates) {
     const date = new Date(dateKey);
@@ -1048,7 +1074,7 @@ function generateMarkdown(messages, cache, userId, context) {
 `;
     const channelsForDate = messagesByDate.get(dateKey);
     const channelEntries = Array.from(channelsForDate.entries()).map(([id, messages2]) => [id || "unknown", messages2]).filter(
-      ([channelId, channelMessages]) => shouldIncludeChannel(channelId, channelMessages, cache, userId, context)
+      ([channelId, channelMessages]) => shouldIncludeChannel(channelId, channelMessages, cache, userId)
     ).sort(([aId], [bId]) => {
       const aName = getFriendlyChannelName(aId, cache, userId);
       const bName = getFriendlyChannelName(bId, cache, userId);
@@ -1061,9 +1087,9 @@ function generateMarkdown(messages, cache, userId, context) {
 `;
       const sortedMessages = channelMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
       for (const message of sortedMessages) {
-        markdown += formatMessage(message, cache, context);
+        markdown += formatMessage(message, cache);
         if (message.threadMessages?.length) {
-          context.log.debug(
+          GlobalContext.log.debug(
             `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`
           );
           markdown += formatThreadReplies(message.threadMessages, cache);
@@ -1077,32 +1103,31 @@ function generateMarkdown(messages, cache, userId, context) {
 }
 
 // src/services/my-messages-service.ts
-async function generateMyMessagesSummary(options, context) {
+async function generateMyMessagesSummary(options) {
   const dateRange = await getDateRange(options);
   const client = await getSlackClient();
-  if (!context.currentUser?.user_id) {
+  if (!GlobalContext.currentUser?.user_id) {
     throw new Error("No current user found");
   }
-  const userId = context.currentUser.user_id;
-  context.log.debug(`Generating my messages summary for user: ${userId}`);
-  context.log.debug(
+  const userId = GlobalContext.currentUser.user_id;
+  GlobalContext.log.debug(`Generating my messages summary for user: ${userId}`);
+  GlobalContext.log.debug(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`
   );
   const { messages, threadMessages, mentionMessages } = await searchMessages(
     client,
     `<@${userId}>`,
     dateRange,
-    options.count,
-    context
+    options.count
   );
   const allMessages = [...messages, ...threadMessages, ...mentionMessages];
-  context.log.debug(
+  GlobalContext.log.debug(
     `Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`
   );
-  context.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
-  const cache = await getSlackEntityCache(client, allMessages, context);
-  context.log.debug("Formatting report...");
-  const markdown = generateMarkdown(allMessages, cache, userId, context);
+  GlobalContext.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
+  const cache = await getSlackEntityCache(client, allMessages);
+  GlobalContext.log.debug("Formatting report...");
+  const markdown = generateMarkdown(allMessages, cache, userId);
   cache.lastUpdated = Date.now();
   await saveSlackCache(cache);
   return {
@@ -1138,7 +1163,7 @@ var myMessagesTool = tool({
   parameters: myMessagesParams,
   annotations: {},
   execute: async ({ since, until, count }) => {
-    const result = await generateMyMessagesSummary({ since, until, count }, GlobalContext);
+    const result = await generateMyMessagesSummary({ since, until, count });
     return result.markdown;
   }
 });
@@ -1366,13 +1391,13 @@ async function getUserProfile(userId) {
 }
 
 // src/services/formatting-service.ts
-function generateSearchResultsMarkdown(messages, cache, userId, context) {
+function generateSearchResultsMarkdown(messages, cache, userId) {
   let markdown = "";
   if (messages.length === 0) {
-    context.log.debug("No search results found");
+    GlobalContext.log.debug("No search results found");
     return "# Search Results\n\nNo messages found matching your search criteria.\n";
   }
-  context.log.debug(`Processing ${messages.length} search results`);
+  GlobalContext.log.debug(`Processing ${messages.length} search results`);
   const messagesByChannel = /* @__PURE__ */ new Map();
   for (const message of messages) {
     const channelId = message.channel?.id || "unknown";
@@ -1497,13 +1522,13 @@ var searchTool = tool({
   description: "Perform a search in Slack using standard Slack search syntax and return matching messages.",
   parameters: searchParams,
   annotations: {},
-  execute: async ({ query, count }, { session }) => {
+  execute: async ({ query, count }) => {
     const results = await performSlackSearch(query, count);
     const cache = {
       channels: results.channels,
       users: results.users
     };
-    return generateSearchResultsMarkdown(results.messages, cache, results.userId, session.context);
+    return generateSearchResultsMarkdown(results.messages, cache, results.userId);
   }
 });
 var setStatusParams = z.object({
@@ -1655,7 +1680,7 @@ var userSearchTool = tool({
   parameters: userSearchParams,
   annotations: {},
   execute: async ({ query, limit }) => {
-    const client = await getSlackClient(GlobalContext);
+    const client = await getSlackClient();
     const cleanQuery = query.trim().replace(/^@/, "");
     if (!cleanQuery) {
       return "Please provide a search term to find users.";
@@ -1795,10 +1820,11 @@ var userProfileTool = tool({
 
 // src/commands/mcp.ts
 function registerMcpCommand(program2) {
-  program2.command("mcp").description("Start an MCP server with search and status capabilities").action(async () => {
+  program2.command("mcp").alias("").description("Start an MCP server with search and status capabilities").action(async () => {
     if (!version.match(/^\d+\.\d+\.\d+$/)) {
       throw new Error("Invalid version format");
     }
+    await getSlackClient();
     const server = new FastMCP({
       name: "slack-tools-server",
       version
@@ -1921,18 +1947,23 @@ program.hook("preAction", async (thisCommand) => {
   const options = thisCommand.opts();
   GlobalContext.debug = options.debug;
   if (options.workspace) {
-    await setLastWorkspace(options.workspace);
     GlobalContext.workspace = options.workspace;
   } else if (options.lastWorkspace) {
     const lastWorkspace = await getLastWorkspace();
     if (lastWorkspace) {
       GlobalContext.workspace = lastWorkspace;
     } else {
-      console.error("No last workspace found. Please specify a workspace using --workspace.");
-      process.exit(1);
+      program.error("No last workspace found. Please specify a workspace using --workspace.");
     }
   }
+  if (!GlobalContext.workspace) {
+    program.error("No workspace found. Please specify a workspace using --workspace.");
+  }
 });
-program.parse(process.argv);
+if (process.argv.some((arg) => program.commands.some((command) => command.name() === arg))) {
+  program.parse(process.argv);
+} else {
+  program.parse([...process.argv, "mcp"]);
+}
 //# sourceMappingURL=cli.mjs.map
 //# sourceMappingURL=cli.mjs.map

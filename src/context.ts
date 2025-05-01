@@ -1,6 +1,6 @@
 import { AuthTestResponse } from '@slack/web-api';
 
-export interface SlackContext {
+interface SlackContext {
   workspace: string;
   debug: boolean;
   hasWorkspace: boolean;
@@ -21,7 +21,6 @@ export const GlobalContext: SlackContext = {
   },
   currentUser: undefined,
   log: {
-    ...console,
     debug: (...args: unknown[]) => {
       if (GlobalContext.debug) {
         console.debug(...args);

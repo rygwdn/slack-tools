@@ -96,7 +96,7 @@ describe('slack-api', () => {
 
   describe('findWorkspaceToken', () => {
     it('should find a workspace by exact URL match', () => {
-      const result = findWorkspaceToken(mockAuth, 'team1.slack.com', GlobalContext);
+      const result = findWorkspaceToken(mockAuth, 'team1.slack.com');
 
       expect(result).toEqual({
         token: 'xoxc-test-token-1',
@@ -106,7 +106,7 @@ describe('slack-api', () => {
     });
 
     it('should find a workspace by name (case insensitive)', () => {
-      const result = findWorkspaceToken(mockAuth, 'team two', GlobalContext);
+      const result = findWorkspaceToken(mockAuth, 'team two');
 
       expect(result).toEqual({
         token: 'xoxc-test-token-2',
@@ -116,7 +116,7 @@ describe('slack-api', () => {
     });
 
     it('should throw an error if workspace not found', () => {
-      expect(() => findWorkspaceToken(mockAuth, 'non-existent', GlobalContext)).toThrow(
+      expect(() => findWorkspaceToken(mockAuth, 'non-existent')).toThrow(
         'Could not find workspace "non-existent"',
       );
 
@@ -126,7 +126,7 @@ describe('slack-api', () => {
 
     it('should throw an error if auth has no cookie', () => {
       const authWithoutCookie = { ...mockAuth, cookie: undefined as any };
-      expect(() => findWorkspaceToken(authWithoutCookie, 'team1.slack.com', GlobalContext)).toThrow(
+      expect(() => findWorkspaceToken(authWithoutCookie, 'team1.slack.com')).toThrow(
         'No cookie found in auth',
       );
     });
@@ -134,7 +134,7 @@ describe('slack-api', () => {
 
   describe('getSlackClient', () => {
     it('should create a WebClient with correct token and cookie', async () => {
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       expect(WebClient).toHaveBeenCalledWith(
         'xoxc-123456789',
@@ -142,7 +142,6 @@ describe('slack-api', () => {
           headers: {
             Cookie: 'd=test-cookie-value',
           },
-          rejectRateLimitedCalls: true,
           logger: expect.anything(),
         }),
       );
@@ -164,7 +163,7 @@ describe('slack-api', () => {
         throw new Error('Process exit');
       });
 
-      await expect(getSlackClient(GlobalContext)).rejects.toThrow(
+      await expect(getSlackClient()).rejects.toThrow(
         "Invalid token format: token should start with 'xoxc-'. Got: invalid-token",
       );
     });
@@ -172,7 +171,7 @@ describe('slack-api', () => {
     it('should set logLevel based on context.debug', async () => {
       GlobalContext.debug = false;
 
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       expect(WebClient).toHaveBeenCalledWith(
         'xoxc-123456789',
@@ -188,7 +187,7 @@ describe('slack-api', () => {
       GlobalContext.currentUser = undefined;
 
       // Execute the function
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       // Auth should be tested
       expect(mockAuthTest).toHaveBeenCalled();
@@ -200,14 +199,14 @@ describe('slack-api', () => {
     it('should not validate auth on subsequent calls', async () => {
       // First call
       GlobalContext.currentUser = undefined;
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
       expect(mockAuthTest).toHaveBeenCalled();
 
       // Reset mock to check if it's called again
       mockAuthTest.mockClear();
 
       // Second call
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       // Auth should not be tested again
       expect(mockAuthTest).not.toHaveBeenCalled();
@@ -220,12 +219,12 @@ describe('slack-api', () => {
       mockAuthTest.mockResolvedValueOnce({ ok: false });
 
       // Execute the function
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       // Should clear stored auth and get fresh tokens
       expect(clearStoredAuth).toHaveBeenCalled();
       expect(getCookie).toHaveBeenCalled();
-      expect(getTokens).toHaveBeenCalledWith(GlobalContext);
+      expect(getTokens).toHaveBeenCalled();
       expect(storeAuth).toHaveBeenCalled();
 
       // Flag should be set after validation
@@ -234,7 +233,7 @@ describe('slack-api', () => {
 
     it('should use stored auth when already validated', async () => {
       // Execute the function
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       // Should get stored auth
       expect(getStoredAuth).toHaveBeenCalled();
@@ -248,11 +247,10 @@ describe('slack-api', () => {
       vi.mocked(getStoredAuth).mockResolvedValueOnce(null);
 
       // Execute the function
-      await getSlackClient(GlobalContext);
+      await getSlackClient();
 
       // Should get fresh tokens
       expect(getCookie).toHaveBeenCalled();
-      expect(getTokens).toHaveBeenCalledWith(GlobalContext);
     });
   });
 });

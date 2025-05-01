@@ -19,13 +19,12 @@ export function registerPrintCommand(program: Command): void {
 
         const auth = storedAuth || {
           cookie: await getCookie(),
-          tokens: await getTokens(GlobalContext),
+          tokens: await getTokens(),
         };
 
         const { token, cookie, workspaceUrl } = findWorkspaceToken(
           auth,
           GlobalContext.workspace || Object.keys(auth.tokens)[0],
-          GlobalContext,
         );
 
         if (!cmdOptions.quiet) {

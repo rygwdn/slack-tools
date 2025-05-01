@@ -107,11 +107,7 @@ describe('Print Command', () => {
 
       // Check if auth was used correctly
       expect(getStoredAuth).toHaveBeenCalled();
-      expect(findWorkspaceToken).toHaveBeenCalledWith(
-        expect.anything(),
-        'test-workspace',
-        expect.anything(),
-      );
+      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'test-workspace');
 
       // Check console output
       expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');
@@ -142,11 +138,7 @@ describe('Print Command', () => {
       await actionCallback!({ quiet: false });
 
       // Check if token was fetched for the specific workspace
-      expect(findWorkspaceToken).toHaveBeenCalledWith(
-        expect.anything(),
-        'team1',
-        expect.anything(),
-      );
+      expect(findWorkspaceToken).toHaveBeenCalledWith(expect.anything(), 'team1');
 
       // Check workspace-specific output
       expect(console.log).toHaveBeenCalledWith('\nFound token for workspace:\n');

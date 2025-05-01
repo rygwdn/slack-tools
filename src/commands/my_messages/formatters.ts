@@ -1,6 +1,6 @@
+import { GlobalContext } from '../../context';
 import { SlackCache, ThreadMessage } from './types';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { SlackContext } from '../../context';
 
 export function getFriendlyChannelName(
   channelId: string,
@@ -95,7 +95,6 @@ function shouldIncludeChannel(
   messages: ThreadMessage[],
   cache: SlackCache,
   userId: string,
-  context: SlackContext,
 ): boolean {
   // Keep the channel if:
   // 1. I sent any message in the channel (including thread replies)
@@ -115,7 +114,7 @@ function shouldIncludeChannel(
     const isBot = dmUser?.isBot || false;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
-      context.log.debug(
+      GlobalContext.log.debug(
         `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`,
       );
     }
@@ -126,16 +125,16 @@ function shouldIncludeChannel(
 }
 
 // Helper function to organize messages into threads
-function organizeMessagesIntoThreads(
-  messages: Match[],
-  context: SlackContext,
-): { threadMap: Map<string, ThreadMessage[]>; standaloneMessages: ThreadMessage[] } {
+function organizeMessagesIntoThreads(messages: Match[]): {
+  threadMap: Map<string, ThreadMessage[]>;
+  standaloneMessages: ThreadMessage[];
+} {
   const threadMap = new Map<string, ThreadMessage[]>();
   const standaloneMessages: ThreadMessage[] = [];
 
   for (const message of messages) {
     if (!isValidThreadMessage(message)) {
-      context.log.debug('Skipping message without timestamp');
+      GlobalContext.log.debug('Skipping message without timestamp');
       continue;
     }
 
@@ -183,7 +182,7 @@ function organizeMessagesIntoThreads(
           hasReplies: false,
         };
         thread.push(messageWithThreadTs);
-        context.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
+        GlobalContext.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
       }
     } else {
       // If no thread_ts or it's the thread parent, it's a standalone/parent message
@@ -193,7 +192,7 @@ function organizeMessagesIntoThreads(
         hasReplies: isThreadParent,
       };
       standaloneMessages.push(messageWithThreadInfo);
-      context.log.debug(
+      GlobalContext.log.debug(
         `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`,
       );
     }
@@ -207,7 +206,6 @@ function addMessageToDateChannelStructure(
   message: ThreadMessage,
   threadMessages: ThreadMessage[] = [],
   dateChannelMap: Map<string, Map<string, ThreadMessage[]>>,
-  context: SlackContext,
 ): void {
   const date = new Date(Number(message.ts) * 1000);
   const dateKey = date.toISOString().split('T')[0];
@@ -224,7 +222,7 @@ function addMessageToDateChannelStructure(
 
   const messagesForChannel = channelsForDate.get(channelId)!;
   if (threadMessages.length > 0) {
-    context.log.debug(
+    GlobalContext.log.debug(
       `Adding message with ${threadMessages.length} thread replies to ${channelId}`,
     );
   }
@@ -238,7 +236,6 @@ function addMessageToDateChannelStructure(
 function groupMessagesByDateAndChannel(
   standaloneMessages: ThreadMessage[],
   threadMap: Map<string, ThreadMessage[]>,
-  context: SlackContext,
 ): Map<string, Map<string, ThreadMessage[]>> {
   const messagesByDate = new Map<string, Map<string, ThreadMessage[]>>();
 
@@ -255,14 +252,9 @@ function groupMessagesByDateAndChannel(
         hasReplies: replies.length > 0,
         threadPermalink: message.threadPermalink || message.permalink,
       };
-      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate);
     } else {
-      addMessageToDateChannelStructure(
-        { ...message, hasReplies: false },
-        [],
-        messagesByDate,
-        context,
-      );
+      addMessageToDateChannelStructure({ ...message, hasReplies: false }, [], messagesByDate);
     }
   }
 
@@ -287,11 +279,11 @@ function groupMessagesByDateAndChannel(
         hasReplies: replies.length > 0,
         threadPermalink: parentMessage.threadPermalink || parentMessage.permalink,
       };
-      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate);
     } else {
       // Create a synthetic parent from the first message
       const firstMessage = sortedThreadMessages[0];
-      context.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
+      GlobalContext.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
 
       // Try to get a thread permalink from one of the replies
       const threadPermalink =
@@ -309,7 +301,7 @@ function groupMessagesByDateAndChannel(
         threadPermalink,
       };
       const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
-      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate, context);
+      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate);
     }
   }
 
@@ -317,7 +309,7 @@ function groupMessagesByDateAndChannel(
 }
 
 // Helper function to format a single message
-function formatMessage(message: ThreadMessage, cache: SlackCache, context: SlackContext): string {
+function formatMessage(message: ThreadMessage, cache: SlackCache): string {
   let markdown = '';
   const timestamp = new Date(Number(message.ts) * 1000);
   const timeString = formatTime(timestamp);
@@ -327,7 +319,7 @@ function formatMessage(message: ThreadMessage, cache: SlackCache, context: Slack
     userName = cache.users[message.user].displayName;
   }
 
-  context.log.debug(`Formatting message from ${userName}`);
+  GlobalContext.log.debug(`Formatting message from ${userName}`);
 
   // Format the main message with thread indicator
   let threadIndicator = '';
@@ -408,21 +400,16 @@ function formatThreadReplies(replies: ThreadMessage[], cache: SlackCache): strin
   return markdown;
 }
 
-export function generateMarkdown(
-  messages: Match[],
-  cache: SlackCache,
-  userId: string,
-  context: SlackContext,
-): string {
+export function generateMarkdown(messages: Match[], cache: SlackCache, userId: string): string {
   let markdown = '';
 
-  context.log.debug(`Processing ${messages.length} total messages`);
+  GlobalContext.log.debug(`Processing ${messages.length} total messages`);
 
   // Organize messages into threads
-  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages, context);
+  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages);
 
   // Group messages by date and channel
-  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap, context);
+  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap);
 
   // Generate markdown for each date
   const sortedDates = Array.from(messagesByDate.keys()).sort();
@@ -436,7 +423,7 @@ export function generateMarkdown(
     const channelEntries = Array.from(channelsForDate.entries())
       .map(([id, messages]) => [id || 'unknown', messages] as [string, ThreadMessage[]])
       .filter(([channelId, channelMessages]) =>
-        shouldIncludeChannel(channelId, channelMessages, cache, userId, context),
+        shouldIncludeChannel(channelId, channelMessages, cache, userId),
       )
       .sort(([aId], [bId]) => {
         const aName = getFriendlyChannelName(aId, cache, userId);
@@ -454,11 +441,11 @@ export function generateMarkdown(
 
       for (const message of sortedMessages) {
         // Format the main message
-        markdown += formatMessage(message, cache, context);
+        markdown += formatMessage(message, cache);
 
         // Add thread replies if any
         if (message.threadMessages?.length) {
-          context.log.debug(
+          GlobalContext.log.debug(
             `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`,
           );
           markdown += formatThreadReplies(message.threadMessages, cache);

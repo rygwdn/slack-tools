@@ -1,4 +1,3 @@
-import { SlackContext } from './context';
 import { Tool } from 'fastmcp';
 import { ZodObject, ZodRawShape } from 'zod';
 
@@ -40,7 +39,6 @@ export interface CacheConfig {
 // For filtering auth by workspace
 export interface WorkspaceAuthOptions {
   workspace?: string;
-  context?: SlackContext;
 }
 
 export function tool<

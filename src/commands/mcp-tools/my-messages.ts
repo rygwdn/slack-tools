@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { generateMyMessagesSummary } from '../../services/my-messages-service';
 import { tool } from '../../types';
-import { GlobalContext } from '../../context';
 
 const myMessagesParams = z.object({
   username: z
@@ -35,7 +34,7 @@ export const myMessagesTool = tool({
   parameters: myMessagesParams,
   annotations: {},
   execute: async ({ since, until, count }) => {
-    const result = await generateMyMessagesSummary({ since, until, count }, GlobalContext);
+    const result = await generateMyMessagesSummary({ since, until, count });
     return result.markdown;
   },
 });
