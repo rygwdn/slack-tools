@@ -4,7 +4,7 @@ export default defineConfig({
   entry: ['src/cli.ts'],
   format: ['esm'],
   clean: true,
-  minify: true,
+  minify: false,
   shims: true,
   dts: false,
   sourcemap: true,

@@ -7,26 +7,13 @@ import {
   extractThreadTsFromPermalink,
   generateMarkdown,
 } from '../../../../src/commands/my_messages/formatters';
-import { SlackContext } from '../../../../src/context';
+import { GlobalContext } from '../../../../src/context';
 import { SlackCache, ThreadMessage } from '../../../../src/commands/my_messages/types';
 
 describe('My Messages Formatters', () => {
-  let context: SlackContext;
   let mockCache: SlackCache;
 
   beforeEach(() => {
-    context = {
-      workspace: 'test-workspace',
-      debug: true,
-      hasWorkspace: true,
-      log: {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-      },
-    };
-
     mockCache = {
       channels: {
         C123: { displayName: 'general', type: 'channel' as const },
@@ -188,7 +175,7 @@ describe('My Messages Formatters', () => {
   describe('generateMarkdown', () => {
     it('should generate markdown for empty messages', () => {
       const messages: ThreadMessage[] = [];
-      const result = generateMarkdown(messages, mockCache, 'U123', context);
+      const result = generateMarkdown(messages, mockCache, 'U123', GlobalContext);
       expect(result).toBe('');
     });
 
@@ -203,7 +190,7 @@ describe('My Messages Formatters', () => {
         },
       ];
 
-      const result = generateMarkdown(messages, mockCache, 'U123', context);
+      const result = generateMarkdown(messages, mockCache, 'U123', GlobalContext);
 
       // The date could be either Dec 31 or Jan 1 depending on timezone
       // We'll check that the date heading format is correct without relying on specific date
@@ -238,7 +225,7 @@ describe('My Messages Formatters', () => {
         },
       ];
 
-      const result = generateMarkdown(messages, mockCache, 'U123', context);
+      const result = generateMarkdown(messages, mockCache, 'U123', GlobalContext);
 
       // Use regex to match date headings regardless of timezone
       const dateHeadings = result.match(/^# [A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}/gm) || [];
@@ -300,7 +287,7 @@ describe('My Messages Formatters', () => {
 
       const messages = [threadParent, threadReply1, threadReply2];
 
-      const result = generateMarkdown(messages, mockCache, 'U123', context);
+      const result = generateMarkdown(messages, mockCache, 'U123', GlobalContext);
 
       // Should organize thread replies under parent
       expect(result).toContain('Thread parent');
@@ -346,7 +333,7 @@ describe('My Messages Formatters', () => {
         permalink: 'https://example.slack.com/archives/D123/p1609459300000000',
       };
 
-      const result = generateMarkdown([botMessage, userMessage], mockCache, 'U123', context);
+      const result = generateMarkdown([botMessage, userMessage], mockCache, 'U123', GlobalContext);
       expect(result).toContain('Bot message');
       expect(result).toContain('User message');
     });

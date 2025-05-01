@@ -1,5 +1,5 @@
 import { SlackContext } from '../context';
-import { getSlackClient, currentUser } from '../slack-api';
+import { getSlackClient } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';

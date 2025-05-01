@@ -31,6 +31,7 @@ describe('auto-register-tools', () => {
   beforeEach(() => {
     program = new Command();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`Process exited with code ${code}`);
     });

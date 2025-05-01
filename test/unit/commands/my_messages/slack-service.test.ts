@@ -3,10 +3,10 @@ import {
   searchMessages,
   searchSlackMessages,
 } from '../../../../src/commands/my_messages/slack-service';
-import { SlackContext } from '../../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import * as dateUtils from '../../../../src/utils/date-utils';
+import { GlobalContext } from '../../../../src/context';
 
 vi.mock('../../../../src/utils/date-utils', () => ({
   formatDateForSearch: vi.fn(),
@@ -15,22 +15,9 @@ vi.mock('../../../../src/utils/date-utils', () => ({
 }));
 
 describe('Slack Service', () => {
-  let context: SlackContext;
   let mockClient: WebClient;
 
   beforeEach(() => {
-    context = {
-      workspace: 'test-workspace',
-      debug: true,
-      hasWorkspace: true,
-      log: {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-      },
-    };
-
     mockClient = {
       search: {
         messages: vi.fn(),
@@ -73,7 +60,7 @@ describe('Slack Service', () => {
       // Execute the search
       const query = 'test query';
       const count = 50;
-      const result = await searchSlackMessages(mockClient, query, count, context);
+      const result = await searchSlackMessages(mockClient, query, count, GlobalContext);
 
       // Verify the API was called correctly
       expect(mockClient.search.messages).toHaveBeenCalledWith({
@@ -85,7 +72,7 @@ describe('Slack Service', () => {
 
       // Verify the results
       expect(result).toEqual(mockMatches);
-      expect(context.log.debug).toHaveBeenCalled();
+      expect(GlobalContext.log.debug).toHaveBeenCalled();
     });
 
     it('should handle empty results', async () => {
@@ -100,7 +87,7 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockResolvedValueOnce(mockResponse);
 
       // Execute the search
-      const result = await searchSlackMessages(mockClient, 'test query', 50, context);
+      const result = await searchSlackMessages(mockClient, 'test query', 50, GlobalContext);
 
       // Verify we get an empty array, not undefined
       expect(result).toEqual([]);
@@ -116,7 +103,7 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockResolvedValueOnce(mockResponse);
 
       // Execute the search
-      const result = await searchSlackMessages(mockClient, 'test query', 50, context);
+      const result = await searchSlackMessages(mockClient, 'test query', 50, GlobalContext);
 
       // Verify we get an empty array when matches is undefined
       expect(result).toEqual([]);
@@ -128,12 +115,12 @@ describe('Slack Service', () => {
       vi.mocked(mockClient.search.messages).mockRejectedValueOnce(new Error(errorMessage));
 
       // Execute the search and expect it to throw
-      await expect(searchSlackMessages(mockClient, 'test query', 50, context)).rejects.toThrow(
-        errorMessage,
-      );
+      await expect(
+        searchSlackMessages(mockClient, 'test query', 50, GlobalContext),
+      ).rejects.toThrow(errorMessage);
 
       // Verify debug log was called
-      expect(context.log.debug).toHaveBeenCalled();
+      expect(GlobalContext.log.debug).toHaveBeenCalled();
     });
   });
 
@@ -185,7 +172,7 @@ describe('Slack Service', () => {
         'testuser',
         { startTime, endTime },
         50,
-        context,
+        GlobalContext,
       );
 
       // Verify the API calls
@@ -194,7 +181,7 @@ describe('Slack Service', () => {
       expect(dateUtils.formatDateForSearch).toHaveBeenCalledTimes(2);
 
       // Verify the queries are being constructed correctly
-      const debugCalls = vi.mocked(context.log.debug).mock.calls.map((call) => call[0]);
+      const debugCalls = vi.mocked(GlobalContext.log.debug).mock.calls.map((call) => call[0]);
       expect(debugCalls.some((call) => (call as string).includes('from:testuser'))).toBe(true);
       expect(debugCalls.some((call) => (call as string).includes('to:testuser'))).toBe(true);
 

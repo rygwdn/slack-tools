@@ -23,8 +23,15 @@ export async function resolveUserForSearch(
     }
   }
 
-  GlobalContext.log.warn(`No user found matching "${cleanIdentifier}". Using as-is.`);
-  return `${cleanIdentifier}`;
+  const simplifiedIdentifier = cleanIdentifier
+    .replace(/^"(.*)"$/, '$1')
+    .replace(/[^\w]+/g, '.')
+    .toLowerCase();
+
+  GlobalContext.log.warn(
+    `No user found matching "${cleanIdentifier}". Using "${simplifiedIdentifier}".`,
+  );
+  return simplifiedIdentifier;
 }
 
 export async function enhanceSearchQuery(client: WebClient, query: string): Promise<string> {

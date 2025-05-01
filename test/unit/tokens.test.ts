@@ -11,8 +11,6 @@ vi.mock('node:os', () => {
 });
 
 describe('tokens', () => {
-  // Mocking console is not needed for the active tests, so no need to declare the variables
-
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -35,23 +33,6 @@ describe('tokens', () => {
 
       // Expect platform error
       await expect(getTokens(mockContext)).rejects.toThrow('only works on macOS');
-    });
-
-    // Skip the other tests that require complex mocking
-    it.skip('should extract tokens from Slack localStorage', async () => {
-      // This test is skipped
-    });
-
-    it.skip('should throw an error if localConfig is not found', async () => {
-      // This test is skipped
-    });
-
-    it.skip('should log a message when closing the database in non-quiet mode', async () => {
-      // This test is skipped
-    });
-
-    it.skip('should handle database locked errors with a helpful message', async () => {
-      // This test is skipped
     });
   });
 });

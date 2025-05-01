@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
-import { SlackContext } from '../../../src/context';
+import { GlobalContext } from '../../../src/context';
 import { WebClient } from '@slack/web-api';
 import { getDateRange } from '../../../src/utils/date-utils';
 import { searchMessages } from '../../../src/commands/my_messages/slack-service';
@@ -13,7 +13,6 @@ import { saveSlackCache } from '../../../src/cache';
 // Mock all the dependencies
 vi.mock('../../../src/slack-api', () => ({
   getSlackClient: vi.fn(),
-  currentUser: { user_id: 'U123', user: 'testuser' },
 }));
 
 vi.mock('../../../src/utils/date-utils', () => ({
@@ -37,7 +36,6 @@ vi.mock('../../../src/cache', () => ({
 }));
 
 describe('My Messages Service', () => {
-  let context: SlackContext;
   let mockClient: WebClient;
   let mockDateRange: { startTime: Date; endTime: Date };
   let mockCache: SlackCache;
@@ -49,19 +47,6 @@ describe('My Messages Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Initialize context with workspace
-    context = {
-      workspace: 'test-workspace',
-      debug: true,
-      hasWorkspace: true,
-      log: {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-      },
-    };
 
     // Create mock objects
     mockClient = {
@@ -112,7 +97,7 @@ describe('My Messages Service', () => {
 
   it('should generate a my messages summary with default options', async () => {
     // Call the function
-    const result = await generateMyMessagesSummary({ count: 200 }, context);
+    const result = await generateMyMessagesSummary({ count: 200 }, GlobalContext);
 
     // Check if all the required functions were called
     expect(getSlackClient).toHaveBeenCalledWith();
@@ -122,10 +107,15 @@ describe('My Messages Service', () => {
       expect.any(String),
       mockDateRange,
       200,
-      context,
+      GlobalContext,
     );
-    expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, mockAllMessages, context);
-    expect(generateMarkdown).toHaveBeenCalledWith(mockAllMessages, mockCache, 'U123', context);
+    expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, mockAllMessages, GlobalContext);
+    expect(generateMarkdown).toHaveBeenCalledWith(
+      mockAllMessages,
+      mockCache,
+      'U123',
+      GlobalContext,
+    );
     expect(saveSlackCache).toHaveBeenCalledWith(
       expect.objectContaining({ lastUpdated: expect.any(Number) }),
     );
@@ -150,7 +140,7 @@ describe('My Messages Service', () => {
     };
 
     // Call the function
-    const result = await generateMyMessagesSummary(customOptions, context);
+    const result = await generateMyMessagesSummary(customOptions, GlobalContext);
 
     // Check if all the required functions were called with custom options
     expect(getDateRange).toHaveBeenCalledWith(customOptions);
@@ -159,7 +149,7 @@ describe('My Messages Service', () => {
       expect.any(String),
       mockDateRange,
       50,
-      context,
+      GlobalContext,
     );
 
     // Check the returned result
@@ -172,6 +162,8 @@ describe('My Messages Service', () => {
     vi.mocked(getDateRange).mockRejectedValueOnce(testError);
 
     // Call the function and expect it to throw
-    await expect(generateMyMessagesSummary({ count: 200 }, context)).rejects.toThrow(testError);
+    await expect(generateMyMessagesSummary({ count: 200 }, GlobalContext)).rejects.toThrow(
+      testError,
+    );
   });
 });

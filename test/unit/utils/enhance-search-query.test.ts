@@ -6,7 +6,7 @@ import { WebClient } from '@slack/web-api';
 vi.mock('@slack/web-api');
 vi.mock('../../../src/context');
 
-describe.skip('enhanceSearchQuery', () => {
+describe('enhanceSearchQuery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

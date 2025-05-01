@@ -12,20 +12,15 @@ vi.mock('keytar', () => ({
 
 vi.mock('level');
 
-// import { GlobalContext } from '../src/context';
-
 vi.mock('../src/context', () => ({
   GlobalContext: {
     workspace: 'test-workspace',
     debug: true,
     hasWorkspace: true,
+    currentUser: {
+      user_id: 'U123',
+      ok: true,
+    },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   },
 }));
-
-// vi.stubGlobal('GlobalContext', {
-//   workspace: 'test-workspace',
-//   debug: true,
-//   hasWorkspace: true,
-//   log: { debug: vi.fn() },
-// });
