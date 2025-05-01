@@ -11,7 +11,6 @@ import { setStatusTool } from './mcp-tools/status';
 import { reminderTool } from './mcp-tools/reminders';
 import { threadRepliesTool } from './mcp-tools/thread-replies';
 import { userProfileTool } from './mcp-tools/user-profile';
-import { userSearchTool } from './mcp-tools/user-search';
 import { userActivityTool } from './mcp-tools/user-activity';
 
 export function registerCommands(program: Command): void {
@@ -31,6 +30,5 @@ export function registerCommands(program: Command): void {
   registerToolAsCommand(program, reminderTool);
   registerToolAsCommand(program, threadRepliesTool);
   registerToolAsCommand(program, userActivityTool);
-  registerToolAsCommand(program, userSearchTool);
   registerToolAsCommand(program, userProfileTool);
 }
