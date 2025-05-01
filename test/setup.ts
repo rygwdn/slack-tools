@@ -19,7 +19,7 @@ vi.mock('../src/context', () => ({
     workspace: 'test-workspace',
     debug: true,
     hasWorkspace: true,
-    log: { debug: vi.fn() },
+    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   },
 }));
 

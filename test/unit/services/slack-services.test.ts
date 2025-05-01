@@ -7,35 +7,19 @@ import {
   performSlackSearch,
   getUserProfile,
 } from '../../../src/services/slack-services';
-import { SlackContext } from '../../../src/context';
 import * as slackApi from '../../../src/slack-api';
 import * as slackService from '../../../src/commands/my_messages/slack-service';
 import * as slackEntityCache from '../../../src/commands/my_messages/slack-entity-cache';
 import * as cache from '../../../src/cache';
 
-// Mock all dependencies
 vi.mock('../../../src/slack-api');
 vi.mock('../../../src/commands/my_messages/slack-service');
 vi.mock('../../../src/commands/my_messages/slack-entity-cache');
 vi.mock('../../../src/cache');
 
 describe('Slack Services', () => {
-  let context: SlackContext;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Create a new context for each test
-    context = {
-      workspace: 'test-workspace',
-      debug: true,
-      hasWorkspace: true,
-      log: {
-        debug: vi.fn(),
-      },
-    };
-
-    // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -228,7 +212,7 @@ describe('Slack Services', () => {
     });
 
     it('should retrieve current status', async () => {
-      const result = await getSlackStatus(context);
+      const result = await getSlackStatus();
 
       // Check that client.users.profile.get was called
       expect(mockClient.users.profile.get).toHaveBeenCalled();
@@ -245,7 +229,7 @@ describe('Slack Services', () => {
       // Override the profile.get mock for this test
       mockClient.users.profile.get.mockResolvedValueOnce({ profile: {} });
 
-      const result = await getSlackStatus(context);
+      const result = await getSlackStatus();
 
       // Check result has empty values
       expect(result).toEqual({
@@ -435,7 +419,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await getUserProfile('U12345', context);
+      const result = await getUserProfile('U12345');
 
       // Check that status fields have default values
       expect(result.status).toEqual({
@@ -452,7 +436,7 @@ describe('Slack Services', () => {
         error: 'user_not_found',
       });
 
-      await expect(getUserProfile('U99999', context)).rejects.toThrow(/User not found/);
+      await expect(getUserProfile('U99999')).rejects.toThrow(/User not found/);
     });
 
     it('should throw an error if profile not found', async () => {
@@ -462,7 +446,7 @@ describe('Slack Services', () => {
         error: 'profile_not_found',
       });
 
-      await expect(getUserProfile('U12345', context)).rejects.toThrow(/Profile not found/);
+      await expect(getUserProfile('U12345')).rejects.toThrow(/Profile not found/);
     });
 
     it('should throw an error if API request fails', async () => {

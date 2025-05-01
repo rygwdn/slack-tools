@@ -18,10 +18,13 @@ const threadRepliesParams = z.object({
     .number()
     .int()
     .optional()
+    .default(100)
     .describe(
       'Maximum number of replies to fetch (1-1000). If not specified, defaults to all replies.',
     ),
 });
+
+// const val = threadRepliesParams.shape.limit._def.defaultValue();
 
 /**
  * Tool for fetching thread replies from Slack

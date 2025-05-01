@@ -1,8 +1,16 @@
+import { AuthTestResponse } from '@slack/web-api';
+
 export interface SlackContext {
   workspace: string;
   debug: boolean;
   hasWorkspace: boolean;
-  log: { debug: (...args: any[]) => void };
+  currentUser: AuthTestResponse | undefined;
+  log: {
+    debug: (message: string, ...args: unknown[]) => void;
+    info: (message: string, ...args: unknown[]) => void;
+    warn: (message: string, ...args: unknown[]) => void;
+    error: (message: string, ...args: unknown[]) => void;
+  };
 }
 
 export const GlobalContext: SlackContext = {
@@ -11,5 +19,16 @@ export const GlobalContext: SlackContext = {
   get hasWorkspace() {
     return this.workspace !== '';
   },
-  log: console,
+  currentUser: undefined,
+  log: {
+    ...console,
+    debug: (...args: unknown[]) => {
+      if (GlobalContext.debug) {
+        console.debug(...args);
+      }
+    },
+    warn: (...args: unknown[]) => console.warn(...args),
+    info: (...args: unknown[]) => console.info(...args),
+    error: (...args: unknown[]) => console.error(...args),
+  },
 };

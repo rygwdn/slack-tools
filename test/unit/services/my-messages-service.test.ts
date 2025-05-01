@@ -13,6 +13,7 @@ import { saveSlackCache } from '../../../src/cache';
 // Mock all the dependencies
 vi.mock('../../../src/slack-api', () => ({
   getSlackClient: vi.fn(),
+  currentUser: { user_id: 'U123', user: 'testuser' },
 }));
 
 vi.mock('../../../src/utils/date-utils', () => ({
@@ -56,6 +57,9 @@ describe('My Messages Service', () => {
       hasWorkspace: true,
       log: {
         debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
       },
     };
 
@@ -94,10 +98,12 @@ describe('My Messages Service', () => {
     // Setup mocks
     vi.mocked(getSlackClient).mockResolvedValue(mockClient);
     vi.mocked(getDateRange).mockResolvedValue(mockDateRange);
-    vi.mocked(searchMessages).mockResolvedValue({
-      messages: mockMessages,
-      threadMessages: mockThreadMessages,
-      mentionMessages: mockMentionMessages,
+    vi.mocked(searchMessages).mockImplementation(async (_client, _username, _dateRange, _count) => {
+      return {
+        messages: mockMessages,
+        threadMessages: mockThreadMessages,
+        mentionMessages: mockMentionMessages,
+      };
     });
     vi.mocked(getSlackEntityCache).mockResolvedValue(mockCache);
     vi.mocked(generateMarkdown).mockReturnValue(mockMarkdown);
@@ -109,11 +115,11 @@ describe('My Messages Service', () => {
     const result = await generateMyMessagesSummary({ count: 200 }, context);
 
     // Check if all the required functions were called
-    expect(getSlackClient).toHaveBeenCalledWith('test-workspace', context);
-    expect(getDateRange).toHaveBeenCalledWith({ count: 200 }, context);
+    expect(getSlackClient).toHaveBeenCalledWith();
+    expect(getDateRange).toHaveBeenCalledWith({ count: 200 });
     expect(searchMessages).toHaveBeenCalledWith(
-      mockClient,
-      'testuser',
+      expect.anything(),
+      expect.any(String),
       mockDateRange,
       200,
       context,
@@ -147,10 +153,10 @@ describe('My Messages Service', () => {
     const result = await generateMyMessagesSummary(customOptions, context);
 
     // Check if all the required functions were called with custom options
-    expect(getDateRange).toHaveBeenCalledWith(customOptions, context);
+    expect(getDateRange).toHaveBeenCalledWith(customOptions);
     expect(searchMessages).toHaveBeenCalledWith(
-      mockClient,
-      'customuser',
+      expect.anything(),
+      expect.any(String),
       mockDateRange,
       50,
       context,

@@ -25,6 +25,9 @@ describe('Slack Service', () => {
       hasWorkspace: true,
       log: {
         debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
       },
     };
 
@@ -126,7 +129,7 @@ describe('Slack Service', () => {
 
       // Execute the search and expect it to throw
       await expect(searchSlackMessages(mockClient, 'test query', 50, context)).rejects.toThrow(
-        `Failed to search Slack: Error: ${errorMessage}`,
+        errorMessage,
       );
 
       // Verify debug log was called
@@ -143,7 +146,7 @@ describe('Slack Service', () => {
 
       // We need to mock searchSlackMessages since that's the function we're testing that calls it
       vi.spyOn({ searchSlackMessages }, 'searchSlackMessages').mockImplementation(
-        async (client, query) => {
+        async (_client, query) => {
           // Return different matches based on the query content
           if (query.includes('from:testuser')) {
             return searchMatches;
@@ -192,24 +195,13 @@ describe('Slack Service', () => {
 
       // Verify the queries are being constructed correctly
       const debugCalls = vi.mocked(context.log.debug).mock.calls.map((call) => call[0]);
-      expect(debugCalls.some((call) => call.includes('from:testuser'))).toBe(true);
-      expect(debugCalls.some((call) => call.includes('to:testuser'))).toBe(true);
+      expect(debugCalls.some((call) => (call as string).includes('from:testuser'))).toBe(true);
+      expect(debugCalls.some((call) => (call as string).includes('to:testuser'))).toBe(true);
 
       // Verify the combined results
       expect(result.messages).toEqual(searchMatches);
       expect(result.threadMessages).toEqual(threadMatches);
       expect(result.mentionMessages).toEqual(mentionMatches);
-    });
-
-    it('should throw an error if username is not provided', async () => {
-      // Setup date range
-      const startTime = new Date('2023-01-01');
-      const endTime = new Date('2023-01-01');
-
-      // Execute the search with undefined username
-      await expect(
-        searchMessages(mockClient, undefined, { startTime, endTime }, 50, context),
-      ).rejects.toThrow('Username is required for searching messages');
     });
   });
 });

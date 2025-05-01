@@ -1,5 +1,5 @@
 import { SlackContext } from '../context';
-import { getSlackClient } from '../slack-api';
+import { getSlackClient, currentUser } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
 import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
@@ -9,7 +9,6 @@ import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse
 import { SlackCache } from '../commands/my_messages/types';
 
 interface MyMessagesOptions {
-  username?: string;
   since?: string;
   until?: string;
   count: number;
@@ -45,16 +44,15 @@ export async function generateMyMessagesSummary(
   options: MyMessagesOptions,
   context: SlackContext,
 ): Promise<MyMessagesSummaryResult> {
-  // Get date range
-  const dateRange = await getDateRange(options, context);
+  const dateRange = await getDateRange(options);
+  const client = await getSlackClient();
+  if (!context.currentUser?.user_id) {
+    throw new Error('No current user found');
+  }
 
-  // Get Slack client and user info
-  const client = await getSlackClient(context.workspace, context);
-  const authTest = await client.auth.test();
-  const userId = authTest.user_id as string;
-  const username = options.username || (authTest.user as string);
+  const userId = context.currentUser.user_id;
 
-  context.log.debug(`Generating my messages summary for user: ${username}`);
+  context.log.debug(`Generating my messages summary for user: ${userId}`);
   context.log.debug(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
   );
@@ -62,12 +60,12 @@ export async function generateMyMessagesSummary(
   // Search messages
   const { messages, threadMessages, mentionMessages } = await searchMessages(
     client,
-    username,
+    `<@${userId}>`,
     dateRange,
     options.count,
     context,
   );
-  const allMessages = [...messages, ...threadMessages, ...mentionMessages] as Match[];
+  const allMessages = [...messages, ...threadMessages, ...mentionMessages];
 
   context.log.debug(
     `Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`,

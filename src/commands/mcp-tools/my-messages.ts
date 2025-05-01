@@ -34,11 +34,8 @@ export const myMessagesTool = tool({
   description: 'Fetch and summarize messages sent by the user in Slack within a given time range.',
   parameters: myMessagesParams,
   annotations: {},
-  execute: async ({ username, since, until, count }) => {
-    const result = await generateMyMessagesSummary(
-      { username, since, until, count },
-      GlobalContext,
-    );
+  execute: async ({ since, until, count }) => {
+    const result = await generateMyMessagesSummary({ since, until, count }, GlobalContext);
     return result.markdown;
   },
 });

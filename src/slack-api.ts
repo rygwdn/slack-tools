@@ -5,32 +5,21 @@ import { getCookie } from './cookies.js';
 import { getTokens } from './tokens.js';
 import { GlobalContext, SlackContext } from './context';
 
-// Track if auth has been tested during this session
-// Exposed for testing purposes
-export let authTestedThisSession = false;
-
-/**
- * Reset the auth tested flag (for testing purposes)
- */
-export function resetAuthTestedFlag(value = false): void {
-  authTestedThisSession = value;
-}
-
-/**
- * Creates a WebClient instance with the provided configuration
- */
-function createWebClient(token: string, cookie: SlackCookie, context?: SlackContext): WebClient {
+function createWebClient(token: string, cookie: SlackCookie, context: SlackContext): WebClient {
   return new WebClient(token, {
     headers: {
       Cookie: `d=${cookie.value}`,
     },
-    logLevel: context?.debug ? LogLevel.DEBUG : LogLevel.ERROR,
+    rejectRateLimitedCalls: true,
+    logger: {
+      ...context.log,
+      setLevel: () => {},
+      getLevel: () => (context.debug ? LogLevel.DEBUG : LogLevel.ERROR),
+      setName: () => {},
+    },
   });
 }
 
-/**
- * Validates the auth by testing a token
- */
 async function validateAuth(auth: SlackAuth, context: SlackContext) {
   // Get the first token to test
   const firstToken = Object.values(auth.tokens)[0]?.token;
@@ -39,22 +28,20 @@ async function validateAuth(auth: SlackAuth, context: SlackContext) {
   }
 
   try {
-    // Test the token by calling auth.test API
     const client = createWebClient(firstToken, auth.cookie, context);
     const response = await client.auth.test();
 
     if (!response.ok) {
       throw new Error('Auth test failed: API returned not ok');
     }
+
+    context.currentUser = response;
   } catch (error) {
     console.error('Auth test API call failed:', error);
     throw new Error('Auth test failed: API call error');
   }
 }
 
-/**
- * Get fresh auth by fetching new tokens and cookie
- */
 async function getFreshAuth(context: SlackContext): Promise<SlackAuth> {
   const newAuth = {
     cookie: await getCookie(),
@@ -67,38 +54,25 @@ async function getFreshAuth(context: SlackContext): Promise<SlackAuth> {
   return newAuth;
 }
 
-/**
- * Validate stored auth and refresh if necessary
- * @returns The validated SlackAuth object
- */
 async function validateAndRefreshAuth(context: SlackContext): Promise<SlackAuth> {
   const storedAuth = await getStoredAuth();
 
   if (storedAuth?.cookie && storedAuth?.tokens) {
     try {
       await validateAuth(storedAuth, context);
-      // Mark auth as tested
-      authTestedThisSession = true;
       return storedAuth;
     } catch (error) {
       console.error('Auth error encountered, clearing stored credentials and retrying...', error);
       await clearStoredAuth();
       const newAuth = await getFreshAuth(context);
-      // Mark auth as tested
-      authTestedThisSession = true;
       return newAuth;
     }
   } else {
     const newAuth = await getFreshAuth(context);
-    // Mark auth as tested
-    authTestedThisSession = true;
     return newAuth;
   }
 }
 
-/**
- * Find a workspace token either by exact URL match or name from a provided SlackAuth
- */
 export function findWorkspaceToken(
   auth: SlackAuth,
   workspaceName: string,
@@ -160,7 +134,7 @@ export function findWorkspaceToken(
  */
 export async function getSlackClient(context: SlackContext = GlobalContext): Promise<WebClient> {
   // Get auth - validate on first call or use stored auth for subsequent calls
-  const auth = !authTestedThisSession
+  const auth = !context.currentUser
     ? await validateAndRefreshAuth(context)
     : (await getStoredAuth()) || (await getFreshAuth(context));
 

@@ -214,6 +214,3 @@ export async function getSlackEntityCache(
 
   return cache;
 }
-
-// Export the original function name for backward compatibility
-export const fetchUserAndChannelInfo = getSlackEntityCache;

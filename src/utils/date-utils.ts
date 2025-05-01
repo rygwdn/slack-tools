@@ -1,4 +1,4 @@
-import { GlobalContext, SlackContext } from '../context';
+import { GlobalContext } from '../context';
 
 /**
  * Parses a date string into a Unix timestamp (seconds).

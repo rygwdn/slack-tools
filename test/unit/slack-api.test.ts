@@ -1,13 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  getSlackClient,
-  findWorkspaceToken,
-  resetAuthTestedFlag,
-  authTestedThisSession,
-} from '../../src/slack-api';
+import { getSlackClient, findWorkspaceToken } from '../../src/slack-api';
 import { SlackContext } from '../../src/context';
-import { createTestContext } from '../../test-helpers';
-import { WebClient } from '@slack/web-api';
+import { AuthTestResponse, WebClient } from '@slack/web-api';
 
 // Mock keychain, tokens, and cookies
 vi.mock('../../src/keychain.js', () => ({
@@ -81,9 +75,6 @@ describe('slack-api', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Reset auth tested state
-    resetAuthTestedFlag(false);
-
     // Mock the stored auth
     vi.mocked(getStoredAuth).mockResolvedValue(mockAuth);
     vi.mocked(getTokens).mockResolvedValue(mockTokens);
@@ -95,8 +86,12 @@ describe('slack-api', () => {
       workspace: 'test-workspace',
       debug: true,
       hasWorkspace: true,
+      currentUser: { ok: true } as AuthTestResponse,
       log: {
         debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
       },
     };
 
@@ -109,9 +104,6 @@ describe('slack-api', () => {
     // Reset the auth.test mock
     mockAuthTest.mockReset();
     mockAuthTest.mockResolvedValue({ ok: true });
-
-    // Set auth flag to true to bypass validation in most tests
-    resetAuthTestedFlag(true);
   });
 
   afterEach(() => {
@@ -160,12 +152,16 @@ describe('slack-api', () => {
     it('should create a WebClient with correct token and cookie', async () => {
       await getSlackClient(context);
 
-      expect(WebClient).toHaveBeenCalledWith('xoxc-123456789', {
-        headers: {
-          Cookie: 'd=test-cookie-value',
-        },
-        logLevel: 'debug', // Since context.debug is true
-      });
+      expect(WebClient).toHaveBeenCalledWith(
+        'xoxc-123456789',
+        expect.objectContaining({
+          headers: {
+            Cookie: 'd=test-cookie-value',
+          },
+          rejectRateLimitedCalls: true,
+          logger: expect.anything(),
+        }),
+      );
     });
 
     it('should exit with error if token has invalid format', async () => {
@@ -197,14 +193,15 @@ describe('slack-api', () => {
       expect(WebClient).toHaveBeenCalledWith(
         'xoxc-123456789',
         expect.objectContaining({
-          logLevel: 'error', // Should be ERROR when debug is false
+          logger: expect.objectContaining({
+            getLevel: expect.any(Function),
+          }),
         }),
       );
     });
 
     it('should validate auth on first call', async () => {
-      // Reset auth flag to simulate first call
-      resetAuthTestedFlag(false);
+      context.currentUser = undefined;
 
       // Execute the function
       await getSlackClient(context);
@@ -213,12 +210,12 @@ describe('slack-api', () => {
       expect(mockAuthTest).toHaveBeenCalled();
 
       // Flag should be set after validation
-      expect(authTestedThisSession).toBe(true);
+      expect(context.currentUser).toBeDefined();
     });
 
     it('should not validate auth on subsequent calls', async () => {
       // First call
-      resetAuthTestedFlag(false);
+      context.currentUser = undefined;
       await getSlackClient(context);
       expect(mockAuthTest).toHaveBeenCalled();
 
@@ -233,8 +230,7 @@ describe('slack-api', () => {
     });
 
     it('should get fresh auth if validation fails', async () => {
-      // Reset auth flag
-      resetAuthTestedFlag(false);
+      context.currentUser = undefined;
 
       // Make auth test fail
       mockAuthTest.mockResolvedValueOnce({ ok: false });
@@ -249,13 +245,10 @@ describe('slack-api', () => {
       expect(storeAuth).toHaveBeenCalled();
 
       // Flag should be set after validation
-      expect(authTestedThisSession).toBe(true);
+      expect(context.currentUser).toBeDefined();
     });
 
     it('should use stored auth when already validated', async () => {
-      // Set auth flag to true to bypass validation
-      resetAuthTestedFlag(true);
-
       // Execute the function
       await getSlackClient(context);
 
@@ -267,9 +260,6 @@ describe('slack-api', () => {
     });
 
     it('should fall back to fresh auth if stored auth is null', async () => {
-      // Set auth flag to true to bypass validation
-      resetAuthTestedFlag(true);
-
       // Make getStoredAuth return null
       vi.mocked(getStoredAuth).mockResolvedValueOnce(null);
 

@@ -1,5 +1,5 @@
-- remove deprecated functions & files
-- replace call-tools by registering all the mcp tools as subcommands replacing the current duplicates. use a utility function to autogen the command reg from an mcp tool.
+- ~~remove deprecated functions & files~~ (completed)
+- ~~replace call-tools by registering all the mcp tools as subcommands replacing the current duplicates. use a utility function to autogen the command reg from an mcp tool.~~ (completed)
 - fold context into session
 
 - auth retrieval isn't working

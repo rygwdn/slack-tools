@@ -43,7 +43,7 @@ describe('User Profile MCP Tool', () => {
       isUltraRestricted: false,
     });
 
-    const result = await userProfileTool.execute({ user_id: 'U12345' }, vi.fn()() as any);
+    const result = await userProfileTool.execute({ user_id: 'U12345' });
 
     expect(result).toContain('## Slack User Profile: Test User');
     expect(result).toContain('- **User ID:** `U12345`');
@@ -59,8 +59,6 @@ describe('User Profile MCP Tool', () => {
   it('should throw an error when API call fails', async () => {
     vi.mocked(slackServices.getUserProfile).mockRejectedValueOnce(new Error('User not found'));
 
-    await expect(userProfileTool.execute({ user_id: 'U99999' }, vi.fn()() as any)).rejects.toThrow(
-      'User not found',
-    );
+    await expect(userProfileTool.execute({ user_id: 'U99999' })).rejects.toThrow('User not found');
   });
 });

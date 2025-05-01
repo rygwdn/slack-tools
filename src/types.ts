@@ -1,6 +1,6 @@
 import { SlackContext } from './context';
 import { Tool } from 'fastmcp';
-import { StandardSchemaV1 } from 'zod/lib/standard-schema';
+import { ZodObject, ZodRawShape } from 'zod';
 
 export interface WorkspaceToken {
   token: string;
@@ -43,8 +43,9 @@ export interface WorkspaceAuthOptions {
   context?: SlackContext;
 }
 
-export function tool<Params extends StandardSchemaV1>(
-  tool: Tool<Record<string, never>, Params>,
-): Tool<Record<string, never>, Params> {
+export function tool<
+  Params extends ZodRawShape,
+  TTool extends Required<Tool<Record<string, never> | undefined, ZodObject<Params>>>,
+>(tool: TTool): TTool {
   return tool;
 }

@@ -2,34 +2,34 @@ import { Level } from 'level';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import type { WorkspaceTokens, SlackConfig } from './types';
-import { SlackContext } from './context';
+import { GlobalContext, SlackContext } from './context';
+import { existsSync } from 'node:fs';
 
 /**
  * Get the path to Slack's LevelDB storage based on the platform
  */
 function getLevelDBPath(): string {
-  if (platform() === 'darwin') {
-    // Try both possible macOS paths
-    const paths = [
-      join(
-        homedir(),
-        'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb',
-      ),
-      join(homedir(), 'Library/Application Support/Slack/Local Storage/leveldb'),
-    ];
-
-    // Return the first path that exists
-    for (const path of paths) {
-      if (path) {
-        return path;
-      }
-    }
-    // If we get here, neither path worked
-    throw new Error("Could not find Slack's Local Storage directory on macOS");
-  } else if (platform() === 'linux') {
-    return join(homedir(), '.config/Slack/Local Storage/leveldb');
+  if (platform() !== 'darwin') {
+    throw new Error('only works on macOS');
   }
-  throw new Error('slacktokens only works on macOS or Linux.');
+
+  const paths = [
+    join(
+      homedir(),
+      'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb',
+    ),
+    join(homedir(), 'Library/Application Support/Slack/Local Storage/leveldb'),
+  ];
+
+  // Return the first path that exists
+  for (const path of paths) {
+    if (existsSync(path)) {
+      GlobalContext.log.debug(`Found leveldb path: ${path}`);
+      return path;
+    }
+  }
+
+  throw new Error("Could not find Slack's Local Storage directory");
 }
 
 /**
@@ -46,22 +46,25 @@ export async function getTokens(context?: SlackContext): Promise<WorkspaceTokens
     await db.open();
 
     // Find the localConfig entry
-    let configValue: string | undefined;
     const entries = await db.iterator().all();
 
-    for (const [key, value] of entries) {
-      const keyStr = key.toString();
-      if (keyStr.includes('localConfig_v2')) {
-        configValue = value.toString();
-        break;
-      }
-    }
+    const configValues = entries
+      .filter(([key]) => key.toString().includes('localConfig_v2'))
+      .map(([_, value]) => value.toString());
 
-    if (!configValue) {
+    GlobalContext.log.debug(
+      `Found ${configValues.length} localConfig_v2 values`,
+      configValues.map((v) => v.slice(0, 10)),
+    );
+
+    if (configValues.length === 0) {
       throw new Error("Slack's Local Storage not recognised: localConfig not found");
     }
+    if (configValues.length > 1) {
+      throw new Error('Slack has multiple localConfig_v2 values');
+    }
 
-    const config = JSON.parse(configValue.slice(1)) as SlackConfig;
+    const config = JSON.parse(configValues[0].slice(1)) as SlackConfig;
     const tokens: WorkspaceTokens = {};
 
     for (const team of Object.values(config.teams)) {

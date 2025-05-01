@@ -51,7 +51,7 @@ describe('User Search MCP Tool', () => {
 
   it('should search for users properly', async () => {
     // Call the execute function directly
-    const result = await userSearchTool.execute({ query: 'doe', limit: 10 }, vi.fn()() as any);
+    const result = await userSearchTool.execute({ query: 'doe', limit: 10 });
 
     // Verify the markdown content
     expect(result).toContain('User Search Results');
@@ -63,7 +63,7 @@ describe('User Search MCP Tool', () => {
 
   it('should handle empty query properly', async () => {
     // Call the execute function directly
-    const result = await userSearchTool.execute({ query: '', limit: 10 }, vi.fn()() as any);
+    const result = await userSearchTool.execute({ query: '', limit: 10 });
 
     expect(result).toContain('Please provide a search term');
   });
@@ -84,17 +84,14 @@ describe('User Search MCP Tool', () => {
     );
 
     // Call the execute function directly
-    const result = await userSearchTool.execute(
-      { query: 'nonexistent', limit: 10 },
-      vi.fn()() as any,
-    );
+    const result = await userSearchTool.execute({ query: 'nonexistent', limit: 10 });
 
     expect(result).toContain('No users found');
   });
 
   it('should include proper search formats in results', async () => {
     // Call the execute function directly
-    const result = await userSearchTool.execute({ query: 'doe', limit: 10 }, vi.fn()() as any);
+    const result = await userSearchTool.execute({ query: 'doe', limit: 10 });
 
     // Check for display names with spaces (quoted format)
     expect(result).toContain('from:"John Doe"');

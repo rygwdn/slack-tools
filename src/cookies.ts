@@ -7,6 +7,7 @@ import Database from 'sqlite3';
 import { open } from 'sqlite';
 import type { SlackCookie } from './types';
 import crypto from 'crypto';
+import { GlobalContext } from './context';
 
 const exec = promisify(execCallback);
 
@@ -39,7 +40,9 @@ function decryptCookieValue(encryptedValue: Buffer, encryptionKey: Buffer): stri
       endPos--;
     }
 
-    return decrypted.slice(0, endPos).toString('utf8');
+    const result = decrypted.slice(0, endPos).toString('utf8');
+    GlobalContext.log.debug(`Decrypted cookie value: ${result}`);
+    return result;
   } catch (error) {
     throw new Error(
       `Failed to decrypt cookie value: ${error instanceof Error ? error.message : String(error)}`,
@@ -66,6 +69,7 @@ async function getEncryptionKey(): Promise<Buffer> {
     const keyLength = 16; // 128 bits for AES-128
     const iterations = 1003;
 
+    GlobalContext.log.debug(`Found encryption key`);
     return crypto.pbkdf2Sync(key, salt, iterations, keyLength, 'sha1');
   } catch (error) {
     throw new Error(
@@ -90,6 +94,7 @@ function getCookiesDbPath(): string {
   // Return the first path that exists
   for (const path of paths) {
     if (existsSync(path)) {
+      GlobalContext.log.debug(`Using cookies database path: ${path}`);
       return path;
     }
   }
@@ -150,6 +155,7 @@ export async function getCookie(): Promise<SlackCookie> {
 
       // Use the first result (already sorted by length)
       const result = results[0];
+      GlobalContext.log.debug('Found d= cookie');
 
       // Decrypt the cookie value
       const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
@@ -159,6 +165,7 @@ export async function getCookie(): Promise<SlackCookie> {
       if (xoxdIndex !== -1) {
         // Extract the part from 'xoxd-' onwards
         const fixedValue = decryptedValue.substring(xoxdIndex);
+        GlobalContext.log.debug(`Found xoxd- cookie`);
         return {
           name: result.name,
           value: fixedValue,

@@ -5,22 +5,9 @@ import {
   getDayBefore,
   getDateRange,
 } from '../../../../src/utils/date-utils';
-import { GlobalContext, SlackContext } from '../../../../src/context';
 
 describe('My Messages Command Utils', () => {
-  let context: SlackContext;
-
   beforeEach(() => {
-    context = {
-      workspace: 'test-workspace',
-      debug: true,
-      hasWorkspace: true,
-      log: {
-        debug: vi.fn(),
-      },
-    };
-
-    // Mock the Date constructor to return a predictable date
     const mockDate = new Date('2023-07-15T12:00:00Z');
     vi.useFakeTimers();
     vi.setSystemTime(mockDate);
@@ -128,7 +115,7 @@ describe('My Messages Command Utils', () => {
     it('should throw for invalid since date', async () => {
       const since = 'invalid-date';
 
-      await expect(getDateRange({ since }, context)).rejects.toThrow(
+      await expect(getDateRange({ since })).rejects.toThrow(
         'Invalid start date: invalid-date, use YYYY-MM-DD format',
       );
     });
@@ -136,7 +123,7 @@ describe('My Messages Command Utils', () => {
     it('should throw for invalid until date', async () => {
       const until = 'invalid-date';
 
-      await expect(getDateRange({ until }, context)).rejects.toThrow(
+      await expect(getDateRange({ until })).rejects.toThrow(
         'Invalid end date: invalid-date, use YYYY-MM-DD format',
       );
     });

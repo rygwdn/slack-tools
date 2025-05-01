@@ -1,7 +1,15 @@
 import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
-import { mcp_tools } from './mcp-tools/tools-registry';
 import { version } from '../../package.json';
+import { myMessagesTool } from './mcp-tools/my-messages';
+import { searchTool } from './mcp-tools/search';
+import { setStatusTool } from './mcp-tools/status';
+import { getStatusTool } from './mcp-tools/status';
+import { reminderTool } from './mcp-tools/reminders';
+import { threadRepliesTool } from './mcp-tools/thread-replies';
+import { userActivityTool } from './mcp-tools/user-activity';
+import { userSearchTool } from './mcp-tools/user-search';
+import { userProfileTool } from './mcp-tools/user-profile';
 
 export function registerMcpCommand(program: Command): void {
   program
@@ -17,10 +25,15 @@ export function registerMcpCommand(program: Command): void {
         version: version as `${number}.${number}.${number}`,
       });
 
-      for (const tool of mcp_tools) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        server.addTool(tool as any);
-      }
+      server.addTool(myMessagesTool);
+      server.addTool(searchTool);
+      server.addTool(setStatusTool);
+      server.addTool(getStatusTool);
+      server.addTool(reminderTool);
+      server.addTool(threadRepliesTool);
+      server.addTool(userActivityTool);
+      server.addTool(userSearchTool);
+      server.addTool(userProfileTool);
 
       server.start({
         transportType: 'stdio',
