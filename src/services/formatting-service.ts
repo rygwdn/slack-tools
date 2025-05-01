@@ -24,10 +24,8 @@ export function generateSearchResultsMarkdown(
 
   GlobalContext.log.debug(`Processing ${messages.length} search results`);
 
-  // Group messages by channel
   const messagesByChannel = new Map<string, Match[]>();
 
-  // Sort messages by channel
   for (const message of messages) {
     const channelId = message.channel?.id || 'unknown';
     if (!messagesByChannel.has(channelId)) {
@@ -36,24 +34,20 @@ export function generateSearchResultsMarkdown(
     messagesByChannel.get(channelId)!.push(message);
   }
 
-  // Sort channels by name
   const sortedChannels = Array.from(messagesByChannel.keys()).sort((aId, bId) => {
     const aName = getFriendlyChannelName(aId, cache, userId);
     const bName = getFriendlyChannelName(bId, cache, userId);
     return aName.localeCompare(bName);
   });
 
-  // Add header for search results
   markdown += `# Search Results\n\n`;
 
-  // Generate markdown for each channel
   for (const channelId of sortedChannels) {
     const channelMessages = messagesByChannel.get(channelId)!;
     const channelName = getFriendlyChannelName(channelId, cache, userId);
 
     markdown += `## ${channelName}\n\n`;
 
-    // Sort messages by timestamp
     const sortedMessages = channelMessages.sort((a, b) => {
       if (!a.ts || !b.ts) return 0;
       return Number(a.ts) - Number(b.ts);
@@ -71,18 +65,14 @@ export function generateSearchResultsMarkdown(
         userName = cache.users[message.user].displayName;
       }
 
-      // Check if message is part of a thread
       let threadIndicator = '';
-      // Check thread information from permalink URL since thread_ts might not be directly available
       const messageTs = message.ts || '';
       const permalink = message.permalink || '';
 
-      // If the permalink contains thread_ts parameter, it's part of a thread
       if (permalink.includes('thread_ts=')) {
         const threadTsMatch = permalink.match(/thread_ts=([^&]+)/);
         const threadTs = threadTsMatch ? threadTsMatch[1] : '';
 
-        // If thread_ts in URL matches this message's ts, it's the start of a thread
         const isThreadStarter = threadTs === messageTs;
 
         if (isThreadStarter) {
@@ -92,18 +82,15 @@ export function generateSearchResultsMarkdown(
         }
       }
 
-      // Format the message with date, time, username, thread indicator, and link
       markdown += `- **${dateString}** [${timeString}](${message.permalink || ''}) **${userName}**:${threadIndicator} `;
 
-      // Format the message text
       const formattedText = formatSlackText(message.text || '', cache);
       const messageLines = formattedText.split('\n');
 
-      // First line goes after the header, additional lines indented
       markdown += messageLines[0] + '\n';
 
       if (messageLines.length > 1) {
-        const indent = '    '; // 4 spaces for markdown list alignment
+        const indent = '    ';
         markdown +=
           messageLines
             .slice(1)
@@ -111,7 +98,7 @@ export function generateSearchResultsMarkdown(
             .join('\n') + '\n';
       }
 
-      markdown += '\n'; // Extra space between messages
+      markdown += '\n';
     }
 
     markdown += '\n';

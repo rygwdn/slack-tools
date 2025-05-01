@@ -3,7 +3,6 @@ import { tool } from '../../types';
 import { performSlackSearch } from '../../services/slack-services';
 import { generateSearchResultsMarkdown } from '../../services/formatting-service';
 
-// Define the schema
 const searchParams = z.object({
   query: z
     .string()
@@ -18,19 +17,19 @@ const searchParams = z.object({
     .describe('Maximum number of results to return (1-1000). Default is 100.'),
 });
 
-/**
- * Tool for searching messages in Slack
- */
 export const searchTool = tool({
   name: 'slack_search',
   description:
     'Perform a search in Slack using standard Slack search syntax and return matching messages.',
   parameters: searchParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: 'Search Slack',
+  },
   execute: async ({ query, count }) => {
     const results = await performSlackSearch(query, count);
 
-    // Format the results as markdown
     const cache = {
       lastUpdated: Date.now(),
       channels: results.channels,

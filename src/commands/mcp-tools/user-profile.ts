@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { tool } from '../../types';
 import { getUserProfile } from '../../services/slack-services';
 
-// Define schema
 const userProfileParams = z.object({
   user_id: z
     .string()
@@ -11,18 +10,18 @@ const userProfileParams = z.object({
     ),
 });
 
-/**
- * Tool for fetching detailed user profile information from Slack
- */
 export const userProfileTool = tool({
   name: 'slack_get_user_profile',
   description: 'Fetch detailed profile information for a specific Slack user by their ID.',
   parameters: userProfileParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: 'Get Slack User Profile',
+  },
   execute: async ({ user_id }) => {
     const profile = await getUserProfile(user_id);
 
-    // Format as markdown
     let markdown = `## Slack User Profile: ${profile.displayName}\n\n`;
 
     markdown += '### Basic Information\n';

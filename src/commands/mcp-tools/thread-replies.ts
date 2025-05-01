@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { tool } from '../../types';
 import { getSlackThreadReplies } from '../../services/slack-services';
 
-// Define schema
 const threadRepliesParams = z.object({
   channel: z
     .string()
@@ -24,20 +23,18 @@ const threadRepliesParams = z.object({
     ),
 });
 
-// const val = threadRepliesParams.shape.limit._def.defaultValue();
-
-/**
- * Tool for fetching thread replies from Slack
- */
 export const threadRepliesTool = tool({
   name: 'slack_get_thread_replies',
   description: 'Fetch replies for a specific message thread in a Slack channel.',
   parameters: threadRepliesParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: 'Get Thread Replies',
+  },
   execute: async ({ channel, ts, limit }) => {
     const result = await getSlackThreadReplies(channel, ts, limit);
 
-    // Format as markdown
     let markdown = `## Thread Replies\n\n`;
 
     if (result.replies.length === 0) {

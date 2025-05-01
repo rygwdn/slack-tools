@@ -37,7 +37,6 @@ export interface MyMessagesSummaryResult {
  * - Messages sent to the user in multi-user channels/groups (unless the user participated in the thread)
  *
  * @param options Options for the summary generation
- * @param context Command context
  * @returns Generated summary result
  */
 export async function generateMyMessagesSummary(
@@ -56,7 +55,6 @@ export async function generateMyMessagesSummary(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
   );
 
-  // Search messages
   const { messages, threadMessages, mentionMessages } = await searchMessages(
     client,
     `<@${userId}>`,
@@ -70,18 +68,14 @@ export async function generateMyMessagesSummary(
   );
   GlobalContext.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
 
-  // Get user and channel information
   const cache = await getSlackEntityCache(client, allMessages);
 
   GlobalContext.log.debug('Formatting report...');
 
-  // Process and format messages
   const markdown = generateMarkdown(allMessages, cache, userId);
 
-  // Update cache last updated time
   cache.lastUpdated = Date.now();
 
-  // Save the cache for future use
   await saveSlackCache(cache);
 
   return {

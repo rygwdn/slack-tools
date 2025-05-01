@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { tool } from '../../types';
 import { createSlackReminder } from '../../services/slack-services';
 
-// Define schema
 const reminderParams = z.object({
   text: z.string().describe('The reminder text (what you want to be reminded about)'),
   time: z
@@ -18,14 +17,16 @@ const reminderParams = z.object({
     ),
 });
 
-/**
- * Tool for creating reminders in Slack
- */
 export const reminderTool = tool({
   name: 'slack_create_reminder',
   description: 'Create a reminder in Slack for yourself or another user.',
   parameters: reminderParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: false,
+    idempotentHint: false,
+    title: 'Create a reminder in Slack',
+  },
   execute: async ({ text, time, user }) => {
     const result = await createSlackReminder(text, time, user);
     return `

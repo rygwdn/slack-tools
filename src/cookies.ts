@@ -83,7 +83,6 @@ async function getEncryptionKey(): Promise<Buffer> {
  */
 function getCookiesDbPath(): string {
   const paths = [
-    // Slack stores cookies in a similar location to Chrome
     join(homedir(), 'Library/Application Support/Slack/Cookies'),
     join(
       homedir(),
@@ -91,7 +90,6 @@ function getCookiesDbPath(): string {
     ),
   ];
 
-  // Return the first path that exists
   for (const path of paths) {
     if (existsSync(path)) {
       GlobalContext.log.debug(`Using cookies database path: ${path}`);
@@ -109,7 +107,6 @@ export async function getCookie(): Promise<SlackCookie> {
     const dbPath = getCookiesDbPath();
     const encryptionKey = await getEncryptionKey();
 
-    // Open the SQLite database
     const db = await open({
       filename: dbPath,
       driver: Database.Database,
@@ -117,7 +114,6 @@ export async function getCookie(): Promise<SlackCookie> {
     });
 
     try {
-      // Get all 'd' cookies
       const results = await db.all(
         'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC',
       );
@@ -126,7 +122,6 @@ export async function getCookie(): Promise<SlackCookie> {
         throw new Error('Could not find any Slack "d" cookies in cookies database');
       }
 
-      // Check if there are multiple cookies with different tokens
       if (results.length > 1) {
         const uniqueTokens = new Set();
         const validResults = [];
@@ -153,17 +148,13 @@ export async function getCookie(): Promise<SlackCookie> {
         }
       }
 
-      // Use the first result (already sorted by length)
       const result = results[0];
       GlobalContext.log.debug('Found d= cookie');
 
-      // Decrypt the cookie value
       const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
 
-      // Check if the string contains xoxd but not at the beginning
       const xoxdIndex = decryptedValue.indexOf('xoxd-');
       if (xoxdIndex !== -1) {
-        // Extract the part from 'xoxd-' onwards
         const fixedValue = decryptedValue.substring(xoxdIndex);
         GlobalContext.log.debug(`Found xoxd- cookie`);
         return {

@@ -145,7 +145,6 @@ export function findWorkspaceToken(
  * Use this function to get a client that can be used to make any Slack API call
  */
 export async function getSlackClient(): Promise<WebClient> {
-  // Get auth - validate on first call or use stored auth for subsequent calls
   const auth = !GlobalContext.currentUser
     ? await validateAndRefreshAuth()
     : (await getStoredAuth()) || (await getFreshAuth());
@@ -157,16 +156,13 @@ export async function getSlackClient(): Promise<WebClient> {
     process.exit(1);
   }
 
-  // Find the workspace token using the auth
   const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
 
   GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
 
-  // Validate token has the correct prefix
   if (!token.startsWith('xoxc-')) {
     throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${token}`);
   }
 
-  // Create and return a web client with the token and cookie
   return createWebClient(token, cookie);
 }

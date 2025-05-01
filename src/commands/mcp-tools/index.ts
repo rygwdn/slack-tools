@@ -5,9 +5,6 @@ import { reminderTool } from './reminders';
 import { threadRepliesTool } from './thread-replies';
 import { userProfileTool } from './user-profile';
 
-/**
- * Central list of all MCP tools available in the application
- */
 export const mcpTools = [
   myMessagesTool,
   searchTool,
