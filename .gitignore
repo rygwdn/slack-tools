@@ -47,3 +47,5 @@ temp/
 # npm specific
 .npm/
 npm-debug.log
+
+**/.claude/settings.local.json

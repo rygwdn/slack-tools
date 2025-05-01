@@ -3,14 +3,7 @@
   - manual auth (use proxyman/chrome to find cookie & token)
   - recommend running with debug logging if auth fails
 
+- update docs on search
+- check annotations to tools
 - make consistent use of markdown formatter tool
-- user search isn't working
-- activity doesn't work.. - looks like it's using a userid?
 - channel names not resolving
-- user resolution should always be from:first.last no @
-  - ensure the query enhancer deals with this
-- ensure cookies are redacted in log output..
-- console.error should go to mcp
-- use UserError where approrpraite
-- add annotations
-- move the z.infer into mcptool. it should be able to take the parameters and shove it into the execute

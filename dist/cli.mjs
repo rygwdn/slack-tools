@@ -1312,44 +1312,6 @@ async function getSlackThreadReplies(channel, ts, limit) {
     throw new Error(`Getting thread replies failed: ${error}`);
   }
 }
-async function getSlackUserActivity(count, user) {
-  try {
-    GlobalContext.log.debug("Getting user activity for workspace:", GlobalContext.workspace);
-    if (user) {
-      GlobalContext.log.debug("User:", user);
-    }
-    const client = await getSlackClient();
-    let userId = user;
-    if (!userId) {
-      const authTest = await client.auth.test();
-      userId = authTest.user_id;
-      GlobalContext.log.debug("Using current user ID:", userId);
-    }
-    const query = `from:<@${userId}>`;
-    const messages = await searchSlackMessages(client, query, count);
-    GlobalContext.log.debug(`Found ${messages.length} messages for user`);
-    const cache = await getSlackEntityCache(client, messages);
-    const channelActivity = {};
-    messages.forEach((msg) => {
-      const channelId = msg.channel?.id || "unknown";
-      channelActivity[channelId] = (channelActivity[channelId] || 0) + 1;
-    });
-    const activityWithNames = Object.entries(channelActivity).map(([channelId, messageCount]) => ({
-      channelId,
-      channelName: cache.channels[channelId]?.displayName || "Unknown channel",
-      messageCount
-    }));
-    activityWithNames.sort((a, b) => b.messageCount - a.messageCount);
-    return {
-      userId,
-      totalMessages: messages.length,
-      channelBreakdown: activityWithNames,
-      timePeriod: `Last ${count} messages`
-    };
-  } catch (error) {
-    throw new Error(`Getting user activity failed: ${error}`);
-  }
-}
 async function getUserProfile(userId) {
   try {
     const client = await getSlackClient();
@@ -1626,48 +1588,6 @@ var threadRepliesTool = tool({
     return markdown;
   }
 });
-var userActivityParams = z.object({
-  count: z.number().int().optional().default(100).describe("Number of recent messages to analyze (1-1000). Default is 100."),
-  user: z.string().optional().describe(
-    `Slack user ID to analyze activity for (e.g. "U12345678"). If omitted, analyzes the current user's activity.`
-  )
-});
-var userActivityTool = tool({
-  name: "slack_user_activity",
-  description: "Analyze a Slack user's recent messaging activity and provide a summary by channel.",
-  parameters: userActivityParams,
-  annotations: {},
-  execute: async ({ count, user }) => {
-    const result = await getSlackUserActivity(count, user);
-    let markdown = `## User Activity Summary
-
-`;
-    markdown += `- **User:** ${result.userId}
-`;
-    markdown += `- **Total Messages:** ${result.totalMessages}
-`;
-    markdown += `- **Time Period:** ${result.timePeriod}
-
-`;
-    markdown += `### Channel Breakdown
-
-`;
-    if (result.channelBreakdown.length === 0) {
-      markdown += "No channel activity found.";
-    } else {
-      markdown += `| Channel | Message Count | % of Total |
-`;
-      markdown += `| ------- | ------------- | ---------- |
-`;
-      result.channelBreakdown.forEach((item) => {
-        const percentage = (item.messageCount / result.totalMessages * 100).toFixed(1);
-        markdown += `| ${item.channelName} | ${item.messageCount} | ${percentage}% |
-`;
-      });
-    }
-    return markdown;
-  }
-});
 var userProfileParams = z.object({
   user_id: z.string().describe(
     'Slack user ID to get profile information for. Must start with "U" followed by alphanumeric characters.'
@@ -1754,7 +1674,6 @@ function registerMcpCommand(program2) {
     server.addTool(getStatusTool);
     server.addTool(reminderTool);
     server.addTool(threadRepliesTool);
-    server.addTool(userActivityTool);
     server.addTool(userProfileTool);
     server.start({
       transportType: "stdio"
@@ -1849,7 +1768,6 @@ function registerCommands(program2) {
   registerToolAsCommand(program2, getStatusTool);
   registerToolAsCommand(program2, reminderTool);
   registerToolAsCommand(program2, threadRepliesTool);
-  registerToolAsCommand(program2, userActivityTool);
   registerToolAsCommand(program2, userProfileTool);
 }
 

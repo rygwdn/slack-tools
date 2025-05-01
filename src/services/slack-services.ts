@@ -216,65 +216,6 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
 }
 
 /**
- * Get user activity statistics
- */
-export async function getSlackUserActivity(count: number, user?: string) {
-  try {
-    GlobalContext.log.debug('Getting user activity for workspace:', GlobalContext.workspace);
-
-    if (user) {
-      GlobalContext.log.debug('User:', user);
-    }
-
-    // Get client
-    const client = await getSlackClient();
-
-    // Get user ID if not provided
-    let userId = user;
-    if (!userId) {
-      const authTest = await client.auth.test();
-      userId = authTest.user_id as string;
-      GlobalContext.log.debug('Using current user ID:', userId);
-    }
-
-    // Search for user's messages
-    const query = `from:<@${userId}>`;
-    const messages = await searchSlackMessages(client, query, count);
-
-    GlobalContext.log.debug(`Found ${messages.length} messages for user`);
-
-    // Get channel information
-    const cache = await getSlackEntityCache(client, messages);
-
-    // Create activity summary by channel
-    const channelActivity: Record<string, number> = {};
-    messages.forEach((msg) => {
-      const channelId = msg.channel?.id || 'unknown';
-      channelActivity[channelId] = (channelActivity[channelId] || 0) + 1;
-    });
-
-    // Add channel names to the activity data
-    const activityWithNames = Object.entries(channelActivity).map(([channelId, messageCount]) => ({
-      channelId,
-      channelName: cache.channels[channelId]?.displayName || 'Unknown channel',
-      messageCount,
-    }));
-
-    // Sort by message count (descending)
-    activityWithNames.sort((a, b) => b.messageCount - a.messageCount);
-
-    return {
-      userId,
-      totalMessages: messages.length,
-      channelBreakdown: activityWithNames,
-      timePeriod: `Last ${count} messages`,
-    };
-  } catch (error) {
-    throw new Error(`Getting user activity failed: ${error}`);
-  }
-}
-
-/**
  * Get detailed user profile information
  */
 export async function getUserProfile(userId: string) {

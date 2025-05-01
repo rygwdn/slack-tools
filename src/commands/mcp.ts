@@ -7,7 +7,6 @@ import { setStatusTool } from './mcp-tools/status';
 import { getStatusTool } from './mcp-tools/status';
 import { reminderTool } from './mcp-tools/reminders';
 import { threadRepliesTool } from './mcp-tools/thread-replies';
-import { userActivityTool } from './mcp-tools/user-activity';
 import { userProfileTool } from './mcp-tools/user-profile';
 import { getSlackClient } from '../slack-api';
 
@@ -35,7 +34,6 @@ export function registerMcpCommand(program: Command): void {
       server.addTool(getStatusTool);
       server.addTool(reminderTool);
       server.addTool(threadRepliesTool);
-      server.addTool(userActivityTool);
       server.addTool(userProfileTool);
 
       server.start({
