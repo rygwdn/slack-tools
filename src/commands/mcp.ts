@@ -1,13 +1,7 @@
 import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
 import { version } from '../../package.json';
-import { myMessagesTool } from './mcp-tools/my-messages';
-import { searchTool } from './mcp-tools/search';
-import { setStatusTool } from './mcp-tools/status';
-import { getStatusTool } from './mcp-tools/status';
-import { reminderTool } from './mcp-tools/reminders';
-import { threadRepliesTool } from './mcp-tools/thread-replies';
-import { userProfileTool } from './mcp-tools/user-profile';
+import { mcpTools } from './mcp-tools';
 import { getSlackClient } from '../slack-api';
 
 export function registerMcpCommand(program: Command): void {
@@ -28,13 +22,10 @@ export function registerMcpCommand(program: Command): void {
         version: version as `${number}.${number}.${number}`,
       });
 
-      server.addTool(myMessagesTool);
-      server.addTool(searchTool);
-      server.addTool(setStatusTool);
-      server.addTool(getStatusTool);
-      server.addTool(reminderTool);
-      server.addTool(threadRepliesTool);
-      server.addTool(userProfileTool);
+      // Add all MCP tools to the server
+      for (const tool of mcpTools) {
+        server.addTool(tool);
+      }
 
       server.start({
         transportType: 'stdio',
