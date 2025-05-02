@@ -1,48 +1,7 @@
 import { getSlackClient } from '../slack-api';
-import { searchSlackMessages } from '../commands/my_messages/slack-service';
-import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
-import { saveSlackCache } from '../cache';
+import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
 import { GlobalContext } from '../context';
 
-/**
- * Search for messages in Slack
- */
-export async function performSlackSearch(query: string, count: number) {
-  try {
-    // Get workspace and client
-    const client = await getSlackClient();
-
-    // Get user ID
-    const authTest = await client.auth.test();
-    const userId = authTest.user_id as string;
-
-    // Search messages
-    GlobalContext.log.debug(`Searching messages with query: ${query}`);
-    const messages = await searchSlackMessages(client, query, count);
-
-    GlobalContext.log.debug(`Found ${messages.length} matching messages. Fetching details...`);
-
-    // Get user and channel information
-    const cache = await getSlackEntityCache(client, messages);
-
-    // Update and save the cache
-    cache.lastUpdated = Date.now();
-    await saveSlackCache(cache);
-
-    return {
-      messages,
-      userId,
-      channels: cache.channels,
-      users: cache.users,
-    };
-  } catch (error) {
-    throw new Error(`Search failed: ${error}`);
-  }
-}
-
-/**
- * Format an emoji string with proper colons
- */
 export function formatEmoji(emoji: string): string {
   if (!emoji) return '';
 
@@ -203,12 +162,11 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
     }));
 
     // Get user and channel information
-    const cache = await getSlackEntityCache(client, normalizedMessages);
+    const cache = await getCacheForMessages(client, normalizedMessages);
 
     return {
       replies: messages,
-      channels: cache.channels,
-      users: cache.users,
+      entities: cache.entities,
     };
   } catch (error) {
     throw new Error(`Getting thread replies failed: ${error}`);

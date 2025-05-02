@@ -4,15 +4,16 @@ import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse
 
 // Extend Match type only for the thread-related fields we need
 export interface ThreadMessage extends Match {
-  thread_ts?: string;
-  threadMessages?: ThreadMessage[];
+  // thread_ts?: string;
+  threadMessages?: Match[];
   // Indicator if this message has replies
-  hasReplies?: boolean;
+  // hasReplies?: boolean;
   // Thread permalink for linking directly to thread
-  threadPermalink?: string;
+  // threadPermalink?: string;
 }
 
 export interface SlackUserInfo {
+  type: 'user';
   displayName: string;
   isBot: boolean;
 }
@@ -20,16 +21,15 @@ export interface SlackUserInfo {
 export interface SlackChannelInfo {
   displayName: string;
   type: 'channel' | 'im' | 'mpim' | 'group';
-  members?: string[];
+  members: string[];
 }
 
 export interface SlackCache {
+  version: number;
   lastUpdated: number;
-  users: {
-    [userId: string]: SlackUserInfo;
-  };
-  channels: {
-    [channelId: string]: SlackChannelInfo;
+  lastWorkspace?: string;
+  entities: {
+    [id: string]: SlackChannelInfo | SlackUserInfo;
   };
 }
 

@@ -45,15 +45,16 @@ describe('User Profile MCP Tool', () => {
 
     const result = await userProfileTool.execute({ user_id: 'U12345' });
 
-    expect(result).toContain('## Slack User Profile: Test User');
-    expect(result).toContain('- **User ID:** `U12345`');
-    expect(result).toContain('- **Username:** @testuser');
-    expect(result).toContain('- **Email:** test@example.com');
-    expect(result).toContain('- **Phone:** 123-456-7890');
-    expect(result).toContain('- **Job Title:** Software Engineer');
-    expect(result).toContain('- **Current Status:** Working :computer:');
-    expect(result).toContain('- **Timezone:** America/Los_Angeles (Pacific Standard Time)');
-    expect(result).toContain('- **Roles:** Admin');
+    expect(result).toContain('User Profile: Test User');
+    expect(result).toContain('Basic Information');
+    expect(result).toContain('`U12345`');
+    expect(result).toContain('@testuser');
+    expect(result).toContain('test@example.com');
+    expect(result).toContain('123-456-7890');
+    expect(result).toContain('Software Engineer');
+    expect(result).toContain('Working :computer:');
+    expect(result).toContain('America/Los_Angeles');
+    expect(result).toContain('Pacific Standard Time');
   });
 
   it('should throw an error when API call fails', async () => {

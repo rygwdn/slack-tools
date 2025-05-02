@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { readFileSync, promises, existsSync as existsSync$1 } from 'fs';
+import { readFileSync, existsSync, promises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import keytar from 'keytar';
@@ -13,7 +13,7 @@ import Database from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
 import { Level } from 'level';
-import { existsSync } from 'node:fs';
+import { existsSync as existsSync$1 } from 'node:fs';
 import { homedir } from 'os';
 import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
@@ -149,7 +149,6 @@ async function getEncryptionKey() {
 }
 function getCookiesDbPath() {
   const paths = [
-    // Slack stores cookies in a similar location to Chrome
     join$1(homedir$1(), "Library/Application Support/Slack/Cookies"),
     join$1(
       homedir$1(),
@@ -157,7 +156,7 @@ function getCookiesDbPath() {
     )
   ];
   for (const path of paths) {
-    if (existsSync$1(path)) {
+    if (existsSync(path)) {
       GlobalContext.log.debug(`Using cookies database path: ${path}`);
       return path;
     }
@@ -241,7 +240,7 @@ function getLevelDBPath() {
     join$1(homedir$1(), "Library/Application Support/Slack/Local Storage/leveldb")
   ];
   for (const path of paths) {
-    if (existsSync(path)) {
+    if (existsSync$1(path)) {
       GlobalContext.log.debug(`Found leveldb path: ${path}`);
       return path;
     }
@@ -294,68 +293,6 @@ async function getTokens() {
     }
   }
 }
-var CONFIG_DIR = join(homedir(), ".slack-tools");
-var CONFIG_FILE = join(CONFIG_DIR, "config.json");
-var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
-var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
-var DEFAULT_CONFIG = {
-  lastWorkspace: null
-};
-async function ensureConfigDir() {
-  try {
-    await promises.mkdir(CONFIG_DIR, { recursive: true });
-  } catch (error) {
-    console.error("Failed to create config directory:", error);
-    throw new Error(`Could not create cache directory: ${error.message}`);
-  }
-}
-async function loadConfig() {
-  await ensureConfigDir();
-  try {
-    const data = await promises.readFile(CONFIG_FILE, "utf8");
-    return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return DEFAULT_CONFIG;
-    }
-    console.error("Failed to load config:", error);
-    return DEFAULT_CONFIG;
-  }
-}
-async function saveConfig(config) {
-  await ensureConfigDir();
-  try {
-    await promises.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
-  } catch (error) {
-    console.error("Failed to save config:", error);
-    throw new Error(`Could not save cache configuration: ${error.message}`);
-  }
-}
-async function getLastWorkspace() {
-  const config = await loadConfig();
-  return config.lastWorkspace;
-}
-async function setLastWorkspace(workspace) {
-  const config = await loadConfig();
-  config.lastWorkspace = workspace;
-  await saveConfig(config);
-}
-async function loadSlackCache(cacheFile = SLACK_CACHE_FILE, ttl = SLACK_CACHE_TTL) {
-  try {
-    await ensureConfigDir();
-    const data = await promises.readFile(cacheFile, "utf-8");
-    const cache = JSON.parse(data);
-    if (Date.now() - cache.lastUpdated < ttl) {
-      return cache;
-    }
-  } catch {
-  }
-  return null;
-}
-async function saveSlackCache(cache, cacheFile = SLACK_CACHE_FILE) {
-  await ensureConfigDir();
-  await promises.writeFile(cacheFile, JSON.stringify(cache, null, 2));
-}
 
 // src/utils/log-utils.ts
 function redactMatch(match) {
@@ -372,6 +309,53 @@ function redact(message) {
 }
 function redactLog(...args) {
   return args.map(redact);
+}
+var CONFIG_DIR = join(homedir(), ".slack-tools");
+var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
+var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
+async function ensureConfigDir() {
+  try {
+    await promises.mkdir(CONFIG_DIR, { recursive: true });
+  } catch (error) {
+    GlobalContext.log.error("Failed to create config directory:", error);
+    throw new Error(`Could not create cache directory: ${error.message}`);
+  }
+}
+function isCacheValid(cache, ttl) {
+  return cache.version === 1 && cache.lastUpdated > Date.now() - ttl && cache.entities && cache.lastUpdated > 0;
+}
+async function readCache(cacheFile, ttl) {
+  if (!existsSync(cacheFile)) {
+    GlobalContext.log.debug(`Cache for ${cacheFile} does not exist`);
+    return null;
+  }
+  const data = await promises.readFile(cacheFile, "utf-8");
+  const cache = JSON.parse(data);
+  if (!isCacheValid(cache, ttl)) {
+    GlobalContext.log.debug(`Cache for ${cacheFile} is invalid`);
+    return null;
+  }
+  return cache;
+}
+async function loadSlackCache() {
+  if (GlobalContext.cache && isCacheValid(GlobalContext.cache, SLACK_CACHE_TTL)) {
+    return GlobalContext.cache;
+  }
+  const cache = await readCache(SLACK_CACHE_FILE, SLACK_CACHE_TTL) || {
+    version: 1,
+    entities: {},
+    lastUpdated: 0,
+    lastWorkspace: GlobalContext.workspace
+  };
+  GlobalContext.cache = cache;
+  GlobalContext.log.debug(`Loaded cache from ${SLACK_CACHE_FILE}`);
+  return cache;
+}
+async function saveSlackCache(lastWorkspace) {
+  const cache = await loadSlackCache();
+  cache.lastWorkspace = GlobalContext.workspace;
+  await ensureConfigDir();
+  await promises.writeFile(SLACK_CACHE_FILE, JSON.stringify(cache));
 }
 
 // src/slack-api.ts
@@ -405,7 +389,6 @@ async function validateAuth(auth) {
       throw new Error("Auth test failed: API returned not ok");
     }
     GlobalContext.currentUser = response;
-    setLastWorkspace(GlobalContext.workspace);
   } catch (error) {
     console.error("Auth test API call failed:", error);
     throw new Error("Auth test failed: API call error");
@@ -487,6 +470,7 @@ async function getSlackClient() {
     console.error("  - Use -l, --last-workspace to use your most recently used workspace");
     process.exit(1);
   }
+  await saveSlackCache();
   const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
   GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
   if (!token.startsWith("xoxc-")) {
@@ -603,6 +587,11 @@ async function resolveUserForSearch(client, userIdentifier) {
     return userIdentifier;
   }
   const cleanIdentifier = userIdentifier.replace(/^@/, "").replace(/^"(.*)"$/, "$1");
+  if (cleanIdentifier === "me" && GlobalContext.currentUser) {
+    return `<@${GlobalContext.currentUser.user_id}>`;
+  } else if (cleanIdentifier === "me") {
+    return "@me";
+  }
   if (/^U[A-Z0-9]{8,}$/.test(cleanIdentifier)) {
     return `<@${cleanIdentifier}>`;
   }
@@ -661,163 +650,255 @@ async function searchSlackMessages(client, query, count) {
   GlobalContext.log.debug(`Original search query: ${query}`);
   const enhancedQuery = await enhanceSearchQuery(client, query);
   GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
-  const searchResults = await client.search.messages({
-    query: enhancedQuery,
-    sort: "timestamp",
-    sort_dir: "asc",
-    count
-  });
-  return searchResults.messages?.matches || [];
+  const matches = [];
+  let pages = 1;
+  for (let page = 1; page <= pages && matches.length < count; page++) {
+    const searchResults = await client.search.messages({
+      query: enhancedQuery,
+      sort: "timestamp",
+      sort_dir: "asc",
+      count,
+      page
+    });
+    if (!searchResults.messages?.matches?.length) {
+      break;
+    }
+    matches.push(...searchResults.messages.matches);
+    if (searchResults.messages?.paging?.pages) {
+      pages = searchResults.messages.paging.pages;
+    }
+  }
+  return matches;
 }
 
 // src/commands/my_messages/slack-entity-cache.ts
-function extractEntitiesFromMessages(messages) {
-  const userIds = /* @__PURE__ */ new Set();
-  const channelIds = /* @__PURE__ */ new Set();
+function extractEntityIds(messages) {
+  const ids = /* @__PURE__ */ new Set();
   for (const message of messages) {
-    if (message.user) userIds.add(message.user);
-    if (message.channel?.id) channelIds.add(message.channel.id);
-    const userMentionRegex = /<@([A-Z0-9]+)>/g;
-    const userMentions = message.text?.match(userMentionRegex) || [];
-    for (const mention of userMentions) {
-      const userId = mention.slice(2, -1);
-      userIds.add(userId);
-    }
-    const channelMentionRegex = /<#([A-Z0-9]+)(\|[^>]+)?>/g;
-    const channelMentions = (message.text || "").match(channelMentionRegex) || [];
-    for (const mention of channelMentions) {
-      const channelId = mention.slice(2).split("|")[0];
-      channelIds.add(channelId);
+    if (message.user) ids.add(`@${message.user}`);
+    if (message.channel?.id) ids.add(`#${message.channel.id}`);
+    const mentionsRegex = /<([#@][A-Z0-9]+)(\|[^>]+)?>/g;
+    const matches = message.text?.matchAll(mentionsRegex) || [];
+    for (const match of matches) {
+      ids.add(match[1]);
     }
   }
-  return { userIds, channelIds };
+  return ids;
 }
-async function fetchAndCacheUsers(client, userIds, cache, isCacheLoaded) {
-  for (const userId of userIds) {
+async function fetchEntityInfo(id, loadingContext) {
+  const typeChar = id[0];
+  const typeId = id.slice(1);
+  if (loadingContext.cache.entities[typeId]) {
+    return;
+  }
+  if (loadingContext.pendingIds[typeId]) {
+    await loadingContext.pendingIds[typeId];
+    return;
+  }
+  const promise = (async () => {
     try {
-      const userResponse = await client.users.info({ user: userId });
-      if (userResponse.ok && userResponse.user) {
-        cache.users[userId] = {
-          displayName: userResponse.user.real_name || userResponse.user.name || userId,
-          isBot: !!userResponse.user.is_bot || (userResponse.user.name || "").includes("bot")
-        };
-        if (isCacheLoaded) {
-          GlobalContext.log.debug(
-            `Added missing user to cache: ${cache.users[userId].displayName}`
-          );
-        }
+      if (typeChar === "@") {
+        await fetchUser(typeId, loadingContext);
+      } else if (typeChar === "#") {
+        await fetchChannel(typeId, loadingContext);
+      } else {
+        throw new Error(`Unknown entity type: ${id}`);
       }
     } catch (error) {
-      GlobalContext.log.debug(`Could not fetch info for user ${userId}:`, error);
+      GlobalContext.log.warn(`Could not fetch info for entity ${id}:`, error);
     }
-  }
+  })();
+  loadingContext.pendingIds[id] = promise;
+  await promise;
 }
-async function fetchDmUserInfo(client, userId, cache, isCacheLoaded) {
-  if (!cache.users[userId]) {
-    try {
-      const userResponse = await client.users.info({ user: userId });
-      if (userResponse.ok && userResponse.user) {
-        cache.users[userId] = {
-          displayName: userResponse.user.real_name || userResponse.user.name || userId,
-          isBot: !!userResponse.user.is_bot || (userResponse.user.name || "").includes("bot")
-        };
-        if (isCacheLoaded) {
-          GlobalContext.log.debug(
-            `Added missing DM user to cache: ${cache.users[userId].displayName}`
-          );
-        }
-      }
-    } catch (error) {
-      GlobalContext.log.debug(`Could not fetch info for DM user ${userId}:`, error);
-    }
+async function fetchUser(userId, loadingContext) {
+  const userResponse = await loadingContext.client.users.info({ user: userId });
+  if (!userResponse.ok || !userResponse.user) {
+    GlobalContext.log.warn(`Could not fetch info for DM user ${userId}:`, userResponse);
+    return;
   }
-}
-async function fetchChannelMembers(client, channelId) {
-  try {
-    const result = await client.conversations.members({ channel: channelId });
-    return result.members || [];
-  } catch (error) {
-    GlobalContext.log.debug(`Could not fetch members for channel ${channelId}:`, error);
-    return void 0;
-  }
-}
-async function fetchAndCacheChannels(client, channelIds, cache, isCacheLoaded, userIds) {
-  for (const channelId of channelIds) {
-    try {
-      const conversationResponse = await client.conversations.info({ channel: channelId });
-      if (conversationResponse.ok && conversationResponse.channel) {
-        const channel = conversationResponse.channel;
-        const channelName = channel.name || channelId;
-        let members = void 0;
-        if (channel.is_im) {
-          const otherUserId = "user" in channel ? channel.user : void 0;
-          if (otherUserId) {
-            userIds.add(otherUserId);
-            await fetchDmUserInfo(client, otherUserId, cache, isCacheLoaded);
-            members = [otherUserId];
-          }
-        } else if (channel.is_mpim) {
-          members = await fetchChannelMembers(client, channelId);
-        }
-        cache.channels[channelId] = {
-          displayName: channelName,
-          type: channel.is_im ? "im" : channel.is_mpim ? "mpim" : "channel",
-          members
-        };
-        if (isCacheLoaded) {
-          GlobalContext.log.debug(`Added missing channel to cache: ${channelName}`);
-        }
-      }
-    } catch (error) {
-      GlobalContext.log.debug(`Could not fetch info for channel ${channelId}:`, error);
-    }
-  }
-}
-async function initializeCache() {
-  return await loadSlackCache() || {
-    users: {},
-    channels: {},
-    lastUpdated: 0
+  loadingContext.cache.entities[userId] = {
+    displayName: userResponse.user.real_name || userResponse.user.name || userId,
+    isBot: !!userResponse.user.is_bot || (userResponse.user.name || "").includes("bot"),
+    type: "user"
   };
+  GlobalContext.log.debug(
+    `Added missing DM user to cache: ${loadingContext.cache.entities[userId].displayName}`
+  );
 }
-async function getSlackEntityCache(client, messages) {
-  const cache = await initializeCache();
-  const isCacheLoaded = cache.lastUpdated > 0;
-  const { userIds, channelIds } = extractEntitiesFromMessages(messages);
-  const missingUserIds = Array.from(userIds).filter((id) => !cache.users[id]);
-  const missingChannelIds = Array.from(channelIds).filter((id) => !cache.channels[id]);
-  if (isCacheLoaded) {
-    GlobalContext.log.debug(
-      "Using cached user and channel information with updates for missing entries"
-    );
-    GlobalContext.log.debug(
-      `Found ${missingUserIds.length} users and ${missingChannelIds.length} channels missing from cache`
-    );
-  } else {
-    GlobalContext.log.debug("No cache found, fetching all user and channel information");
+async function fetchChannel(channelId, loadingContext) {
+  const conversationResponse = await loadingContext.client.conversations.info({
+    channel: channelId
+  });
+  if (!conversationResponse.ok || !conversationResponse.channel) {
+    GlobalContext.log.warn(`Could not fetch info for channel ${channelId}`);
+    return;
   }
-  await fetchAndCacheUsers(client, missingUserIds, cache, isCacheLoaded);
-  await fetchAndCacheChannels(client, missingChannelIds, cache, isCacheLoaded, userIds);
+  const channel = conversationResponse.channel;
+  const channelName = channel.name || channelId;
+  const members = "members" in channel ? channel.members : [];
+  if ("user" in channel) {
+    members.push(channel.user);
+  }
+  await Promise.all(members.map((member) => fetchUser(member, loadingContext)));
+  loadingContext.cache.entities[channelId] = {
+    displayName: channelName,
+    type: channel.is_im ? "im" : channel.is_mpim ? "mpim" : "channel",
+    members
+  };
+  GlobalContext.log.debug(`Added missing channel to cache: ${channelName}`);
+}
+async function getCacheForMessages(client, messages) {
+  const cache = await loadSlackCache();
+  const ids = extractEntityIds(messages);
+  const loadingContext = {
+    pendingIds: {},
+    cache,
+    client
+  };
+  await Promise.all(Array.from(ids).map((id) => fetchEntityInfo(id, loadingContext)));
   cache.lastUpdated = Date.now();
-  await saveSlackCache(cache);
+  await saveSlackCache();
   return cache;
 }
 
-// src/commands/my_messages/formatters.ts
-function getFriendlyChannelName(channelId, cache, userId) {
-  const channel = cache.channels[channelId];
+// src/utils/markdown-utils.ts
+function objectToMarkdown(obj) {
+  return [...objectToMarkdownLines(obj, 1, true)].join("\n");
+}
+function* objectToMarkdownLines(obj, level = 1, previousWasHeading = false) {
+  if (isLines(obj)) {
+    for (const part of obj) {
+      if (typeof part === "string") {
+        yield part;
+      } else {
+        yield* objectToMarkdownLines(part, level + 1);
+      }
+    }
+  } else if (isKeyValue(obj)) {
+    for (const [key, keyValue] of Object.entries(obj)) {
+      yield `**${key}**: ${keyValue}`;
+    }
+  } else if (isHeader(obj)) {
+    for (const [heading, parts] of Object.entries(obj)) {
+      const headingLevel = Math.min(level, 6);
+      const headingPrefix = "#".repeat(headingLevel) + " ";
+      if (!previousWasHeading) {
+        yield "";
+      }
+      yield headingPrefix + heading;
+      yield "";
+      yield* objectToMarkdownLines(parts, level + 1, true);
+      previousWasHeading = false;
+    }
+  } else {
+    assertNever(obj);
+  }
+}
+function isKeyValue(obj) {
+  return typeof obj === "object" && obj !== null && !Array.isArray(obj) && Object.values(obj).every((v) => typeof v === "string");
+}
+function isLines(obj) {
+  return Array.isArray(obj);
+}
+function isHeader(obj) {
+  return typeof obj === "object" && obj !== null && !isLines(obj) && !isKeyValue(obj);
+}
+function assertNever(_value) {
+  throw new Error(
+    `ERROR! Reached forbidden guard function with unexpected value: ${JSON.stringify(_value)}`
+  );
+}
+
+// src/services/formatting-service.ts
+function generateSearchResultsMarkdown(messages, cache) {
+  if (messages.length === 0) {
+    GlobalContext.log.debug("No search results found");
+    return "No messages found matching your search criteria.";
+  }
+  GlobalContext.log.debug(`Processing ${messages.length} search results`);
+  const messagesByChannel = /* @__PURE__ */ new Map();
+  for (const message of messages) {
+    const channelName = getFriendlyChannelName(message.channel?.id || "unknown", cache);
+    const channelMessages = messagesByChannel.get(channelName) || [];
+    channelMessages.push(message);
+    messagesByChannel.set(channelName, channelMessages);
+  }
+  const sortedChannels = Array.from(messagesByChannel.entries()).sort((a, b) => {
+    return a[0].localeCompare(b[0]);
+  });
+  const searchResults = {};
+  for (const [channelName, channelMessages] of sortedChannels) {
+    searchResults[channelName] = [];
+    const sortedMessages = channelMessages.sort((a, b) => {
+      return Number(a.ts) - Number(b.ts);
+    });
+    for (const message of sortedMessages) {
+      if (!message.ts) continue;
+      searchResults[channelName].push(...formatMessage(message, cache));
+    }
+  }
+  return objectToMarkdown({
+    "Search Results": searchResults
+  });
+}
+function formatMessage(message, cache, { includeThreadLinks = true } = {}) {
+  const timestamp = new Date(Number(message.ts) * 1e3);
+  const dateString = timestamp.toLocaleDateString();
+  const timeString = formatTime(timestamp);
+  let userName = message.username || "Unknown User";
+  if (message.user && cache.entities[message.user]) {
+    userName = cache.entities[message.user].displayName;
+  }
+  const messageTs = message.ts || "";
+  const permalink = message.permalink || "";
+  const formattedText = formatSlackText(message.text || "", cache);
+  const messageLines = formattedText.split("\n");
+  let threadIndicator = "";
+  if (permalink.includes("thread_ts=") && includeThreadLinks) {
+    const threadTsMatch = permalink.match(/thread_ts=([^&]+)/);
+    const threadTs = threadTsMatch ? threadTsMatch[1] : "";
+    const isThreadStarter = threadTs === messageTs;
+    if (isThreadStarter) {
+      threadIndicator = ` (\u{1F4AC} Start of Thread)`;
+    } else {
+      threadIndicator = ` (\u{1F4AC} Part of Thread)`;
+    }
+  }
+  const formattedLines = [
+    `- **${dateString}** [${timeString}](${permalink})${threadIndicator} **${userName}**: ${messageLines[0]}`
+  ];
+  messageLines.slice(1).forEach((line) => {
+    formattedLines.push(line);
+  });
+  return formattedLines;
+}
+function formatStatusOutput(status) {
+  if (!status.status && !status.emoji) {
+    return "No status is currently set.\n";
+  }
+  return objectToMarkdown({
+    [`Current Slack Status`]: {
+      status: status.status,
+      emoji: status.emoji,
+      expirationTime: status.expirationTime ? new Date(status.expirationTime).toLocaleString() : "Never"
+    }
+  });
+}
+function getFriendlyChannelName(channelId, cache) {
+  const channel = cache.entities[channelId];
   if (!channel) return channelId;
   if (channel.type === "channel") {
     return `#${channel.displayName}`;
   }
   if (channel.type === "im" && channel.members && channel.members.length > 0) {
     const otherUserId = channel.members[0];
-    const otherUser = cache.users[otherUserId];
+    const otherUser = cache.entities[otherUserId];
     const displayName = otherUser ? otherUser.displayName : channel.displayName;
     return `DM with ${displayName}`;
   }
   if (channel.type === "mpim" && channel.members) {
-    const memberNames = channel.members.filter((id) => id !== userId).map((id) => cache.users[id]?.displayName || id).join(", ");
+    const memberNames = channel.members.filter((id) => id !== GlobalContext.currentUser?.user_id).map((id) => cache.entities[id]?.displayName || id).join(", ");
     return `Group DM with ${memberNames}`;
   }
   return channelId;
@@ -825,7 +906,7 @@ function getFriendlyChannelName(channelId, cache, userId) {
 function formatSlackText(text, cache) {
   if (!text) return "";
   text = text.replace(/<@([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, userId, displayName) => {
-    const user = cache.users[userId];
+    const user = cache.entities[userId];
     if (user) {
       return `@${user.displayName}`;
     } else if (displayName) {
@@ -835,7 +916,7 @@ function formatSlackText(text, cache) {
   });
   text = text.replace(/<#([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, channelId, channelName) => {
     if (channelName) return `#${channelName}`;
-    const channel = cache.channels[channelId];
+    const channel = cache.entities[channelId];
     return channel ? `#${channel.displayName}` : match;
   });
   text = text.replace(/<((?:https?:\/\/)[^|>]+)\|([^>]+)>/g, "[$2]($1)");
@@ -847,9 +928,6 @@ function formatTime(date) {
   const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
 }
-function isValidThreadMessage(message) {
-  return typeof message.ts === "string";
-}
 function extractThreadTsFromPermalink(permalink) {
   if (!permalink) return void 0;
   try {
@@ -859,21 +937,23 @@ function extractThreadTsFromPermalink(permalink) {
     return void 0;
   }
 }
+
+// src/commands/my_messages/formatters.ts
 function shouldIncludeChannel(channelId, messages, cache, userId) {
   const hasMyMessage = messages.some((msg) => {
     const hasMyDirectMessage = msg.user === userId;
     const hasMyThreadReply = msg.threadMessages?.some((reply) => reply.user === userId) ?? false;
     return hasMyDirectMessage || hasMyThreadReply;
   });
-  const channel = cache.channels[channelId];
+  const channel = cache.entities[channelId];
   if (!channel) return true;
   if (channel.type === "im") {
-    const dmUser = cache.users[channel.members?.[0] || ""];
-    const isBot = dmUser?.isBot || false;
+    const dmUser = cache.entities[channel.members?.[0] || ""];
+    const isBot = dmUser?.type === "user" && dmUser.isBot;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
       GlobalContext.log.debug(
-        `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`
+        `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache)}`
       );
     }
     return shouldKeep;
@@ -881,225 +961,84 @@ function shouldIncludeChannel(channelId, messages, cache, userId) {
   return true;
 }
 function organizeMessagesIntoThreads(messages) {
-  const threadMap = /* @__PURE__ */ new Map();
-  const standaloneMessages = [];
+  const messageByThread = /* @__PURE__ */ new Map();
   for (const message of messages) {
-    if (!isValidThreadMessage(message)) {
-      GlobalContext.log.debug("Skipping message without timestamp");
-      continue;
-    }
-    const threadTs = message.thread_ts || extractThreadTsFromPermalink(message.permalink);
-    let threadPermalink = void 0;
-    let isThreadParent = false;
-    if (message.permalink) {
-      if (message.permalink.includes("thread_ts=")) {
-        threadPermalink = message.permalink;
-        isThreadParent = message.permalink.includes(`thread_ts=${message.ts}`);
-      } else if (threadTs) {
-        try {
-          const url = new URL(message.permalink);
-          url.searchParams.set("thread_ts", threadTs);
-          threadPermalink = url.toString();
-        } catch {
-          threadPermalink = message.permalink;
-        }
-      }
-    }
-    if (threadTs && message.ts !== threadTs) {
-      if (!threadMap.has(threadTs)) {
-        threadMap.set(threadTs, []);
-      }
-      const thread = threadMap.get(threadTs);
-      if (!thread.some((m) => m.ts === message.ts)) {
-        const messageWithThreadTs = {
-          ...message,
-          thread_ts: threadTs,
-          threadPermalink,
-          hasReplies: false
-        };
-        thread.push(messageWithThreadTs);
-        GlobalContext.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
-      }
+    const key = extractThreadTsFromPermalink(message.permalink) || "standalone";
+    messageByThread.set(key, [...messageByThread.get(key) || [], message]);
+  }
+  const topLevelMessages = [];
+  for (const [key, messages2] of messageByThread.entries()) {
+    if (key === "standalone" || messages2.length === 1) {
+      topLevelMessages.push(...messages2.map((message) => ({ ...message, threadMessages: [] })));
     } else {
-      const messageWithThreadInfo = {
-        ...message,
-        threadPermalink,
-        hasReplies: isThreadParent
-      };
-      standaloneMessages.push(messageWithThreadInfo);
-      GlobalContext.log.debug(
-        `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`
-      );
+      const firstMessage = messages2.sort((a, b) => Number(a.ts) - Number(b.ts))[0];
+      topLevelMessages.push({
+        ...firstMessage,
+        threadMessages: messages2.filter((m) => m !== firstMessage)
+      });
     }
   }
-  return { threadMap, standaloneMessages };
+  return topLevelMessages;
 }
-function addMessageToDateChannelStructure(message, threadMessages = [], dateChannelMap) {
-  const date = new Date(Number(message.ts) * 1e3);
-  const dateKey = date.toISOString().split("T")[0];
-  const channelId = message.channel?.id || "unknown";
-  if (!dateChannelMap.has(dateKey)) {
-    dateChannelMap.set(dateKey, /* @__PURE__ */ new Map());
+function groupMessagesByDateAndChannel(topLevelMessages) {
+  const messagesByDate = /* @__PURE__ */ new Map();
+  for (const message of topLevelMessages) {
+    const date = new Date(Number(message.ts) * 1e3);
+    const dateKey = date.toISOString().split("T")[0];
+    const channelId = message.channel?.id || "unknown";
+    const key = `${dateKey}-${channelId}`;
+    const messagesForChannel = messagesByDate.get(key) || {
+      date: dateKey,
+      channelId,
+      messages: []
+    };
+    messagesByDate.set(key, {
+      ...messagesForChannel,
+      messages: [...messagesForChannel.messages, message]
+    });
   }
-  const channelsForDate = dateChannelMap.get(dateKey);
-  if (!channelsForDate.has(channelId)) {
-    channelsForDate.set(channelId, []);
-  }
-  const messagesForChannel = channelsForDate.get(channelId);
-  if (threadMessages.length > 0) {
-    GlobalContext.log.debug(
-      `Adding message with ${threadMessages.length} thread replies to ${channelId}`
-    );
-  }
-  messagesForChannel.push({
-    ...message,
-    threadMessages
+  return Array.from(messagesByDate.values()).sort((a, b) => {
+    const aKey = `${a.date}-${a.channelId}`;
+    const bKey = `${b.date}-${b.channelId}`;
+    return -aKey.localeCompare(bKey);
   });
 }
-function groupMessagesByDateAndChannel(standaloneMessages, threadMap) {
-  const messagesByDate = /* @__PURE__ */ new Map();
-  for (const message of standaloneMessages) {
-    if (message.ts && threadMap.has(message.ts)) {
-      const threadMessages = threadMap.get(message.ts);
-      const replies = threadMessages.filter((m) => m.ts !== message.ts);
-      const messageWithReplies = {
-        ...message,
-        hasReplies: replies.length > 0,
-        threadPermalink: message.threadPermalink || message.permalink
-      };
-      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate);
-    } else {
-      addMessageToDateChannelStructure({ ...message, hasReplies: false }, [], messagesByDate);
-    }
-  }
-  for (const [threadTs, threadMessages] of threadMap.entries()) {
-    if (standaloneMessages.some((m) => m.ts === threadTs)) {
-      continue;
-    }
-    const sortedThreadMessages = threadMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
-    const parentMessage = sortedThreadMessages.find((m) => m.ts === threadTs);
-    if (parentMessage) {
-      const replies = sortedThreadMessages.filter((m) => m.ts !== parentMessage.ts);
-      const parentWithReplies = {
-        ...parentMessage,
-        hasReplies: replies.length > 0,
-        threadPermalink: parentMessage.threadPermalink || parentMessage.permalink
-      };
-      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate);
-    } else {
-      const firstMessage = sortedThreadMessages[0];
-      GlobalContext.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
-      const threadPermalink = sortedThreadMessages.find((m) => m.threadPermalink)?.threadPermalink || firstMessage.permalink;
-      const syntheticParent = {
-        ...firstMessage,
-        thread_ts: threadTs,
-        ts: threadTs,
-        text: firstMessage.text,
-        user: firstMessage.user,
-        channel: firstMessage.channel,
-        hasReplies: true,
-        threadPermalink
-      };
-      const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
-      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate);
-    }
-  }
-  return messagesByDate;
-}
-function formatMessage(message, cache) {
-  let markdown = "";
-  const timestamp = new Date(Number(message.ts) * 1e3);
-  const timeString = formatTime(timestamp);
-  let userName = message.username || "Unknown User";
-  if (message.user && cache.users[message.user]) {
-    userName = cache.users[message.user].displayName;
-  }
-  GlobalContext.log.debug(`Formatting message from ${userName}`);
-  let threadIndicator = "";
-  if (message.hasReplies) {
-    const isThreadStarter = message.thread_ts === message.ts || message.permalink?.includes(`thread_ts=${message.ts}`);
-    if (isThreadStarter) {
-      threadIndicator = ` [\u{1F4AC} Start of Thread](${message.threadPermalink || message.permalink || ""})`;
-    } else {
-      threadIndicator = ` [\u{1F4AC} Part of Thread](${message.threadPermalink || message.permalink || ""})`;
-    }
-  }
-  markdown += `- [*${timeString}*](${message.permalink || ""}) **${userName}**${threadIndicator}: `;
-  const formattedText = formatSlackText(message.text || "", cache);
-  const messageLines = formattedText.split("\n");
-  markdown += messageLines[0] + "\n";
-  if (messageLines.length > 1) {
-    const indent = "    ";
-    markdown += messageLines.slice(1).map((line) => `${indent}${line}`).join("\n") + "\n";
-  }
-  return markdown;
-}
-function formatThreadReplies(replies, cache) {
-  let markdown = "";
-  const sortedReplies = replies.sort((a, b) => Number(a.ts) - Number(b.ts));
-  for (const reply of sortedReplies) {
-    const replyTimestamp = new Date(Number(reply.ts) * 1e3);
-    const replyTimeString = formatTime(replyTimestamp);
-    let replyUserName = reply.username || "Unknown User";
-    if (reply.user && cache.users[reply.user]) {
-      replyUserName = cache.users[reply.user].displayName;
-    }
-    markdown += "        - ";
-    if (reply.permalink) {
-      markdown += `[*${replyTimeString}*](${reply.permalink})`;
-    } else {
-      markdown += `*${replyTimeString}*`;
-    }
-    const formattedReplyText = formatSlackText(reply.text || "", cache);
-    const replyLines = formattedReplyText.split("\n");
-    markdown += ` **${replyUserName}**: ${replyLines[0]}
-`;
-    if (replyLines.length > 1) {
-      const replyIndent = "            ";
-      markdown += replyLines.slice(1).map((line) => `${replyIndent}${line}`).join("\n") + "\n";
-    }
-  }
-  return markdown;
-}
 function generateMarkdown(messages, cache, userId) {
-  let markdown = "";
   GlobalContext.log.debug(`Processing ${messages.length} total messages`);
-  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages);
-  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap);
-  const sortedDates = Array.from(messagesByDate.keys()).sort();
-  for (const dateKey of sortedDates) {
-    const date = new Date(dateKey);
-    markdown += `# ${date.toDateString()}
-
-`;
-    const channelsForDate = messagesByDate.get(dateKey);
-    const channelEntries = Array.from(channelsForDate.entries()).map(([id, messages2]) => [id || "unknown", messages2]).filter(
-      ([channelId, channelMessages]) => shouldIncludeChannel(channelId, channelMessages, cache, userId)
-    ).sort(([aId], [bId]) => {
-      const aName = getFriendlyChannelName(aId, cache, userId);
-      const bName = getFriendlyChannelName(bId, cache, userId);
-      return aName.localeCompare(bName);
-    });
-    for (const [channelId, channelMessages] of channelEntries) {
-      const channelName = getFriendlyChannelName(channelId, cache, userId);
-      markdown += `## ${channelName}
-
-`;
-      const sortedMessages = channelMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
-      for (const message of sortedMessages) {
-        markdown += formatMessage(message, cache);
-        if (message.threadMessages?.length) {
-          GlobalContext.log.debug(
-            `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`
-          );
-          markdown += formatThreadReplies(message.threadMessages, cache);
-          markdown += "\n";
-        }
-      }
-      markdown += "\n";
-    }
+  const distinctMessages = messages.filter(
+    (message, index, self) => index === self.findIndex((t) => t.permalink === message.permalink)
+  );
+  const topLevelMessages = organizeMessagesIntoThreads(distinctMessages);
+  const messagesByChannel = /* @__PURE__ */ new Map();
+  for (const message of topLevelMessages) {
+    const channelId = message.channel?.id || "unknown";
+    messagesByChannel.set(channelId, [...messagesByChannel.get(channelId) || [], message]);
   }
-  return markdown;
+  const filteredTopLevelMessages = Array.from(messagesByChannel.entries()).filter(([channelId, messages2]) => shouldIncludeChannel(channelId, messages2, cache, userId)).flatMap(([_, messages2]) => messages2);
+  const messagesByDateAndChannel = groupMessagesByDateAndChannel(filteredTopLevelMessages);
+  const sections = [];
+  for (const { date, channelId, messages: messages2 } of messagesByDateAndChannel) {
+    const sortedMessages = messages2.sort((a, b) => Number(a.ts) - Number(b.ts));
+    const lines = [];
+    for (const message of sortedMessages) {
+      lines.push(...formatMessage(message, cache));
+      if (message.threadMessages?.length) {
+        for (const threadMessage of message.threadMessages) {
+          lines.push(
+            ...formatMessage(threadMessage, cache, { includeThreadLinks: false }).map(
+              (line) => `  ${line}`
+            )
+          );
+        }
+        lines.push("");
+      }
+    }
+    const channelName = getFriendlyChannelName(channelId, cache);
+    sections.push({
+      [`${date} - ${channelName}`]: lines
+    });
+  }
+  return objectToMarkdown(sections);
 }
 
 // src/services/my-messages-service.ts
@@ -1125,11 +1064,11 @@ async function generateMyMessagesSummary(options) {
     `Found ${messages.length} direct messages, ${threadMessages.length} thread messages, and ${mentionMessages.length} mention messages`
   );
   GlobalContext.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
-  const cache = await getSlackEntityCache(client, allMessages);
+  const cache = await getCacheForMessages(client, allMessages);
   GlobalContext.log.debug("Formatting report...");
   const markdown = generateMarkdown(allMessages, cache, userId);
   cache.lastUpdated = Date.now();
-  await saveSlackCache(cache);
+  await saveSlackCache();
   return {
     markdown,
     allMessages,
@@ -1161,7 +1100,11 @@ var myMessagesTool = tool({
   name: "slack_my_messages",
   description: "Fetch and summarize messages sent by the user in Slack within a given time range.",
   parameters: myMessagesParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: "My Messages"
+  },
   execute: async ({ since, until, count }) => {
     const result = await generateMyMessagesSummary({ since, until, count });
     return result.markdown;
@@ -1169,27 +1112,6 @@ var myMessagesTool = tool({
 });
 
 // src/services/slack-services.ts
-async function performSlackSearch(query, count) {
-  try {
-    const client = await getSlackClient();
-    const authTest = await client.auth.test();
-    const userId = authTest.user_id;
-    GlobalContext.log.debug(`Searching messages with query: ${query}`);
-    const messages = await searchSlackMessages(client, query, count);
-    GlobalContext.log.debug(`Found ${messages.length} matching messages. Fetching details...`);
-    const cache = await getSlackEntityCache(client, messages);
-    cache.lastUpdated = Date.now();
-    await saveSlackCache(cache);
-    return {
-      messages,
-      userId,
-      channels: cache.channels,
-      users: cache.users
-    };
-  } catch (error) {
-    throw new Error(`Search failed: ${error}`);
-  }
-}
 function formatEmoji(emoji) {
   if (!emoji) return "";
   let formattedEmoji = emoji;
@@ -1302,11 +1224,10 @@ async function getSlackThreadReplies(channel, ts, limit) {
       channel: { id: channel },
       team: msg.team
     }));
-    const cache = await getSlackEntityCache(client, normalizedMessages);
+    const cache = await getCacheForMessages(client, normalizedMessages);
     return {
       replies: messages,
-      channels: cache.channels,
-      users: cache.users
+      entities: cache.entities
     };
   } catch (error) {
     throw new Error(`Getting thread replies failed: ${error}`);
@@ -1352,147 +1273,7 @@ async function getUserProfile(userId) {
   }
 }
 
-// src/services/formatting-service.ts
-function generateSearchResultsMarkdown(messages, cache, userId) {
-  let markdown = "";
-  if (messages.length === 0) {
-    GlobalContext.log.debug("No search results found");
-    return "# Search Results\n\nNo messages found matching your search criteria.\n";
-  }
-  GlobalContext.log.debug(`Processing ${messages.length} search results`);
-  const messagesByChannel = /* @__PURE__ */ new Map();
-  for (const message of messages) {
-    const channelId = message.channel?.id || "unknown";
-    if (!messagesByChannel.has(channelId)) {
-      messagesByChannel.set(channelId, []);
-    }
-    messagesByChannel.get(channelId).push(message);
-  }
-  const sortedChannels = Array.from(messagesByChannel.keys()).sort((aId, bId) => {
-    const aName = getFriendlyChannelName(aId, cache, userId);
-    const bName = getFriendlyChannelName(bId, cache, userId);
-    return aName.localeCompare(bName);
-  });
-  markdown += `# Search Results
-
-`;
-  for (const channelId of sortedChannels) {
-    const channelMessages = messagesByChannel.get(channelId);
-    const channelName = getFriendlyChannelName(channelId, cache, userId);
-    markdown += `## ${channelName}
-
-`;
-    const sortedMessages = channelMessages.sort((a, b) => {
-      if (!a.ts || !b.ts) return 0;
-      return Number(a.ts) - Number(b.ts);
-    });
-    for (const message of sortedMessages) {
-      if (!message.ts) continue;
-      const timestamp = new Date(Number(message.ts) * 1e3);
-      const dateString = timestamp.toLocaleDateString();
-      const timeString = formatTime(timestamp);
-      let userName = message.username || "Unknown User";
-      if (message.user && cache.users[message.user]) {
-        userName = cache.users[message.user].displayName;
-      }
-      let threadIndicator = "";
-      const messageTs = message.ts || "";
-      const permalink = message.permalink || "";
-      if (permalink.includes("thread_ts=")) {
-        const threadTsMatch = permalink.match(/thread_ts=([^&]+)/);
-        const threadTs = threadTsMatch ? threadTsMatch[1] : "";
-        const isThreadStarter = threadTs === messageTs;
-        if (isThreadStarter) {
-          threadIndicator = ` [\u{1F4AC} Start of Thread](${permalink})`;
-        } else {
-          threadIndicator = ` [\u{1F4AC} Part of Thread](${permalink})`;
-        }
-      }
-      markdown += `- **${dateString}** [${timeString}](${message.permalink || ""}) **${userName}**:${threadIndicator} `;
-      const formattedText = formatSlackText(message.text || "", cache);
-      const messageLines = formattedText.split("\n");
-      markdown += messageLines[0] + "\n";
-      if (messageLines.length > 1) {
-        const indent = "    ";
-        markdown += messageLines.slice(1).map((line) => `${indent}${line}`).join("\n") + "\n";
-      }
-      markdown += "\n";
-    }
-    markdown += "\n";
-  }
-  return markdown;
-}
-function formatStatusOutput(status) {
-  let output = "# Current Slack Status\n\n";
-  if (!status.status && !status.emoji) {
-    output += "No status is currently set.\n";
-    return output;
-  }
-  if (status.emoji) {
-    output += `**Status:** ${status.emoji} ${status.status}
-
-`;
-  } else {
-    output += `**Status:** ${status.status}
-
-`;
-  }
-  if (status.expirationTime) {
-    const expirationDate = new Date(status.expirationTime);
-    output += `**Expires:** ${expirationDate.toLocaleString()}
-`;
-  } else {
-    output += "**Expires:** Never (permanent status)\n";
-  }
-  return output;
-}
-function formatStatusUpdateOutput(result) {
-  let output = "# Status Update\n\n";
-  if (result.success) {
-    output += "\u2705 Status updated successfully\n\n";
-    if (result.emoji) {
-      output += `**New Status:** ${result.emoji} ${result.text}
-
-`;
-    } else {
-      output += `**New Status:** ${result.text}
-
-`;
-    }
-    if (result.expirationTime) {
-      const expirationDate = new Date(result.expirationTime);
-      output += `**Expires:** ${expirationDate.toLocaleString()}
-`;
-    } else {
-      output += "**Expires:** Never (permanent status)\n";
-    }
-  } else {
-    output += "\u274C Failed to update status\n\n";
-  }
-  return output;
-}
-
-// src/commands/mcp-tools/search.ts
-var searchParams = z.object({
-  query: z.string().describe(
-    'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.'
-  ),
-  count: z.number().int().optional().default(100).describe("Maximum number of results to return (1-1000). Default is 100.")
-});
-var searchTool = tool({
-  name: "slack_search",
-  description: "Perform a search in Slack using standard Slack search syntax and return matching messages.",
-  parameters: searchParams,
-  annotations: {},
-  execute: async ({ query, count }) => {
-    const results = await performSlackSearch(query, count);
-    const cache = {
-      channels: results.channels,
-      users: results.users
-    };
-    return generateSearchResultsMarkdown(results.messages, cache, results.userId);
-  }
-});
+// src/commands/mcp-tools/status.ts
 var setStatusParams = z.object({
   text: z.string().describe("Status text to display (up to 100 characters)"),
   emoji: z.string().optional().describe('Emoji code to display with status (without colons, e.g. "computer" for :computer:)'),
@@ -1503,20 +1284,55 @@ var setStatusTool = tool({
   name: "slack_set_status",
   description: "Set the current user's Slack status, optionally with an emoji and duration.",
   parameters: setStatusParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: false,
+    idempotentHint: true,
+    title: "Set Slack Status"
+  },
   execute: async ({ text, emoji, duration }) => {
     const result = await setSlackStatus(text, emoji, duration);
-    return formatStatusUpdateOutput(result);
+    return formatStatusOutput({
+      status: result.text,
+      emoji: result.emoji,
+      expirationTime: result.expirationTime
+    });
   }
 });
 var getStatusTool = tool({
   name: "slack_get_status",
   description: "Get the current user's Slack status including text, emoji, and expiration.",
   parameters: getStatusParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: "Get Slack Status"
+  },
   execute: async (_args) => {
     const status = await getSlackStatus();
     return formatStatusOutput(status);
+  }
+});
+var searchParams = z.object({
+  query: z.string().describe(
+    'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.'
+  ),
+  count: z.number().int().optional().default(100).describe("Maximum number of results to return (1-1000). Default is 100.")
+});
+var searchTool = tool({
+  name: "slack_search",
+  description: "Perform a search in Slack using standard Slack search syntax and return matching messages.",
+  parameters: searchParams,
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: "Search Slack"
+  },
+  execute: async ({ query, count }) => {
+    const client = await getSlackClient();
+    const messages = await searchSlackMessages(client, query, count);
+    const cache = await getCacheForMessages(client, messages);
+    return generateSearchResultsMarkdown(messages, cache);
   }
 });
 var reminderParams = z.object({
@@ -1532,16 +1348,22 @@ var reminderTool = tool({
   name: "slack_create_reminder",
   description: "Create a reminder in Slack for yourself or another user.",
   parameters: reminderParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: false,
+    idempotentHint: false,
+    title: "Create a reminder in Slack"
+  },
   execute: async ({ text, time, user }) => {
     const result = await createSlackReminder(text, time, user);
-    return `
-## Reminder Created
-- **Text:** ${text}
-- **Time:** ${time}
-${user ? `- **User:** ${user}` : ""}
-- **Success:** ${result.success ? "\u2705" : "\u274C"}
-    `.trim();
+    return objectToMarkdown({
+      [`Reminder Created`]: {
+        text,
+        time,
+        user,
+        success: result.success ? "\u2705" : "\u274C"
+      }
+    });
   }
 });
 var threadRepliesParams = z.object({
@@ -1559,33 +1381,24 @@ var threadRepliesTool = tool({
   name: "slack_get_thread_replies",
   description: "Fetch replies for a specific message thread in a Slack channel.",
   parameters: threadRepliesParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: "Get Thread Replies"
+  },
   execute: async ({ channel, ts, limit }) => {
     const result = await getSlackThreadReplies(channel, ts, limit);
-    let markdown = `## Thread Replies
-
-`;
     if (result.replies.length === 0) {
-      markdown += "No replies found in this thread.";
-    } else {
-      markdown += `Found ${result.replies.length} replies:
-
-`;
-      result.replies.forEach((reply, index) => {
-        const user = result.users[reply.user ?? ""]?.displayName || reply.user;
-        const time = reply.ts ? new Date(parseInt(reply.ts) * 1e3).toLocaleString() : "Unknown time";
-        markdown += `### Reply ${index + 1}
-`;
-        markdown += `- **From:** ${user}
-`;
-        markdown += `- **Time:** ${time}
-`;
-        markdown += `- **Text:** ${reply.text || ""}
-
-`;
-      });
+      return "No replies found in this thread.";
     }
-    return markdown;
+    const formattedReplies = result.replies.map((reply) => {
+      const user = result.entities[reply.user ?? ""]?.displayName || reply.user;
+      const time = reply.ts ? new Date(parseInt(reply.ts) * 1e3).toLocaleString() : "Unknown time";
+      return `${user} - ${time}: ${reply.text}`;
+    });
+    return objectToMarkdown({
+      [`Thread Replies: ${result.replies.length}`]: formattedReplies
+    });
   }
 });
 var userProfileParams = z.object({
@@ -1597,65 +1410,51 @@ var userProfileTool = tool({
   name: "slack_get_user_profile",
   description: "Fetch detailed profile information for a specific Slack user by their ID.",
   parameters: userProfileParams,
-  annotations: {},
+  annotations: {
+    openWorldHint: true,
+    readOnlyHint: true,
+    title: "Get Slack User Profile"
+  },
   execute: async ({ user_id }) => {
     const profile = await getUserProfile(user_id);
-    let markdown = `## Slack User Profile: ${profile.displayName}
-
-`;
-    markdown += "### Basic Information\n";
-    markdown += `- **User ID:** \`${profile.userId}\`
-`;
-    markdown += `- **Username:** @${profile.username}
-`;
-    markdown += `- **Display Name:** ${profile.displayName}
-`;
-    markdown += `- **Real Name:** ${profile.realName || "Not set"}
-`;
-    markdown += `- **Job Title:** ${profile.title || "Not set"}
-`;
-    markdown += `- **Email:** ${profile.email || "Not available"}
-`;
-    markdown += `- **Phone:** ${profile.phone || "Not set"}
-`;
-    markdown += "\n### Status\n";
-    markdown += `- **Current Status:** ${profile.status.text ? profile.status.text : "No status set"} ${profile.status.emoji || ""}
-`;
-    if (profile.status.expiration) {
-      markdown += `- **Status Expiration:** ${profile.status.expiration}
-`;
-    }
-    markdown += "\n### Account Information\n";
-    markdown += `- **Team ID:** ${profile.teamId || "Unknown"}
-`;
-    markdown += `- **Timezone:** ${profile.timezone || "Unknown"} (${profile.timezoneLabel || ""})
-`;
-    markdown += `- **Account Type:** ${profile.isBot ? "Bot" : "User"}
-`;
-    if (profile.isAdmin || profile.isOwner) {
-      const roles = [];
-      if (profile.isOwner) roles.push("Owner");
-      if (profile.isAdmin) roles.push("Admin");
-      markdown += `- **Roles:** ${roles.join(", ")}
-`;
-    }
-    if (profile.isRestricted || profile.isUltraRestricted) {
-      const restrictions = [];
-      if (profile.isRestricted) restrictions.push("Restricted");
-      if (profile.isUltraRestricted) restrictions.push("Ultra Restricted");
-      markdown += `- **Restrictions:** ${restrictions.join(", ")}
-`;
-    }
-    markdown += `- **Last Updated:** ${profile.updated || "Unknown"}
-`;
-    if (profile.avatarUrl) {
-      markdown += "\n### Profile Image\n";
-      markdown += `![${profile.displayName}'s profile picture](${profile.avatarUrl})
-`;
-    }
-    return markdown;
+    return objectToMarkdown({
+      [`User Profile: ${profile.displayName}`]: {
+        "Basic Information": {
+          "User ID": `\`${profile.userId}\``,
+          Username: `@${profile.username}`,
+          "Display Name": profile.displayName || "",
+          "Real Name": profile.realName || "Not set",
+          "Job Title": profile.title || "Not set",
+          Email: profile.email || "Not available",
+          Phone: profile.phone || "Not set"
+        },
+        Status: {
+          "Current Status": `${profile.status.text ? profile.status.text : "No status set"} ${profile.status.emoji || ""}`,
+          "Status Expiration": profile.status.expiration || ""
+        },
+        "Account Information": {
+          "Team ID": profile.teamId || "Unknown",
+          Timezone: `${profile.timezone || "Unknown"} (${profile.timezoneLabel || ""})`,
+          "Account Type": profile.isBot ? "Bot" : "User"
+        },
+        "Profile Image": {
+          "Avatar URL": profile.avatarUrl || "Not available"
+        }
+      }
+    });
   }
 });
+
+// src/commands/mcp-tools/index.ts
+var mcpTools = [
+  myMessagesTool,
+  searchTool,
+  setStatusTool,
+  getStatusTool,
+  reminderTool,
+  threadRepliesTool,
+  userProfileTool
+];
 
 // src/commands/mcp.ts
 function registerMcpCommand(program2) {
@@ -1668,13 +1467,9 @@ function registerMcpCommand(program2) {
       name: "slack-tools-server",
       version
     });
-    server.addTool(myMessagesTool);
-    server.addTool(searchTool);
-    server.addTool(setStatusTool);
-    server.addTool(getStatusTool);
-    server.addTool(reminderTool);
-    server.addTool(threadRepliesTool);
-    server.addTool(userProfileTool);
+    for (const tool2 of mcpTools) {
+      server.addTool(tool2);
+    }
     server.start({
       transportType: "stdio"
     });
@@ -1762,13 +1557,9 @@ function registerCommands(program2) {
   registerPrintCommand(program2);
   registerTestCommand(program2);
   registerMcpCommand(program2);
-  registerToolAsCommand(program2, myMessagesTool);
-  registerToolAsCommand(program2, searchTool);
-  registerToolAsCommand(program2, setStatusTool);
-  registerToolAsCommand(program2, getStatusTool);
-  registerToolAsCommand(program2, reminderTool);
-  registerToolAsCommand(program2, threadRepliesTool);
-  registerToolAsCommand(program2, userProfileTool);
+  for (const tool2 of mcpTools) {
+    registerToolAsCommand(program2, tool2);
+  }
 }
 
 // src/cli.ts
@@ -1784,9 +1575,9 @@ program.hook("preAction", async (thisCommand) => {
   if (options.workspace) {
     GlobalContext.workspace = options.workspace;
   } else if (options.lastWorkspace) {
-    const lastWorkspace = await getLastWorkspace();
-    if (lastWorkspace) {
-      GlobalContext.workspace = lastWorkspace;
+    const cache = await loadSlackCache();
+    if (cache.lastWorkspace) {
+      GlobalContext.workspace = cache.lastWorkspace;
     } else {
       program.error("No last workspace found. Please specify a workspace using --workspace.");
     }

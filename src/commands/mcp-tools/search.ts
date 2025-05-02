@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { tool } from '../../types';
-import { performSlackSearch } from '../../services/slack-services';
 import { generateSearchResultsMarkdown } from '../../services/formatting-service';
+import { getCacheForMessages } from '../my_messages/slack-entity-cache';
+import { getSlackClient } from '../../slack-api';
+import { searchSlackMessages } from '../my_messages/slack-service';
 
 const searchParams = z.object({
   query: z
@@ -28,14 +30,10 @@ export const searchTool = tool({
     title: 'Search Slack',
   },
   execute: async ({ query, count }) => {
-    const results = await performSlackSearch(query, count);
+    const client = await getSlackClient();
+    const messages = await searchSlackMessages(client, query, count);
+    const cache = await getCacheForMessages(client, messages);
 
-    const cache = {
-      lastUpdated: Date.now(),
-      channels: results.channels,
-      users: results.users,
-    };
-
-    return generateSearchResultsMarkdown(results.messages, cache, results.userId);
+    return generateSearchResultsMarkdown(messages, cache);
   },
 });

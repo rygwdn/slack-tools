@@ -1,6 +1,7 @@
 import { AuthTestResponse } from '@slack/web-api';
-
+import { SlackCache } from './commands/my_messages/types';
 interface SlackContext {
+  cache?: SlackCache;
   workspace: string;
   debug: boolean;
   hasWorkspace: boolean;

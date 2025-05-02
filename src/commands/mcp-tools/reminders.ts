@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { tool } from '../../types';
 import { createSlackReminder } from '../../services/slack-services';
-
+import { objectToMarkdown } from '../../utils/markdown-utils';
 const reminderParams = z.object({
   text: z.string().describe('The reminder text (what you want to be reminded about)'),
   time: z
@@ -29,12 +29,14 @@ export const reminderTool = tool({
   },
   execute: async ({ text, time, user }) => {
     const result = await createSlackReminder(text, time, user);
-    return `
-## Reminder Created
-- **Text:** ${text}
-- **Time:** ${time}
-${user ? `- **User:** ${user}` : ''}
-- **Success:** ${result.success ? '✅' : '❌'}
-    `.trim();
+
+    return objectToMarkdown({
+      [`Reminder Created`]: {
+        text,
+        time,
+        user,
+        success: result.success ? '✅' : '❌',
+      },
+    });
   },
 });

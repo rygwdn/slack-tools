@@ -68,6 +68,7 @@ describe('Slack Service', () => {
         sort: 'timestamp',
         sort_dir: 'asc',
         count,
+        page: 1,
       });
 
       // Verify the results

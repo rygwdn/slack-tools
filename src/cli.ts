@@ -3,8 +3,8 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerCommands } from './commands/register-commands';
-import { getLastWorkspace } from './cache';
 import { GlobalContext } from './context';
+import { loadSlackCache } from './cache';
 
 // Get current file directory (ES module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -25,7 +25,6 @@ program
 
 registerCommands(program);
 
-// Update workspace in context before running command
 program.hook('preAction', async (thisCommand) => {
   const options = thisCommand.opts();
 
@@ -34,9 +33,9 @@ program.hook('preAction', async (thisCommand) => {
   if (options.workspace) {
     GlobalContext.workspace = options.workspace;
   } else if (options.lastWorkspace) {
-    const lastWorkspace = await getLastWorkspace();
-    if (lastWorkspace) {
-      GlobalContext.workspace = lastWorkspace;
+    const cache = await loadSlackCache();
+    if (cache.lastWorkspace) {
+      GlobalContext.workspace = cache.lastWorkspace;
     } else {
       program.error('No last workspace found. Please specify a workspace using --workspace.');
     }

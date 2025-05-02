@@ -58,12 +58,25 @@ export async function searchSlackMessages(
   const enhancedQuery = await enhanceSearchQuery(client, query);
   GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
 
-  const searchResults = await client.search.messages({
-    query: enhancedQuery,
-    sort: 'timestamp',
-    sort_dir: 'asc',
-    count,
-  });
+  const matches: Match[] = [];
 
-  return searchResults.messages?.matches || [];
+  let pages = 1;
+  for (let page = 1; page <= pages && matches.length < count; page++) {
+    const searchResults = await client.search.messages({
+      query: enhancedQuery,
+      sort: 'timestamp',
+      sort_dir: 'asc',
+      count,
+      page,
+    });
+    if (!searchResults.messages?.matches?.length) {
+      break;
+    }
+
+    matches.push(...searchResults.messages.matches);
+    if (searchResults.messages?.paging?.pages) {
+      pages = searchResults.messages.paging.pages;
+    }
+  }
+  return matches;
 }

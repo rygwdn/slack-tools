@@ -3,11 +3,11 @@ import { generateMyMessagesSummary } from '../../../src/services/my-messages-ser
 import { WebClient } from '@slack/web-api';
 import { getDateRange } from '../../../src/utils/date-utils';
 import { searchMessages } from '../../../src/commands/my_messages/slack-service';
-import { getSlackEntityCache } from '../../../src/commands/my_messages/slack-entity-cache';
-import { generateMarkdown } from '../../../src/commands/my_messages/formatters';
+import { getCacheForMessages } from '../../../src/commands/my_messages/slack-entity-cache';
 import { SlackCache } from '../../../src/commands/my_messages/types';
 import { getSlackClient } from '../../../src/slack-api';
 import { saveSlackCache } from '../../../src/cache';
+import * as formatters from '../../../src/commands/my_messages/formatters';
 
 // Mock all the dependencies
 vi.mock('../../../src/slack-api', () => ({
@@ -23,11 +23,13 @@ vi.mock('../../../src/commands/my_messages/slack-service', () => ({
 }));
 
 vi.mock('../../../src/commands/my_messages/slack-entity-cache', () => ({
+  getCacheForMessages: vi.fn(),
   getSlackEntityCache: vi.fn(),
 }));
 
 vi.mock('../../../src/commands/my_messages/formatters', () => ({
   generateMarkdown: vi.fn(),
+  generateMarkdownWithObjectFormatter: vi.fn(),
 }));
 
 vi.mock('../../../src/cache', () => ({
@@ -71,8 +73,11 @@ describe('My Messages Service', () => {
 
     // Mock cache
     mockCache = {
-      users: { U123: { displayName: 'Test User', isBot: false } },
-      channels: { C123: { displayName: 'general', type: 'channel' } },
+      entities: {
+        U123: { displayName: 'Test User', isBot: false, type: 'user' },
+        C123: { displayName: 'general', type: 'channel', members: [] },
+      },
+      version: 1,
       lastUpdated: Date.now(),
     };
 
@@ -89,8 +94,8 @@ describe('My Messages Service', () => {
         mentionMessages: mockMentionMessages,
       };
     });
-    vi.mocked(getSlackEntityCache).mockResolvedValue(mockCache);
-    vi.mocked(generateMarkdown).mockReturnValue(mockMarkdown);
+    vi.mocked(getCacheForMessages).mockResolvedValue(mockCache);
+    vi.mocked(formatters.generateMarkdown).mockReturnValue(mockMarkdown);
     vi.mocked(saveSlackCache).mockResolvedValue(undefined);
   });
 
@@ -107,11 +112,9 @@ describe('My Messages Service', () => {
       mockDateRange,
       200,
     );
-    expect(getSlackEntityCache).toHaveBeenCalledWith(mockClient, mockAllMessages);
-    expect(generateMarkdown).toHaveBeenCalledWith(mockAllMessages, mockCache, 'U123');
-    expect(saveSlackCache).toHaveBeenCalledWith(
-      expect.objectContaining({ lastUpdated: expect.any(Number) }),
-    );
+    expect(getCacheForMessages).toHaveBeenCalledWith(mockClient, mockAllMessages);
+    expect(formatters.generateMarkdown).toHaveBeenCalledWith(mockAllMessages, mockCache, 'U123');
+    expect(saveSlackCache).toHaveBeenCalled();
 
     // Check the returned result
     expect(result).toEqual({

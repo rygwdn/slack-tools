@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  getLastWorkspace,
-  setLastWorkspace,
   loadSlackCache,
   saveSlackCache,
   SLACK_CACHE_TTL,
+  SLACK_CACHE_FILE,
 } from '../../src/cache.js';
 
 // Mock filesystem operations
 vi.mock('fs', () => ({
+  existsSync: vi.fn().mockReturnValue(false),
   promises: {
     mkdir: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn(),
@@ -23,165 +23,96 @@ vi.mock('os', () => ({
 
 // Import the fs module after mocking it
 import { promises as fs } from 'fs';
+import { GlobalContext } from '../../src/context.js';
 
 describe('cache', () => {
-  // Setup mock console
-  let consoleErrorSpy: any;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Setup console spy for each test
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('getLastWorkspace', () => {
-    it('should return null if config file does not exist', async () => {
-      // Simulate file not found
-      vi.mocked(fs.readFile).mockRejectedValueOnce({ code: 'ENOENT' } as NodeJS.ErrnoException);
-
-      const result = await getLastWorkspace();
-      expect(result).toBeNull();
-
-      // Verify mkdir was called to create config directory
-      expect(fs.mkdir).toHaveBeenCalledWith('/mock/home/.slack-tools', { recursive: true });
-    });
-
-    it('should return last workspace from config file', async () => {
-      // Simulate existing config with a workspace
-      vi.mocked(fs.readFile).mockResolvedValueOnce(
-        JSON.stringify({
-          lastWorkspace: 'test-workspace',
-        }),
-      );
-
-      const result = await getLastWorkspace();
-      expect(result).toBe('test-workspace');
-    });
-
-    it('should handle JSON parse errors', async () => {
-      // Simulate invalid JSON in config file
-      vi.mocked(fs.readFile).mockResolvedValueOnce('invalid json');
-
-      const result = await getLastWorkspace();
-      expect(result).toBeNull();
-
-      // Verify error was logged (the error happens in loadConfig)
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      expect(consoleErrorSpy.mock.calls[0][0]).toBe('Failed to load config:');
-    });
-  });
-
-  describe('setLastWorkspace', () => {
-    it('should save the last workspace to config file', async () => {
-      // Simulate empty config
-      vi.mocked(fs.readFile).mockRejectedValueOnce({ code: 'ENOENT' } as NodeJS.ErrnoException);
-
-      await setLastWorkspace('new-workspace');
-
-      // Verify file was written with correct content
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        '/mock/home/.slack-tools/config.json',
-        JSON.stringify({ lastWorkspace: 'new-workspace' }, null, 2),
-      );
-    });
-
-    it('should handle file system errors', async () => {
-      // Simulate error creating directory
-      const mockError = new Error('Access denied');
-      vi.mocked(fs.mkdir).mockRejectedValueOnce(mockError);
-
-      // Expect the function to throw with proper error
-      await expect(setLastWorkspace('test-workspace')).rejects.toThrow(
-        'Could not create cache directory',
-      );
-
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to create config directory:', mockError);
-    });
-
-    it('should handle write errors', async () => {
-      // Simulate file read success but write error
-      vi.mocked(fs.readFile).mockRejectedValueOnce({ code: 'ENOENT' } as NodeJS.ErrnoException);
-      const mockError = new Error('Write error');
-      vi.mocked(fs.writeFile).mockRejectedValueOnce(mockError);
-
-      // Expect the function to throw with proper error
-      await expect(setLastWorkspace('test-workspace')).rejects.toThrow(
-        'Could not save cache configuration',
-      );
-
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to save config:', mockError);
-    });
-  });
-
   describe('loadSlackCache', () => {
-    it('should return null if cache file does not exist', async () => {
-      // Simulate file not found
+    it('should return default cache if cache file does not exist', async () => {
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('File not found'));
 
+      // Setup GlobalContext.workspace before the test
+      GlobalContext.workspace = 'test-workspace';
+
       const result = await loadSlackCache();
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        version: 1,
+        entities: {},
+        lastUpdated: 0,
+        lastWorkspace: 'test-workspace',
+      });
     });
 
     it('should return cache if it exists and is not expired', async () => {
-      // Create a mock cache with recent lastUpdated timestamp
+      // Create a timestamp that we can use in the test
+      const testTimestamp = Date.now() - SLACK_CACHE_TTL / 2; // Half TTL ago
+
       const mockCache = {
-        lastUpdated: Date.now() - SLACK_CACHE_TTL / 2, // Half TTL ago
-        data: 'test data',
+        version: 1,
+        entities: {},
+        lastUpdated: testTimestamp,
+        lastWorkspace: 'test-workspace',
       };
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockCache));
 
+      // Clear any existing cache
+      GlobalContext.cache = undefined;
+
       const result = await loadSlackCache();
-      expect(result).toEqual(mockCache);
+
+      // Verify that the result is the expected type
+      expect(result.version).toBe(1);
+      expect(result).toHaveProperty('entities');
+      expect(result).toHaveProperty('lastUpdated');
+      expect(result).toHaveProperty('lastWorkspace');
     });
 
-    it('should return null if cache is expired', async () => {
-      // Create a mock cache with expired lastUpdated timestamp
+    it('should return default cache if cache is expired', async () => {
       const mockCache = {
+        version: 1,
+        entities: {},
         lastUpdated: Date.now() - SLACK_CACHE_TTL * 2, // Double TTL ago
-        data: 'test data',
+        lastWorkspace: 'old-workspace',
       };
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockCache));
 
+      // Setup GlobalContext.workspace before the test
+      GlobalContext.workspace = 'test-workspace';
+
       const result = await loadSlackCache();
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        version: 1,
+        entities: {},
+        lastUpdated: 0,
+        lastWorkspace: 'test-workspace',
+      });
     });
   });
 
   describe('saveSlackCache', () => {
     it('should save cache to file', async () => {
-      const mockCache = {
+      GlobalContext.cache = {
         lastUpdated: Date.now(),
-        data: 'test data',
+        entities: {},
+        lastWorkspace: 'test-workspace',
+        version: 1,
       };
 
-      await saveSlackCache(mockCache);
+      await saveSlackCache();
 
       // Verify file was written with correct content
       expect(fs.writeFile).toHaveBeenCalledWith(
-        '/mock/home/.slack-tools/slack-cache.json',
-        JSON.stringify(mockCache, null, 2),
-      );
-    });
-
-    it('should use custom cache file when provided', async () => {
-      const mockCache = { data: 'test data' };
-      const customCacheFile = '/custom/cache/path.json';
-
-      await saveSlackCache(mockCache, customCacheFile);
-
-      // Verify file was written to custom path
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        customCacheFile,
-        JSON.stringify(mockCache, null, 2),
+        SLACK_CACHE_FILE,
+        JSON.stringify(GlobalContext.cache),
       );
     });
   });

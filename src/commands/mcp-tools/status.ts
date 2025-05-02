@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { tool } from '../../types';
 import { setSlackStatus, getSlackStatus } from '../../services/slack-services';
-import { formatStatusOutput, formatStatusUpdateOutput } from '../../services/formatting-service';
+import { formatStatusOutput } from '../../services/formatting-service';
 
 const setStatusParams = z.object({
   text: z.string().describe('Status text to display (up to 100 characters)'),
@@ -30,7 +30,11 @@ export const setStatusTool = tool({
   },
   execute: async ({ text, emoji, duration }) => {
     const result = await setSlackStatus(text, emoji, duration);
-    return formatStatusUpdateOutput(result);
+    return formatStatusOutput({
+      status: result.text,
+      emoji: result.emoji,
+      expirationTime: result.expirationTime,
+    });
   },
 });
 

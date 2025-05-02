@@ -12,6 +12,12 @@ export async function resolveUserForSearch(
 
   const cleanIdentifier = userIdentifier.replace(/^@/, '').replace(/^"(.*)"$/, '$1');
 
+  if (cleanIdentifier === 'me' && GlobalContext.currentUser) {
+    return `<@${GlobalContext.currentUser.user_id}>`;
+  } else if (cleanIdentifier === 'me') {
+    return '@me';
+  }
+
   if (/^U[A-Z0-9]{8,}$/.test(cleanIdentifier)) {
     return `<@${cleanIdentifier}>`;
   }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { tool } from '../../types';
 import { getSlackThreadReplies } from '../../services/slack-services';
+import { objectToMarkdown } from '../../utils/markdown-utils';
 
 const threadRepliesParams = z.object({
   channel: z
@@ -35,26 +36,18 @@ export const threadRepliesTool = tool({
   execute: async ({ channel, ts, limit }) => {
     const result = await getSlackThreadReplies(channel, ts, limit);
 
-    let markdown = `## Thread Replies\n\n`;
-
     if (result.replies.length === 0) {
-      markdown += 'No replies found in this thread.';
-    } else {
-      markdown += `Found ${result.replies.length} replies:\n\n`;
-
-      result.replies.forEach((reply, index) => {
-        const user = result.users[reply.user ?? '']?.displayName || reply.user;
-        const time = reply.ts
-          ? new Date(parseInt(reply.ts) * 1000).toLocaleString()
-          : 'Unknown time';
-
-        markdown += `### Reply ${index + 1}\n`;
-        markdown += `- **From:** ${user}\n`;
-        markdown += `- **Time:** ${time}\n`;
-        markdown += `- **Text:** ${reply.text || ''}\n\n`;
-      });
+      return 'No replies found in this thread.';
     }
 
-    return markdown;
+    const formattedReplies = result.replies.map((reply) => {
+      const user = result.entities[reply.user ?? '']?.displayName || reply.user;
+      const time = reply.ts ? new Date(parseInt(reply.ts) * 1000).toLocaleString() : 'Unknown time';
+      return `${user} - ${time}: ${reply.text}`;
+    });
+
+    return objectToMarkdown({
+      [`Thread Replies: ${result.replies.length}`]: formattedReplies,
+    });
   },
 });

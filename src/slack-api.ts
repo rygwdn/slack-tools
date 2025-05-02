@@ -4,8 +4,8 @@ import type { SlackAuth, SlackCookie } from './types.js';
 import { getCookie } from './cookies.js';
 import { getTokens } from './tokens.js';
 import { GlobalContext } from './context.js';
-import { setLastWorkspace } from './cache.js';
 import { redactLog } from './utils/log-utils.js';
+import { saveSlackCache } from './cache.js';
 
 function createWebClient(token: string, cookie: SlackCookie): WebClient {
   return new WebClient(token, {
@@ -29,7 +29,6 @@ function createWebClient(token: string, cookie: SlackCookie): WebClient {
 }
 
 async function validateAuth(auth: SlackAuth) {
-  // Get the first token to test
   const firstToken = Object.values(auth.tokens)[0]?.token;
   if (!firstToken) {
     throw new Error('Auth test failed: No token found');
@@ -44,7 +43,6 @@ async function validateAuth(auth: SlackAuth) {
     }
 
     GlobalContext.currentUser = response;
-    setLastWorkspace(GlobalContext.workspace);
   } catch (error) {
     console.error('Auth test API call failed:', error);
     throw new Error('Auth test failed: API call error');
@@ -155,6 +153,8 @@ export async function getSlackClient(): Promise<WebClient> {
     console.error('  - Use -l, --last-workspace to use your most recently used workspace');
     process.exit(1);
   }
+
+  await saveSlackCache();
 
   const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
 

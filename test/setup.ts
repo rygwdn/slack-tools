@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
 
 vi.mock('keytar', () => ({
   getPassword: vi.fn().mockResolvedValue('mock-password'),
@@ -11,6 +11,10 @@ vi.mock('keytar', () => ({
 }));
 
 vi.mock('level');
+
+beforeAll(() => {
+  process.env.TZ = 'EST';
+});
 
 vi.mock('../src/context', () => ({
   GlobalContext: {

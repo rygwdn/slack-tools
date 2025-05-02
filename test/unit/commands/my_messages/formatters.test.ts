@@ -1,12 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  formatSlackText,
-  getFriendlyChannelName,
-  formatTime,
-  isValidThreadMessage,
-  extractThreadTsFromPermalink,
-  generateMarkdown,
-} from '../../../../src/commands/my_messages/formatters';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { generateMarkdown } from '../../../../src/commands/my_messages/formatters';
 import { SlackCache, ThreadMessage } from '../../../../src/commands/my_messages/types';
 
 describe('My Messages Formatters', () => {
@@ -14,161 +7,19 @@ describe('My Messages Formatters', () => {
 
   beforeEach(() => {
     mockCache = {
-      channels: {
-        C123: { displayName: 'general', type: 'channel' as const },
-        C456: { displayName: 'random', type: 'channel' as const },
+      version: 1,
+      entities: {
+        C123: { displayName: 'general', type: 'channel' as const, members: [] },
+        C456: { displayName: 'random', type: 'channel' as const, members: [] },
         D123: { displayName: 'user1-dm', type: 'im' as const, members: ['U789'] },
         G123: { displayName: 'group-dm', type: 'mpim' as const, members: ['U456', 'U789'] },
-      },
-      users: {
-        U123: { displayName: 'User One', isBot: false },
-        U456: { displayName: 'User Two', isBot: false },
-        U789: { displayName: 'User Three', isBot: false },
-        U999: { displayName: 'Bot User', isBot: true },
+        U123: { displayName: 'User One', isBot: false, type: 'user' as const },
+        U456: { displayName: 'User Two', isBot: false, type: 'user' as const },
+        U789: { displayName: 'User Three', isBot: false, type: 'user' as const },
+        U999: { displayName: 'Bot User', isBot: true, type: 'user' as const },
       },
       lastUpdated: Date.now(),
     };
-  });
-
-  describe('getFriendlyChannelName', () => {
-    it('should format channel names with hash prefix', () => {
-      const result = getFriendlyChannelName('C123', mockCache, 'U123');
-      expect(result).toBe('#general');
-    });
-
-    it('should format DM channels with user name', () => {
-      const result = getFriendlyChannelName('D123', mockCache, 'U123');
-      expect(result).toBe('DM with User Three');
-    });
-
-    it('should format group DMs with member names', () => {
-      const result = getFriendlyChannelName('G123', mockCache, 'U123');
-      expect(result).toBe('Group DM with User Two, User Three');
-    });
-
-    it('should filter out current user from group DM names', () => {
-      const result = getFriendlyChannelName('G123', mockCache, 'U456');
-      expect(result).toBe('Group DM with User Three');
-    });
-
-    it('should return channel ID when channel not found in cache', () => {
-      const result = getFriendlyChannelName('UNKNOWN', mockCache, 'U123');
-      expect(result).toBe('UNKNOWN');
-    });
-  });
-
-  describe('formatSlackText', () => {
-    it('should replace user mentions with display names', () => {
-      const text = 'Hello <@U123> and <@U456>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Hello @User One and @User Two');
-    });
-
-    it('should handle user mentions with display name override', () => {
-      const text = 'Hello <@U123|alice> and <@U456|bob>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Hello @User One and @User Two');
-    });
-
-    it('should use provided display name when user not in cache', () => {
-      const text = 'Hello <@U000|unknown_user>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Hello @unknown_user');
-    });
-
-    it('should replace channel mentions with channel names', () => {
-      const text = 'Check <#C123> and <#C456>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Check #general and #random');
-    });
-
-    it('should handle channel mentions with name override', () => {
-      const text = 'Check <#C123|general-channel>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Check #general-channel');
-    });
-
-    it('should convert formatted links to markdown', () => {
-      const text = 'See <https://example.com|this link>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('See [this link](https://example.com)');
-    });
-
-    it('should convert plain links', () => {
-      const text = 'See <https://example.com>';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('See https://example.com');
-    });
-
-    it('should handle multiline text with proper indentation', () => {
-      const text = 'First line\nSecond line\nThird line';
-      const result = formatSlackText(text, mockCache);
-      expect(result).toBe('First line\n    Second line\n    Third line');
-    });
-
-    it('should handle empty text', () => {
-      const result = formatSlackText('', mockCache);
-      expect(result).toBe('');
-    });
-  });
-
-  describe('formatTime', () => {
-    it('should format time with zero padding for hours and minutes', () => {
-      // To avoid timezone issues, let's mock the date's getHours and getMinutes methods
-      const mockDate = new Date();
-      vi.spyOn(mockDate, 'getHours').mockReturnValue(9);
-      vi.spyOn(mockDate, 'getMinutes').mockReturnValue(5);
-
-      const result = formatTime(mockDate);
-      expect(result).toBe('09:05');
-    });
-
-    it('should handle midnight correctly', () => {
-      const mockDate = new Date();
-      vi.spyOn(mockDate, 'getHours').mockReturnValue(0);
-      vi.spyOn(mockDate, 'getMinutes').mockReturnValue(0);
-
-      const result = formatTime(mockDate);
-      expect(result).toBe('00:00');
-    });
-  });
-
-  describe('isValidThreadMessage', () => {
-    it('should return true for messages with a timestamp', () => {
-      const message: ThreadMessage = { ts: '1609459200.000000' };
-      expect(isValidThreadMessage(message)).toBe(true);
-    });
-
-    it('should return false for messages without a timestamp', () => {
-      const message: ThreadMessage = { text: 'Invalid message' };
-      expect(isValidThreadMessage(message)).toBe(false);
-    });
-  });
-
-  describe('extractThreadTsFromPermalink', () => {
-    it('should extract thread_ts from permalink', () => {
-      const permalink =
-        'https://example.slack.com/archives/C123/p123456?thread_ts=1609459200.000000';
-      const result = extractThreadTsFromPermalink(permalink);
-      expect(result).toBe('1609459200.000000');
-    });
-
-    it('should return undefined for permalinks without thread_ts', () => {
-      const permalink = 'https://example.slack.com/archives/C123/p123456';
-      const result = extractThreadTsFromPermalink(permalink);
-      expect(result).toBeUndefined();
-    });
-
-    it('should return undefined for invalid URLs', () => {
-      const permalink = 'not-a-url';
-      const result = extractThreadTsFromPermalink(permalink);
-      expect(result).toBeUndefined();
-    });
-
-    it('should handle undefined permalink', () => {
-      const result = extractThreadTsFromPermalink(undefined as unknown as string);
-      expect(result).toBeUndefined();
-    });
   });
 
   describe('generateMarkdown', () => {
@@ -191,12 +42,12 @@ describe('My Messages Formatters', () => {
 
       const result = generateMarkdown(messages, mockCache, 'U123');
 
-      // The date could be either Dec 31 or Jan 1 depending on timezone
-      // We'll check that the date heading format is correct without relying on specific date
-      expect(result).toMatch(/^# [A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}/m);
-      expect(result).toContain('## #general');
-      expect(result).toContain('Test message');
-      expect(result).toContain('User One');
+      expect(result).toMatchInlineSnapshot(`
+        "
+        ## 2021-01-01 - #general
+
+        - **12/31/2020** [19:00](https://example.slack.com/archives/C123/p1609459200000000) **User One**: Test message"
+      `);
     });
 
     it('should organize messages by date and channel', () => {
@@ -226,32 +77,17 @@ describe('My Messages Formatters', () => {
 
       const result = generateMarkdown(messages, mockCache, 'U123');
 
-      // Use regex to match date headings regardless of timezone
-      const dateHeadings = result.match(/^# [A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}/gm) || [];
-      expect(dateHeadings.length).toBe(2); // Should have two date sections
+      expect(result).toMatchInlineSnapshot(`
+        "
+        ## 2021-01-02 - #random
 
-      // Find the indices of these date headings
-      const date1Index = result.indexOf(dateHeadings[0] || '');
-      const date2Index = result.indexOf(dateHeadings[1] || '');
+        - **1/1/2021** [19:00](https://example.slack.com/archives/C456/p1609545600000000) **User Two**: Message in random
 
-      expect(date1Index).toBeGreaterThan(-1);
-      expect(date2Index).toBeGreaterThan(-1);
+        ## 2021-01-01 - #general
 
-      // Dates should be in chronological order
-      expect(date1Index).toBeLessThan(date2Index);
-
-      // Extract sections
-      const generalSection = result.substring(date1Index, date2Index);
-      const randomSection = result.substring(date2Index);
-
-      // First date should have both messages in general channel
-      expect(generalSection).toContain('## #general');
-      expect(generalSection).toContain('Message in general');
-      expect(generalSection).toContain('Another message in general');
-
-      // Second date should have random channel message
-      expect(randomSection).toContain('## #random');
-      expect(randomSection).toContain('Message in random');
+        - **12/31/2020** [19:00](https://example.slack.com/archives/C123/p1609459200000000) **User One**: Message in general
+        - **12/31/2020** [19:01](https://example.slack.com/archives/C123/p1609459300000000) **User One**: Another message in general"
+      `);
     });
 
     it('should handle thread messages', () => {
@@ -269,7 +105,6 @@ describe('My Messages Formatters', () => {
         text: 'Thread reply 1',
         user: 'U456',
         channel: { id: 'C123' },
-        thread_ts: '1609459200.000000',
         permalink:
           'https://example.slack.com/archives/C123/p1609459300000000?thread_ts=1609459200.000000',
       };
@@ -279,7 +114,6 @@ describe('My Messages Formatters', () => {
         text: 'Thread reply 2',
         user: 'U789',
         channel: { id: 'C123' },
-        thread_ts: '1609459200.000000',
         permalink:
           'https://example.slack.com/archives/C123/p1609459400000000?thread_ts=1609459200.000000',
       };

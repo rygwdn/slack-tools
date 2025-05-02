@@ -2,7 +2,7 @@ import { GlobalContext } from '../context';
 import { getSlackClient } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
-import { getSlackEntityCache } from '../commands/my_messages/slack-entity-cache';
+import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
 import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
@@ -68,7 +68,7 @@ export async function generateMyMessagesSummary(
   );
   GlobalContext.log.debug(`Found ${allMessages.length} total messages. Fetching details...`);
 
-  const cache = await getSlackEntityCache(client, allMessages);
+  const cache = await getCacheForMessages(client, allMessages);
 
   GlobalContext.log.debug('Formatting report...');
 
@@ -76,7 +76,7 @@ export async function generateMyMessagesSummary(
 
   cache.lastUpdated = Date.now();
 
-  await saveSlackCache(cache);
+  await saveSlackCache();
 
   return {
     markdown,

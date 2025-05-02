@@ -4,18 +4,11 @@ import {
   calculateExpirationTime,
   setSlackStatus,
   getSlackStatus,
-  performSlackSearch,
   getUserProfile,
 } from '../../../src/services/slack-services';
 import * as slackApi from '../../../src/slack-api';
-import * as slackService from '../../../src/commands/my_messages/slack-service';
-import * as slackEntityCache from '../../../src/commands/my_messages/slack-entity-cache';
-import * as cache from '../../../src/cache';
 
 vi.mock('../../../src/slack-api');
-vi.mock('../../../src/commands/my_messages/slack-service');
-vi.mock('../../../src/commands/my_messages/slack-entity-cache');
-vi.mock('../../../src/cache');
 
 describe('Slack Services', () => {
   beforeEach(() => {
@@ -246,65 +239,6 @@ describe('Slack Services', () => {
 
       // Expect the function to throw
       await expect(getSlackStatus()).rejects.toThrow('Status retrieval failed: Error: API Error');
-    });
-  });
-
-  describe('performSlackSearch', () => {
-    let mockClient: any;
-    let mockMessages: any[];
-    let mockEntityCache: any;
-
-    beforeEach(() => {
-      // Setup mock client and data
-      mockClient = {
-        auth: {
-          test: vi.fn().mockResolvedValue({ user_id: 'U12345' }),
-        },
-      };
-
-      mockMessages = [
-        { user: 'U12345', ts: '1609459200.000100', text: 'Test message', channel: 'C12345' },
-      ];
-
-      mockEntityCache = {
-        lastUpdated: 1609459200000,
-        channels: { C12345: { name: 'general' } },
-        users: { U12345: { name: 'testuser' } },
-      };
-
-      // Setup mocks for all dependencies
-      vi.mocked(slackApi.getSlackClient).mockResolvedValue(mockClient);
-      vi.mocked(slackService.searchSlackMessages).mockResolvedValue(mockMessages);
-      vi.mocked(slackEntityCache.getSlackEntityCache).mockResolvedValue(mockEntityCache);
-      vi.mocked(cache.saveSlackCache).mockResolvedValue(undefined);
-    });
-
-    it('should search messages and return results with metadata', async () => {
-      const result = await performSlackSearch('test query', 10);
-
-      // Check that dependencies were called
-      expect(slackApi.getSlackClient).toHaveBeenCalledWith();
-      expect(slackService.searchSlackMessages).toHaveBeenCalled();
-      expect(slackEntityCache.getSlackEntityCache).toHaveBeenCalled();
-      expect(cache.saveSlackCache).toHaveBeenCalled();
-
-      // Check result structure
-      expect(result).toEqual({
-        messages: mockMessages,
-        userId: 'U12345',
-        channels: mockEntityCache.channels,
-        users: mockEntityCache.users,
-      });
-    });
-
-    it('should throw an error if search fails', async () => {
-      // Make search throw an error
-      vi.mocked(slackService.searchSlackMessages).mockRejectedValueOnce(
-        new Error('Search API Error'),
-      );
-
-      // Expect the function to throw with the specific error message
-      await expect(performSlackSearch('failed query', 10)).rejects.toThrow(/Search failed:/);
     });
   });
 

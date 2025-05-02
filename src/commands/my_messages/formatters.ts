@@ -1,95 +1,13 @@
 import { GlobalContext } from '../../context';
 import { SlackCache, ThreadMessage } from './types';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
+import {
+  extractThreadTsFromPermalink,
+  formatMessage,
+  getFriendlyChannelName,
+} from '../../services/formatting-service';
+import { objectToMarkdown } from '../../utils/markdown-utils';
 
-export function getFriendlyChannelName(
-  channelId: string,
-  cache: SlackCache,
-  userId: string,
-): string {
-  const channel = cache.channels[channelId];
-  if (!channel) return channelId;
-
-  if (channel.type === 'channel') {
-    return `#${channel.displayName}`;
-  }
-
-  if (channel.type === 'im' && channel.members && channel.members.length > 0) {
-    const otherUserId = channel.members[0];
-    const otherUser = cache.users[otherUserId];
-    const displayName = otherUser ? otherUser.displayName : channel.displayName;
-    return `DM with ${displayName}`;
-  }
-
-  if (channel.type === 'mpim' && channel.members) {
-    const memberNames = channel.members
-      .filter((id) => id !== userId)
-      .map((id) => cache.users[id]?.displayName || id)
-      .join(', ');
-    return `Group DM with ${memberNames}`;
-  }
-
-  return channelId;
-}
-
-export function formatSlackText(text: string, cache: SlackCache): string {
-  if (!text) return '';
-
-  // Convert user mentions: <@U123ABC> -> @username
-  // Also handle format with display name: <@U123ABC|display_name> -> @username
-  text = text.replace(/<@([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, userId, displayName) => {
-    // If we have the user in cache, use their display name
-    const user = cache.users[userId];
-    if (user) {
-      return `@${user.displayName}`;
-    }
-    // If not in cache but a display name was provided in the mention, use that
-    else if (displayName) {
-      return `@${displayName}`;
-    }
-    // Otherwise return the original match
-    return match;
-  });
-
-  // Convert channel mentions: <#C123ABC> or <#C123ABC|channel-name> -> #channel-name
-  text = text.replace(/<#([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, channelId, channelName) => {
-    if (channelName) return `#${channelName}`;
-    const channel = cache.channels[channelId];
-    return channel ? `#${channel.displayName}` : match;
-  });
-
-  // Convert links: <https://example.com|text> -> [text](https://example.com)
-  text = text.replace(/<((?:https?:\/\/)[^|>]+)\|([^>]+)>/g, '[$2]($1)');
-  // Convert plain links: <https://example.com> -> https://example.com
-  text = text.replace(/<((?:https?:\/\/)[^>]+)>/g, '$1');
-
-  // Handle newlines by adding proper markdown indentation
-  return text.split('\n').join('\n    ');
-}
-
-export function formatTime(date: Date): string {
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-export function isValidThreadMessage(message: Match): message is ThreadMessage {
-  return typeof message.ts === 'string';
-}
-
-// Function to extract thread_ts from permalink
-export function extractThreadTsFromPermalink(permalink?: string): string | undefined {
-  if (!permalink) return undefined;
-
-  try {
-    const url = new URL(permalink);
-    return url.searchParams.get('thread_ts') || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-// Helper function to check if a channel should be included in the report
 function shouldIncludeChannel(
   channelId: string,
   messages: ThreadMessage[],
@@ -105,17 +23,17 @@ function shouldIncludeChannel(
     return hasMyDirectMessage || hasMyThreadReply;
   });
 
-  const channel = cache.channels[channelId];
+  const channel = cache.entities[channelId];
   if (!channel) return true; // Keep channels we don't have info for
 
   // Check if it's a bot DM
   if (channel.type === 'im') {
-    const dmUser = cache.users[channel.members?.[0] || ''];
-    const isBot = dmUser?.isBot || false;
+    const dmUser = cache.entities[channel.members?.[0] || ''];
+    const isBot = dmUser?.type === 'user' && dmUser.isBot;
     const shouldKeep = hasMyMessage || !isBot;
     if (!shouldKeep) {
       GlobalContext.log.debug(
-        `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache, userId)}`,
+        `Filtering out bot channel: ${getFriendlyChannelName(channelId, cache)}`,
       );
     }
     return shouldKeep;
@@ -124,338 +42,109 @@ function shouldIncludeChannel(
   return true;
 }
 
-// Helper function to organize messages into threads
-function organizeMessagesIntoThreads(messages: Match[]): {
-  threadMap: Map<string, ThreadMessage[]>;
-  standaloneMessages: ThreadMessage[];
-} {
-  const threadMap = new Map<string, ThreadMessage[]>();
-  const standaloneMessages: ThreadMessage[] = [];
-
+function organizeMessagesIntoThreads(messages: Match[]): ThreadMessage[] {
+  const messageByThread = new Map<string, Match[]>();
   for (const message of messages) {
-    if (!isValidThreadMessage(message)) {
-      GlobalContext.log.debug('Skipping message without timestamp');
-      continue;
-    }
+    const key = extractThreadTsFromPermalink(message.permalink) || 'standalone';
+    messageByThread.set(key, [...(messageByThread.get(key) || []), message]);
+  }
+  const topLevelMessages: ThreadMessage[] = [];
 
-    // Try to get thread_ts from the message or extract it from permalink
-    const threadTs = message.thread_ts || extractThreadTsFromPermalink(message.permalink);
-
-    // Create a thread permalink if this message has a permalink and thread_ts
-    let threadPermalink = undefined;
-    let isThreadParent = false;
-
-    // Determine if this message is part of a thread
-    if (message.permalink) {
-      // Check if the permalink contains thread_ts which would indicate a thread
-      if (message.permalink.includes('thread_ts=')) {
-        threadPermalink = message.permalink;
-        // If the thread_ts in permalink matches this message's ts, it's a thread parent
-        isThreadParent = message.permalink.includes(`thread_ts=${message.ts}`);
-      } else if (threadTs) {
-        // If we have thread_ts but it's not in permalink, add it
-        try {
-          const url = new URL(message.permalink);
-          url.searchParams.set('thread_ts', threadTs);
-          threadPermalink = url.toString();
-        } catch {
-          // If URL parsing fails, keep the original permalink
-          threadPermalink = message.permalink;
-        }
-      }
-    }
-
-    // If the message has a thread_ts and it's not the thread parent (ts !== thread_ts), it's a reply
-    if (threadTs && message.ts !== threadTs) {
-      // Ensure thread_ts is valid
-      if (!threadMap.has(threadTs)) {
-        threadMap.set(threadTs, []);
-      }
-      const thread = threadMap.get(threadTs)!;
-      // Add the message to the thread if it's not already there
-      if (!thread.some((m) => m.ts === message.ts)) {
-        // Ensure thread_ts is properly set on the message object for later use
-        const messageWithThreadTs: ThreadMessage = {
-          ...message,
-          thread_ts: threadTs,
-          threadPermalink,
-          hasReplies: false,
-        };
-        thread.push(messageWithThreadTs);
-        GlobalContext.log.debug(`Added message to thread: ${message.text?.slice(0, 50)}`);
-      }
+  for (const [key, messages] of messageByThread.entries()) {
+    if (key === 'standalone' || messages.length === 1) {
+      topLevelMessages.push(...messages.map((message) => ({ ...message, threadMessages: [] })));
     } else {
-      // If no thread_ts or it's the thread parent, it's a standalone/parent message
-      const messageWithThreadInfo: ThreadMessage = {
-        ...message,
-        threadPermalink,
-        hasReplies: isThreadParent,
-      };
-      standaloneMessages.push(messageWithThreadInfo);
-      GlobalContext.log.debug(
-        `Added standalone/parent message: ${message.ts} ${threadTs} ${message.text?.slice(0, 50)}`,
-      );
+      const firstMessage = messages.sort((a, b) => Number(a.ts) - Number(b.ts))[0];
+      topLevelMessages.push({
+        ...firstMessage,
+        threadMessages: messages.filter((m) => m !== firstMessage),
+      });
     }
   }
 
-  return { threadMap, standaloneMessages };
+  return topLevelMessages;
 }
 
-// Helper function to add a message to the date/channel structure
-function addMessageToDateChannelStructure(
-  message: ThreadMessage,
-  threadMessages: ThreadMessage[] = [],
-  dateChannelMap: Map<string, Map<string, ThreadMessage[]>>,
-): void {
-  const date = new Date(Number(message.ts) * 1000);
-  const dateKey = date.toISOString().split('T')[0];
-  const channelId = message.channel?.id || 'unknown';
+function groupMessagesByDateAndChannel(topLevelMessages: ThreadMessage[]) {
+  const messagesByDate = new Map<
+    string,
+    {
+      date: string;
+      channelId: string;
+      messages: ThreadMessage[];
+    }
+  >();
 
-  if (!dateChannelMap.has(dateKey)) {
-    dateChannelMap.set(dateKey, new Map());
-  }
-  const channelsForDate = dateChannelMap.get(dateKey)!;
+  for (const message of topLevelMessages) {
+    const date = new Date(Number(message.ts) * 1000);
+    const dateKey = date.toISOString().split('T')[0];
+    const channelId = message.channel?.id || 'unknown';
+    const key = `${dateKey}-${channelId}`;
 
-  if (!channelsForDate.has(channelId)) {
-    channelsForDate.set(channelId, []);
+    const messagesForChannel = messagesByDate.get(key) || {
+      date: dateKey,
+      channelId,
+      messages: [],
+    };
+    messagesByDate.set(key, {
+      ...messagesForChannel,
+      messages: [...messagesForChannel.messages, message],
+    });
   }
 
-  const messagesForChannel = channelsForDate.get(channelId)!;
-  if (threadMessages.length > 0) {
-    GlobalContext.log.debug(
-      `Adding message with ${threadMessages.length} thread replies to ${channelId}`,
-    );
-  }
-  messagesForChannel.push({
-    ...message,
-    threadMessages,
+  return Array.from(messagesByDate.values()).sort((a, b) => {
+    const aKey = `${a.date}-${a.channelId}`;
+    const bKey = `${b.date}-${b.channelId}`;
+    return -aKey.localeCompare(bKey);
   });
 }
 
-// Helper function to group messages by date and channel
-function groupMessagesByDateAndChannel(
-  standaloneMessages: ThreadMessage[],
-  threadMap: Map<string, ThreadMessage[]>,
-): Map<string, Map<string, ThreadMessage[]>> {
-  const messagesByDate = new Map<string, Map<string, ThreadMessage[]>>();
-
-  // Process standalone messages
-  for (const message of standaloneMessages) {
-    // If this message started a thread, add its replies
-    if (message.ts && threadMap.has(message.ts)) {
-      const threadMessages = threadMap.get(message.ts)!;
-      // Filter out the parent message from replies if it exists
-      const replies = threadMessages.filter((m) => m.ts !== message.ts);
-      // Mark that this message has replies
-      const messageWithReplies: ThreadMessage = {
-        ...message,
-        hasReplies: replies.length > 0,
-        threadPermalink: message.threadPermalink || message.permalink,
-      };
-      addMessageToDateChannelStructure(messageWithReplies, replies, messagesByDate);
-    } else {
-      addMessageToDateChannelStructure({ ...message, hasReplies: false }, [], messagesByDate);
-    }
-  }
-
-  // Process threads where we don't have the parent message
-  for (const [threadTs, threadMessages] of threadMap.entries()) {
-    // Skip threads we've already handled via standalone messages
-    if (standaloneMessages.some((m) => m.ts === threadTs)) {
-      continue;
-    }
-
-    // Sort thread messages by timestamp
-    const sortedThreadMessages = threadMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
-
-    // Find the parent message (message with ts === thread_ts)
-    const parentMessage = sortedThreadMessages.find((m) => m.ts === threadTs);
-
-    if (parentMessage) {
-      // We have the parent, add it with its replies
-      const replies = sortedThreadMessages.filter((m) => m.ts !== parentMessage.ts);
-      const parentWithReplies: ThreadMessage = {
-        ...parentMessage,
-        hasReplies: replies.length > 0,
-        threadPermalink: parentMessage.threadPermalink || parentMessage.permalink,
-      };
-      addMessageToDateChannelStructure(parentWithReplies, replies, messagesByDate);
-    } else {
-      // Create a synthetic parent from the first message
-      const firstMessage = sortedThreadMessages[0];
-      GlobalContext.log.debug(`Thread ${threadTs} missing parent, using first reply as parent`);
-
-      // Try to get a thread permalink from one of the replies
-      const threadPermalink =
-        sortedThreadMessages.find((m) => m.threadPermalink)?.threadPermalink ||
-        firstMessage.permalink;
-
-      const syntheticParent: ThreadMessage = {
-        ...firstMessage,
-        thread_ts: threadTs,
-        ts: threadTs,
-        text: firstMessage.text,
-        user: firstMessage.user,
-        channel: firstMessage.channel,
-        hasReplies: true,
-        threadPermalink,
-      };
-      const replies = sortedThreadMessages.filter((m) => m.ts !== firstMessage.ts);
-      addMessageToDateChannelStructure(syntheticParent, replies, messagesByDate);
-    }
-  }
-
-  return messagesByDate;
-}
-
-// Helper function to format a single message
-function formatMessage(message: ThreadMessage, cache: SlackCache): string {
-  let markdown = '';
-  const timestamp = new Date(Number(message.ts) * 1000);
-  const timeString = formatTime(timestamp);
-
-  let userName = message.username || 'Unknown User';
-  if (message.user && cache.users[message.user]) {
-    userName = cache.users[message.user].displayName;
-  }
-
-  GlobalContext.log.debug(`Formatting message from ${userName}`);
-
-  // Format the main message with thread indicator
-  let threadIndicator = '';
-  if (message.hasReplies) {
-    // If the thread_ts matches this message's ts, it's the start of a thread
-    const isThreadStarter =
-      message.thread_ts === message.ts || message.permalink?.includes(`thread_ts=${message.ts}`);
-
-    if (isThreadStarter) {
-      threadIndicator = ` [💬 Start of Thread](${message.threadPermalink || message.permalink || ''})`;
-    } else {
-      threadIndicator = ` [💬 Part of Thread](${message.threadPermalink || message.permalink || ''})`;
-    }
-  }
-
-  markdown += `- [*${timeString}*](${message.permalink || ''}) **${userName}**${threadIndicator}: `;
-
-  // Handle multi-line messages by properly indenting continuation lines
-  const formattedText = formatSlackText(message.text || '', cache);
-  const messageLines = formattedText.split('\n');
-  markdown += messageLines[0] + '\n'; // First line goes right after the timestamp and username
-
-  // Any additional lines need to be indented to align with the first line
-  if (messageLines.length > 1) {
-    const indent = '    '; // 4 spaces for markdown list alignment
-    markdown +=
-      messageLines
-        .slice(1)
-        .map((line) => `${indent}${line}`)
-        .join('\n') + '\n';
-  }
-
-  return markdown;
-}
-
-// Helper function to format thread replies
-function formatThreadReplies(replies: ThreadMessage[], cache: SlackCache): string {
-  let markdown = '';
-
-  // Sort replies by timestamp
-  const sortedReplies = replies.sort((a, b) => Number(a.ts) - Number(b.ts));
-
-  for (const reply of sortedReplies) {
-    const replyTimestamp = new Date(Number(reply.ts) * 1000);
-    const replyTimeString = formatTime(replyTimestamp);
-
-    let replyUserName = reply.username || 'Unknown User';
-    if (reply.user && cache.users[reply.user]) {
-      replyUserName = cache.users[reply.user].displayName;
-    }
-
-    // Thread replies don't need reaction indicators
-
-    // Indent thread replies with 8 spaces for proper markdown nesting under parent
-    markdown += '        - '; // 8 spaces for nesting + the bullet point
-    if (reply.permalink) {
-      markdown += `[*${replyTimeString}*](${reply.permalink})`;
-    } else {
-      markdown += `*${replyTimeString}*`;
-    }
-
-    // Format the reply text
-    const formattedReplyText = formatSlackText(reply.text || '', cache);
-    const replyLines = formattedReplyText.split('\n');
-    markdown += ` **${replyUserName}**: ${replyLines[0]}\n`; // First line
-
-    // Any additional lines in the reply need to be indented further
-    if (replyLines.length > 1) {
-      const replyIndent = '            '; // 12 spaces for nested list continuation
-      markdown +=
-        replyLines
-          .slice(1)
-          .map((line) => `${replyIndent}${line}`)
-          .join('\n') + '\n';
-    }
-  }
-
-  return markdown;
-}
-
 export function generateMarkdown(messages: Match[], cache: SlackCache, userId: string): string {
-  let markdown = '';
-
   GlobalContext.log.debug(`Processing ${messages.length} total messages`);
 
-  // Organize messages into threads
-  const { threadMap, standaloneMessages } = organizeMessagesIntoThreads(messages);
+  const distinctMessages = messages.filter(
+    (message, index, self) => index === self.findIndex((t) => t.permalink === message.permalink),
+  );
 
-  // Group messages by date and channel
-  const messagesByDate = groupMessagesByDateAndChannel(standaloneMessages, threadMap);
+  const topLevelMessages = organizeMessagesIntoThreads(distinctMessages);
 
-  // Generate markdown for each date
-  const sortedDates = Array.from(messagesByDate.keys()).sort();
-  for (const dateKey of sortedDates) {
-    const date = new Date(dateKey);
-    markdown += `# ${date.toDateString()}\n\n`;
+  const messagesByChannel = new Map<string, ThreadMessage[]>();
+  for (const message of topLevelMessages) {
+    const channelId = message.channel?.id || 'unknown';
+    messagesByChannel.set(channelId, [...(messagesByChannel.get(channelId) || []), message]);
+  }
+  const filteredTopLevelMessages = Array.from(messagesByChannel.entries())
+    .filter(([channelId, messages]) => shouldIncludeChannel(channelId, messages, cache, userId))
+    .flatMap(([_, messages]) => messages);
 
-    const channelsForDate = messagesByDate.get(dateKey)!;
+  const messagesByDateAndChannel = groupMessagesByDateAndChannel(filteredTopLevelMessages);
 
-    // Filter and sort channels
-    const channelEntries = Array.from(channelsForDate.entries())
-      .map(([id, messages]) => [id || 'unknown', messages] as [string, ThreadMessage[]])
-      .filter(([channelId, channelMessages]) =>
-        shouldIncludeChannel(channelId, channelMessages, cache, userId),
-      )
-      .sort(([aId], [bId]) => {
-        const aName = getFriendlyChannelName(aId, cache, userId);
-        const bName = getFriendlyChannelName(bId, cache, userId);
-        return aName.localeCompare(bName);
-      });
+  const sections = [];
 
-    // Generate markdown for each channel
-    for (const [channelId, channelMessages] of channelEntries) {
-      const channelName = getFriendlyChannelName(channelId, cache, userId);
-      markdown += `## ${channelName}\n\n`;
+  for (const { date, channelId, messages } of messagesByDateAndChannel) {
+    const sortedMessages = messages.sort((a, b) => Number(a.ts) - Number(b.ts));
+    const lines = [];
 
-      // Sort messages by timestamp
-      const sortedMessages = channelMessages.sort((a, b) => Number(a.ts) - Number(b.ts));
+    for (const message of sortedMessages) {
+      lines.push(...formatMessage(message, cache));
 
-      for (const message of sortedMessages) {
-        // Format the main message
-        markdown += formatMessage(message, cache);
-
-        // Add thread replies if any
-        if (message.threadMessages?.length) {
-          GlobalContext.log.debug(
-            `Adding ${message.threadMessages.length} thread replies for message: ${message.text?.slice(0, 50)}`,
+      if (message.threadMessages?.length) {
+        for (const threadMessage of message.threadMessages) {
+          lines.push(
+            ...formatMessage(threadMessage, cache, { includeThreadLinks: false }).map(
+              (line) => `  ${line}`,
+            ),
           );
-          markdown += formatThreadReplies(message.threadMessages, cache);
-          markdown += '\n'; // Add extra line after thread
         }
+        lines.push('');
       }
-
-      markdown += '\n';
     }
+
+    const channelName = getFriendlyChannelName(channelId, cache);
+    sections.push({
+      [`${date} - ${channelName}`]: lines,
+    });
   }
 
-  return markdown;
+  return objectToMarkdown(sections);
 }
