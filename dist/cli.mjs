@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { readFileSync, existsSync, promises } from 'fs';
+import { readFileSync, existsSync as existsSync$1, promises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import keytar from 'keytar';
-import { WebClient, LogLevel } from '@slack/web-api';
 import { join as join$1 } from 'node:path';
 import { platform, homedir as homedir$1 } from 'node:os';
 import { promisify } from 'node:util';
@@ -13,52 +12,31 @@ import Database from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
 import { Level } from 'level';
-import { existsSync as existsSync$1 } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { WebClient, LogLevel } from '@slack/web-api';
 import { homedir } from 'os';
 import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 
 var SERVICE_NAME = "slack-tools";
-var COOKIE_KEY = "slack-cookie";
-async function storeAuth(auth) {
-  for (const [url, details] of Object.entries(auth.tokens)) {
-    await keytar.setPassword(SERVICE_NAME, url, JSON.stringify(details));
-  }
-  if (auth.cookie) {
-    await keytar.setPassword(SERVICE_NAME, COOKIE_KEY, JSON.stringify(auth.cookie));
-  }
+var COOKIE_KEY = "slack-cookie-1";
+async function storeAuth(workspace, auth) {
+  await keytar.setPassword(SERVICE_NAME, COOKIE_KEY, auth.cookie);
+  await keytar.setPassword(SERVICE_NAME, workspace, auth.token);
 }
-async function getStoredAuth() {
+var envCookie = process.env.SLACK_COOKIE;
+var envToken = process.env.SLACK_TOKEN;
+async function getStoredAuth(workspace) {
   try {
-    const credentials = await keytar.findCredentials(SERVICE_NAME);
-    if (credentials.length === 0) {
-      return null;
-    }
-    const tokens = {};
-    let cookie = null;
-    for (const cred of credentials) {
-      if (cred.account === COOKIE_KEY) {
-        try {
-          cookie = JSON.parse(cred.password);
-        } catch (error) {
-          console.error("Failed to parse cookie from keychain:", error);
-        }
-      } else {
-        try {
-          const details = JSON.parse(cred.password);
-          tokens[cred.account] = details;
-        } catch (error) {
-          console.error(`Failed to parse token for ${cred.account}:`, error);
-        }
-      }
-    }
-    if (Object.keys(tokens).length === 0) {
-      return null;
-    }
+    const cookie = envCookie || await keytar.getPassword(SERVICE_NAME, COOKIE_KEY);
     if (!cookie) {
       return null;
     }
-    return { tokens, cookie };
+    const token = envToken || await keytar.getPassword(SERVICE_NAME, workspace);
+    if (!token) {
+      return null;
+    }
+    return { token, cookie };
   } catch (error) {
     console.error("Failed to read auth from keychain:", error);
     return null;
@@ -104,8 +82,6 @@ var GlobalContext = {
     error: (...args) => console.error(...args)
   }
 };
-
-// src/cookies.ts
 var exec = promisify(exec$1);
 function decryptCookieValue(encryptedValue, encryptionKey) {
   try {
@@ -156,7 +132,7 @@ function getCookiesDbPath() {
     )
   ];
   for (const path of paths) {
-    if (existsSync(path)) {
+    if (existsSync$1(path)) {
       GlobalContext.log.debug(`Using cookies database path: ${path}`);
       return path;
     }
@@ -207,18 +183,12 @@ async function getCookie() {
       if (xoxdIndex !== -1) {
         const fixedValue = decryptedValue.substring(xoxdIndex);
         GlobalContext.log.debug(`Found xoxd- cookie`);
-        return {
-          name: result.name,
-          value: fixedValue
-        };
+        return fixedValue;
       }
       if (!decryptedValue.startsWith("xoxd-")) {
         throw new Error("Decrypted cookie value does not have the required xoxd- prefix");
       }
-      return {
-        name: result.name,
-        value: decryptedValue
-      };
+      return decryptedValue;
     } finally {
       await db.close();
     }
@@ -240,14 +210,14 @@ function getLevelDBPath() {
     join$1(homedir$1(), "Library/Application Support/Slack/Local Storage/leveldb")
   ];
   for (const path of paths) {
-    if (existsSync$1(path)) {
+    if (existsSync(path)) {
       GlobalContext.log.debug(`Found leveldb path: ${path}`);
       return path;
     }
   }
   throw new Error("Could not find Slack's Local Storage directory");
 }
-async function getTokens() {
+async function getToken(workspace) {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
   try {
@@ -265,14 +235,16 @@ async function getTokens() {
       throw new Error("Slack has multiple localConfig_v2 values");
     }
     const config = JSON.parse(configValues[0].slice(1));
-    const tokens = {};
+    GlobalContext.log.debug(
+      "Config:",
+      Object.values(config.teams).map((t) => t.name)
+    );
     for (const team of Object.values(config.teams)) {
-      tokens[team.url] = {
-        token: team.token,
-        name: team.name
-      };
+      if (!workspace || team.name === workspace) {
+        return team.token;
+      }
     }
-    return tokens;
+    throw new Error(`No token found for workspace: ${workspace}`);
   } catch (error) {
     console.error("Error:", error);
     if (error && typeof error === "object" && "code" in error) {
@@ -292,6 +264,36 @@ async function getTokens() {
       await db.close();
     }
   }
+}
+
+// src/commands/print.ts
+function registerPrintCommand(program2) {
+  program2.command("print").description("Print tokens and cookie").option("-q, --quiet", "Suppress output and only show tokens/cookies").action(async (cmdOptions) => {
+    try {
+      const storedAuth = await getStoredAuth(GlobalContext.workspace);
+      if (!cmdOptions.quiet && !storedAuth) {
+        console.log("No stored auth found, fetching fresh credentials...");
+      }
+      const auth = storedAuth || {
+        cookie: await getCookie(),
+        token: await getToken()
+      };
+      if (!cmdOptions.quiet) {
+        console.log("\nFound token for workspace:\n");
+        console.log(`Workspace URL: ${GlobalContext.workspace}`);
+        console.log(`Token: ${auth.token}
+`);
+        console.log("Found cookie:");
+        console.log(`${auth.cookie}
+`);
+      } else {
+        console.log(auth.token);
+        console.log(auth.cookie);
+      }
+    } catch (error) {
+      program2.error(error.toString());
+    }
+  });
 }
 
 // src/utils/log-utils.ts
@@ -325,7 +327,7 @@ function isCacheValid(cache, ttl) {
   return cache.version === 1 && cache.lastUpdated > Date.now() - ttl && cache.entities && cache.lastUpdated > 0;
 }
 async function readCache(cacheFile, ttl) {
-  if (!existsSync(cacheFile)) {
+  if (!existsSync$1(cacheFile)) {
     GlobalContext.log.debug(`Cache for ${cacheFile} does not exist`);
     return null;
   }
@@ -344,16 +346,14 @@ async function loadSlackCache() {
   const cache = await readCache(SLACK_CACHE_FILE, SLACK_CACHE_TTL) || {
     version: 1,
     entities: {},
-    lastUpdated: 0,
-    lastWorkspace: GlobalContext.workspace
+    lastUpdated: 0
   };
   GlobalContext.cache = cache;
   GlobalContext.log.debug(`Loaded cache from ${SLACK_CACHE_FILE}`);
   return cache;
 }
-async function saveSlackCache(lastWorkspace) {
+async function saveSlackCache() {
   const cache = await loadSlackCache();
-  cache.lastWorkspace = GlobalContext.workspace;
   await ensureConfigDir();
   await promises.writeFile(SLACK_CACHE_FILE, JSON.stringify(cache));
 }
@@ -362,7 +362,7 @@ async function saveSlackCache(lastWorkspace) {
 function createWebClient(token, cookie) {
   return new WebClient(token, {
     headers: {
-      Cookie: `d=${cookie.value}`
+      Cookie: `d=${cookie}`
     },
     logger: {
       debug: (message, ...args) => GlobalContext.log.debug(...redactLog(message, ...args)),
@@ -378,12 +378,8 @@ function createWebClient(token, cookie) {
   });
 }
 async function validateAuth(auth) {
-  const firstToken = Object.values(auth.tokens)[0]?.token;
-  if (!firstToken) {
-    throw new Error("Auth test failed: No token found");
-  }
   try {
-    const client = createWebClient(firstToken, auth.cookie);
+    const client = createWebClient(auth.token, auth.cookie);
     const response = await client.auth.test();
     if (!response.ok) {
       throw new Error("Auth test failed: API returned not ok");
@@ -396,16 +392,16 @@ async function validateAuth(auth) {
 }
 async function getFreshAuth() {
   const newAuth = {
-    cookie: await getCookie(),
-    tokens: await getTokens()
+    cookie: envCookie || await getCookie(),
+    token: envToken || await getToken(GlobalContext.workspace)
   };
   await validateAuth(newAuth);
-  await storeAuth(newAuth);
+  await storeAuth(GlobalContext.workspace, newAuth);
   return newAuth;
 }
 async function validateAndRefreshAuth() {
-  const storedAuth = await getStoredAuth();
-  if (storedAuth?.cookie && storedAuth?.tokens) {
+  const storedAuth = await getStoredAuth(GlobalContext.workspace);
+  if (storedAuth?.cookie && storedAuth?.token) {
     try {
       await validateAuth(storedAuth);
       return storedAuth;
@@ -420,98 +416,21 @@ async function validateAndRefreshAuth() {
     return newAuth;
   }
 }
-function findWorkspaceToken(auth, workspaceName) {
-  if (!auth.cookie) {
-    throw new Error("No cookie found in auth");
-  }
-  GlobalContext.log.debug("Available workspaces:", Object.keys(auth.tokens).join(", "));
-  GlobalContext.log.debug("Looking for workspace:", workspaceName);
-  if (auth.tokens[workspaceName]) {
-    const token = auth.tokens[workspaceName].token;
-    GlobalContext.log.debug(`Found token for workspace URL: ${workspaceName}`);
-    GlobalContext.log.debug(
-      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`
-    );
-    return {
-      token,
-      workspaceUrl: workspaceName,
-      cookie: auth.cookie
-    };
-  }
-  const wsEntry = Object.entries(auth.tokens).find(
-    ([, details]) => details.name.toLowerCase() === workspaceName.toLowerCase()
-  );
-  if (wsEntry) {
-    const token = wsEntry[1].token;
-    GlobalContext.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
-    GlobalContext.log.debug(`Workspace URL: ${wsEntry[0]}`);
-    GlobalContext.log.debug(
-      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`
-    );
-    return {
-      token,
-      workspaceUrl: wsEntry[0],
-      cookie: auth.cookie
-    };
-  }
-  GlobalContext.log.debug("All available workspaces:");
-  Object.entries(auth.tokens).forEach(([url, details]) => {
-    GlobalContext.log.debug(`- ${details.name} (${url})`);
-  });
-  throw new Error(
-    `Could not find workspace "${workspaceName}". Use 'slack-tools print' to see available workspaces.`
-  );
-}
 async function getSlackClient() {
-  const auth = !GlobalContext.currentUser ? await validateAndRefreshAuth() : await getStoredAuth() || await getFreshAuth();
+  const auth = !GlobalContext.currentUser ? await validateAndRefreshAuth() : await getStoredAuth(GlobalContext.workspace) || await getFreshAuth();
   if (!GlobalContext.workspace) {
     console.error("Error: No workspace specified. Please specify a workspace using:");
     console.error("  - Use -w, --workspace <workspace> to specify a workspace directly");
-    console.error("  - Use -l, --last-workspace to use your most recently used workspace");
     process.exit(1);
   }
   await saveSlackCache();
-  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
-  GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
-  if (!token.startsWith("xoxc-")) {
-    throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${token}`);
+  if (!auth.token.startsWith("xoxc-")) {
+    throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${auth.token}`);
   }
-  return createWebClient(token, cookie);
-}
-
-// src/commands/print.ts
-function registerPrintCommand(program2) {
-  program2.command("print").description("Print tokens and cookie").option("-q, --quiet", "Suppress output and only show tokens/cookies").action(async (cmdOptions) => {
-    try {
-      const storedAuth = await getStoredAuth();
-      if (!cmdOptions.quiet && !storedAuth) {
-        console.log("No stored auth found, fetching fresh credentials...");
-      }
-      const auth = storedAuth || {
-        cookie: await getCookie(),
-        tokens: await getTokens()
-      };
-      const { token, cookie, workspaceUrl } = findWorkspaceToken(
-        auth,
-        GlobalContext.workspace || Object.keys(auth.tokens)[0]
-      );
-      if (!cmdOptions.quiet) {
-        console.log("\nFound token for workspace:\n");
-        console.log(`Workspace URL: ${workspaceUrl}`);
-        console.log(`Token: ${token}
-`);
-        console.log("Found cookie:");
-        console.log(`${cookie.name}: ${cookie.value}
-`);
-      } else {
-        console.log(token);
-        console.log(cookie.value);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      process.exit(1);
-    }
-  });
+  if (!auth.cookie.startsWith("xoxd-")) {
+    throw new Error(`Invalid cookie format: cookie should start with 'xoxd-'. Got: ${auth.cookie}`);
+  }
+  return createWebClient(auth.token, auth.cookie);
 }
 
 // src/commands/test.ts
@@ -1566,25 +1485,23 @@ function registerCommands(program2) {
 var __filename2 = fileURLToPath(import.meta.url);
 var __dirname2 = dirname(__filename2);
 var packageJson = JSON.parse(readFileSync(join(__dirname2, "../package.json"), "utf8"));
+async function getWorkspaceFromOptions(program2, options) {
+  if (options.workspace) {
+    return options.workspace;
+  } else if (process.env.SLACK_TOOLS_WORKSPACE) {
+    return process.env.SLACK_TOOLS_WORKSPACE;
+  }
+  program2.error(
+    "No workspace found. Please specify a workspace using --workspace or set the SLACK_TOOLS_WORKSPACE environment variable."
+  );
+}
 var program = new Command();
-program.name("slack-tools-mcp").description("CLI for extracting Slack tokens and cookies and making API calls with MCP support").version(packageJson.version).option("-w, --workspace <workspace>", "Specify Slack workspace URL or name").option("-l, --last-workspace", "Use the last used workspace").option("-d, --debug", "Enable debug mode for detailed logging");
+program.name("slack-tools-mcp").description("CLI for extracting Slack tokens and cookies and making API calls with MCP support").version(packageJson.version).option("-w, --workspace <workspace>", "Specify Slack workspace URL or name").option("-d, --debug", "Enable debug mode for detailed logging");
 registerCommands(program);
 program.hook("preAction", async (thisCommand) => {
   const options = thisCommand.opts();
-  GlobalContext.debug = options.debug;
-  if (options.workspace) {
-    GlobalContext.workspace = options.workspace;
-  } else if (options.lastWorkspace) {
-    const cache = await loadSlackCache();
-    if (cache.lastWorkspace) {
-      GlobalContext.workspace = cache.lastWorkspace;
-    } else {
-      program.error("No last workspace found. Please specify a workspace using --workspace.");
-    }
-  }
-  if (!GlobalContext.workspace) {
-    program.error("No workspace found. Please specify a workspace using --workspace.");
-  }
+  GlobalContext.debug = options.debug || process.env.SLACK_TOOLS_DEBUG === "true";
+  GlobalContext.workspace = await getWorkspaceFromOptions(program, options);
 });
 if (process.argv.some((arg) => program.commands.some((command) => command.name() === arg))) {
   program.parse(process.argv);

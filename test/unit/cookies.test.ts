@@ -20,32 +20,20 @@ describe('cookies', () => {
   describe('getCookie', () => {
     it('should return a cookie with xoxd- prefix', async () => {
       // Setup mock implementation for this test
-      vi.mocked(cookiesModule.getCookie).mockResolvedValue({
-        name: 'd',
-        value: 'xoxd-test-token',
-      });
+      vi.mocked(cookiesModule.getCookie).mockResolvedValue('xoxd-test-token');
 
       const result = await cookiesModule.getCookie();
 
-      expect(result).toEqual({
-        name: 'd',
-        value: 'xoxd-test-token',
-      });
+      expect(result).toEqual('xoxd-test-token');
     });
 
     it('should extract xoxd- token from within a string', async () => {
       // This is testing our implementation that would extract 'xoxd-test-token' from 'prefix-xoxd-test-token'
-      vi.mocked(cookiesModule.getCookie).mockResolvedValue({
-        name: 'd',
-        value: 'xoxd-test-token',
-      });
+      vi.mocked(cookiesModule.getCookie).mockResolvedValue('xoxd-test-token');
 
       const result = await cookiesModule.getCookie();
 
-      expect(result).toEqual({
-        name: 'd',
-        value: 'xoxd-test-token',
-      });
+      expect(result).toEqual('xoxd-test-token');
     });
 
     it('should throw an error when cookie does not contain xoxd-', async () => {
@@ -83,17 +71,11 @@ describe('cookies', () => {
 
     it('should succeed when multiple cookies contain the same token', async () => {
       // For identical tokens, we would still succeed
-      vi.mocked(cookiesModule.getCookie).mockResolvedValue({
-        name: 'd',
-        value: 'xoxd-same-token',
-      });
+      vi.mocked(cookiesModule.getCookie).mockResolvedValue('xoxd-same-token');
 
       const result = await cookiesModule.getCookie();
 
-      expect(result).toEqual({
-        name: 'd',
-        value: 'xoxd-same-token',
-      });
+      expect(result).toEqual('xoxd-same-token');
     });
   });
 });

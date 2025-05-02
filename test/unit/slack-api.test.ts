@@ -1,22 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getSlackClient, findWorkspaceToken } from '../../src/slack-api';
+import { getSlackClient } from '../../src/slack-api';
 import { GlobalContext } from '../../src/context';
 import { WebClient } from '@slack/web-api';
 
-// Mock keychain, tokens, and cookies
-vi.mock('../../src/keychain.js', () => ({
-  getStoredAuth: vi.fn(),
-  storeAuth: vi.fn(),
-  clearStoredAuth: vi.fn(),
-}));
-
-vi.mock('../../src/tokens.js', () => ({
-  getTokens: vi.fn(),
-}));
-
-vi.mock('../../src/cookies.js', () => ({
-  getCookie: vi.fn(),
-}));
+vi.mock('../../src/keychain.js');
+vi.mock('../../src/tokens.js');
+vi.mock('../../src/cookies.js');
 
 // Mock authentication test response
 const mockAuthTest = vi.fn().mockResolvedValue({ ok: true });
@@ -40,31 +29,15 @@ vi.mock('@slack/web-api', () => ({
 
 // Import mocked functions
 import { getStoredAuth, storeAuth, clearStoredAuth } from '../../src/keychain.js';
-import { getTokens } from '../../src/tokens.js';
+import { getToken } from '../../src/tokens.js';
 import { getCookie } from '../../src/cookies.js';
 
 describe('slack-api', () => {
   // Test data
   const mockToken = 'xoxc-123456789';
-  const mockWorkspaceUrl = 'https://test-workspace.slack.com';
-  const mockTokens = {
-    'team1.slack.com': {
-      token: 'xoxc-test-token-1',
-      name: 'Team One',
-    },
-    'team2.slack.com': {
-      token: 'xoxc-test-token-2',
-      name: 'Team Two',
-    },
-    [mockWorkspaceUrl]: {
-      token: mockToken,
-      name: 'test-workspace',
-    },
-  };
-
-  const mockCookie = { name: 'd', value: 'test-cookie-value' };
+  const mockCookie = 'xoxd-test-cookie-value';
   const mockAuth = {
-    tokens: mockTokens,
+    token: mockToken,
     cookie: mockCookie,
   };
 
@@ -74,7 +47,7 @@ describe('slack-api', () => {
 
     // Mock the stored auth
     vi.mocked(getStoredAuth).mockResolvedValue(mockAuth);
-    vi.mocked(getTokens).mockResolvedValue(mockTokens);
+    vi.mocked(getToken).mockResolvedValue(mockToken);
     vi.mocked(getCookie).mockResolvedValue(mockCookie);
     vi.mocked(clearStoredAuth).mockResolvedValue(undefined);
     vi.mocked(storeAuth).mockResolvedValue(undefined);
@@ -94,40 +67,18 @@ describe('slack-api', () => {
     vi.restoreAllMocks();
   });
 
-  describe('findWorkspaceToken', () => {
-    it('should find a workspace by exact URL match', () => {
-      const result = findWorkspaceToken(mockAuth, 'team1.slack.com');
+  describe('getSlackClient', () => {
+    it('should create a WebClient with correct token and cookie', async () => {
+      await getSlackClient();
 
-      expect(result).toEqual({
-        token: 'xoxc-test-token-1',
-        workspaceUrl: 'team1.slack.com',
-        cookie: mockCookie,
-      });
-    });
-
-    it('should find a workspace by name (case insensitive)', () => {
-      const result = findWorkspaceToken(mockAuth, 'team two');
-
-      expect(result).toEqual({
-        token: 'xoxc-test-token-2',
-        workspaceUrl: 'team2.slack.com',
-        cookie: mockCookie,
-      });
-    });
-
-    it('should throw an error if workspace not found', () => {
-      expect(() => findWorkspaceToken(mockAuth, 'non-existent')).toThrow(
-        'Could not find workspace "non-existent"',
-      );
-
-      // Debug information should be logged
-      expect(GlobalContext.log.debug).toHaveBeenCalledWith('All available workspaces:');
-    });
-
-    it('should throw an error if auth has no cookie', () => {
-      const authWithoutCookie = { ...mockAuth, cookie: undefined as any };
-      expect(() => findWorkspaceToken(authWithoutCookie, 'team1.slack.com')).toThrow(
-        'No cookie found in auth',
+      expect(WebClient).toHaveBeenCalledWith(
+        'xoxc-123456789',
+        expect.objectContaining({
+          headers: {
+            Cookie: 'd=xoxd-test-cookie-value',
+          },
+          logger: expect.anything(),
+        }),
       );
     });
   });
@@ -140,7 +91,7 @@ describe('slack-api', () => {
         'xoxc-123456789',
         expect.objectContaining({
           headers: {
-            Cookie: 'd=test-cookie-value',
+            Cookie: 'd=xoxd-test-cookie-value',
           },
           logger: expect.anything(),
         }),
@@ -150,12 +101,7 @@ describe('slack-api', () => {
     it('should exit with error if token has invalid format', async () => {
       // Mock an invalid token
       vi.mocked(getStoredAuth).mockResolvedValue({
-        tokens: {
-          'test-workspace': {
-            token: 'invalid-token', // Not starting with xoxc-
-            name: 'Invalid Team',
-          },
-        },
+        token: 'invalid-token', // Not starting with xoxc-
         cookie: mockCookie,
       });
 
@@ -224,7 +170,7 @@ describe('slack-api', () => {
       // Should clear stored auth and get fresh tokens
       expect(clearStoredAuth).toHaveBeenCalled();
       expect(getCookie).toHaveBeenCalled();
-      expect(getTokens).toHaveBeenCalled();
+      expect(getToken).toHaveBeenCalled();
       expect(storeAuth).toHaveBeenCalled();
 
       // Flag should be set after validation
@@ -243,13 +189,10 @@ describe('slack-api', () => {
     });
 
     it('should fall back to fresh auth if stored auth is null', async () => {
-      // Make getStoredAuth return null
       vi.mocked(getStoredAuth).mockResolvedValueOnce(null);
 
-      // Execute the function
       await getSlackClient();
 
-      // Should get fresh tokens
       expect(getCookie).toHaveBeenCalled();
     });
   });

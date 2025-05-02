@@ -53,7 +53,6 @@ export async function loadSlackCache(): Promise<SlackCache> {
     version: 1,
     entities: {},
     lastUpdated: 0,
-    lastWorkspace: GlobalContext.workspace,
   };
 
   GlobalContext.cache = cache;
@@ -61,9 +60,8 @@ export async function loadSlackCache(): Promise<SlackCache> {
   return cache;
 }
 
-export async function saveSlackCache(lastWorkspace?: string): Promise<void> {
+export async function saveSlackCache(): Promise<void> {
   const cache = await loadSlackCache();
-  cache.lastWorkspace = lastWorkspace || GlobalContext.workspace;
 
   await ensureConfigDir();
   await fs.writeFile(SLACK_CACHE_FILE, JSON.stringify(cache));

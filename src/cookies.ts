@@ -5,7 +5,6 @@ import { exec as execCallback } from 'child_process';
 import { existsSync } from 'fs';
 import Database from 'sqlite3';
 import { open } from 'sqlite';
-import type { SlackCookie } from './types';
 import crypto from 'crypto';
 import { GlobalContext } from './context';
 
@@ -102,7 +101,7 @@ function getCookiesDbPath(): string {
 /**
  * Extract and decrypt cookie value for Slack
  */
-export async function getCookie(): Promise<SlackCookie> {
+export async function getCookie(): Promise<string> {
   try {
     const dbPath = getCookiesDbPath();
     const encryptionKey = await getEncryptionKey();
@@ -157,20 +156,14 @@ export async function getCookie(): Promise<SlackCookie> {
       if (xoxdIndex !== -1) {
         const fixedValue = decryptedValue.substring(xoxdIndex);
         GlobalContext.log.debug(`Found xoxd- cookie`);
-        return {
-          name: result.name,
-          value: fixedValue,
-        };
+        return fixedValue;
       }
 
       if (!decryptedValue.startsWith('xoxd-')) {
         throw new Error('Decrypted cookie value does not have the required xoxd- prefix');
       }
 
-      return {
-        name: result.name,
-        value: decryptedValue,
-      };
+      return decryptedValue;
     } finally {
       await db.close();
     }

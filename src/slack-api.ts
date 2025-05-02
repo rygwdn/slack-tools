@@ -1,16 +1,16 @@
 import { WebClient, LogLevel } from '@slack/web-api';
-import { getStoredAuth, clearStoredAuth, storeAuth } from './keychain.js';
-import type { SlackAuth, SlackCookie } from './types.js';
+import { getStoredAuth, clearStoredAuth, storeAuth, envCookie, envToken } from './keychain.js';
+import type { SlackAuth } from './types.js';
 import { getCookie } from './cookies.js';
-import { getTokens } from './tokens.js';
+import { getToken } from './tokens.js';
 import { GlobalContext } from './context.js';
 import { redactLog } from './utils/log-utils.js';
 import { saveSlackCache } from './cache.js';
 
-function createWebClient(token: string, cookie: SlackCookie): WebClient {
+function createWebClient(token: string, cookie: string): WebClient {
   return new WebClient(token, {
     headers: {
-      Cookie: `d=${cookie.value}`,
+      Cookie: `d=${cookie}`,
     },
     logger: {
       debug: (message: string, ...args: unknown[]) =>
@@ -29,13 +29,8 @@ function createWebClient(token: string, cookie: SlackCookie): WebClient {
 }
 
 async function validateAuth(auth: SlackAuth) {
-  const firstToken = Object.values(auth.tokens)[0]?.token;
-  if (!firstToken) {
-    throw new Error('Auth test failed: No token found');
-  }
-
   try {
-    const client = createWebClient(firstToken, auth.cookie);
+    const client = createWebClient(auth.token, auth.cookie);
     const response = await client.auth.test();
 
     if (!response.ok) {
@@ -51,20 +46,20 @@ async function validateAuth(auth: SlackAuth) {
 
 async function getFreshAuth(): Promise<SlackAuth> {
   const newAuth = {
-    cookie: await getCookie(),
-    tokens: await getTokens(),
+    cookie: envCookie || (await getCookie()),
+    token: envToken || (await getToken(GlobalContext.workspace)),
   };
 
   await validateAuth(newAuth);
-  await storeAuth(newAuth);
+  await storeAuth(GlobalContext.workspace, newAuth);
 
   return newAuth;
 }
 
 async function validateAndRefreshAuth(): Promise<SlackAuth> {
-  const storedAuth = await getStoredAuth();
+  const storedAuth = await getStoredAuth(GlobalContext.workspace);
 
-  if (storedAuth?.cookie && storedAuth?.tokens) {
+  if (storedAuth?.cookie && storedAuth?.token) {
     try {
       await validateAuth(storedAuth);
       return storedAuth;
@@ -80,64 +75,6 @@ async function validateAndRefreshAuth(): Promise<SlackAuth> {
   }
 }
 
-export function findWorkspaceToken(
-  auth: SlackAuth,
-  workspaceName: string,
-): {
-  token: string;
-  workspaceUrl: string;
-  cookie: SlackCookie;
-} {
-  if (!auth.cookie) {
-    throw new Error('No cookie found in auth');
-  }
-
-  GlobalContext.log.debug('Available workspaces:', Object.keys(auth.tokens).join(', '));
-  GlobalContext.log.debug('Looking for workspace:', workspaceName);
-
-  // First try exact match with URL
-  if (auth.tokens[workspaceName]) {
-    const token = auth.tokens[workspaceName].token;
-    GlobalContext.log.debug(`Found token for workspace URL: ${workspaceName}`);
-    GlobalContext.log.debug(
-      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`,
-    );
-    return {
-      token,
-      workspaceUrl: workspaceName,
-      cookie: auth.cookie,
-    };
-  }
-
-  // Try to find by name (case insensitive)
-  const wsEntry = Object.entries(auth.tokens).find(
-    ([, details]) => details.name.toLowerCase() === workspaceName.toLowerCase(),
-  );
-
-  if (wsEntry) {
-    const token = wsEntry[1].token;
-    GlobalContext.log.debug(`Found token for workspace name: ${wsEntry[1].name}`);
-    GlobalContext.log.debug(`Workspace URL: ${wsEntry[0]}`);
-    GlobalContext.log.debug(
-      `Token: ${token.substring(0, 5)}...${token.substring(token.length - 5)}`,
-    );
-    return {
-      token,
-      workspaceUrl: wsEntry[0],
-      cookie: auth.cookie,
-    };
-  }
-
-  GlobalContext.log.debug('All available workspaces:');
-  Object.entries(auth.tokens).forEach(([url, details]) => {
-    GlobalContext.log.debug(`- ${details.name} (${url})`);
-  });
-
-  throw new Error(
-    `Could not find workspace "${workspaceName}". Use 'slack-tools print' to see available workspaces.`,
-  );
-}
-
 /**
  * Get a Slack WebClient instance configured with the appropriate token and cookies for a workspace
  * Use this function to get a client that can be used to make any Slack API call
@@ -145,24 +82,23 @@ export function findWorkspaceToken(
 export async function getSlackClient(): Promise<WebClient> {
   const auth = !GlobalContext.currentUser
     ? await validateAndRefreshAuth()
-    : (await getStoredAuth()) || (await getFreshAuth());
+    : (await getStoredAuth(GlobalContext.workspace)) || (await getFreshAuth());
 
   if (!GlobalContext.workspace) {
     console.error('Error: No workspace specified. Please specify a workspace using:');
     console.error('  - Use -w, --workspace <workspace> to specify a workspace directly');
-    console.error('  - Use -l, --last-workspace to use your most recently used workspace');
     process.exit(1);
   }
 
   await saveSlackCache();
 
-  const { token, cookie, workspaceUrl } = findWorkspaceToken(auth, GlobalContext.workspace);
-
-  GlobalContext.log.debug(`Using workspace: ${workspaceUrl}`);
-
-  if (!token.startsWith('xoxc-')) {
-    throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${token}`);
+  if (!auth.token.startsWith('xoxc-')) {
+    throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${auth.token}`);
   }
 
-  return createWebClient(token, cookie);
+  if (!auth.cookie.startsWith('xoxd-')) {
+    throw new Error(`Invalid cookie format: cookie should start with 'xoxd-'. Got: ${auth.cookie}`);
+  }
+
+  return createWebClient(auth.token, auth.cookie);
 }

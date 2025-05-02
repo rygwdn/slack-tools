@@ -46,7 +46,6 @@ describe('cache', () => {
         version: 1,
         entities: {},
         lastUpdated: 0,
-        lastWorkspace: 'test-workspace',
       });
     });
 
@@ -58,7 +57,6 @@ describe('cache', () => {
         version: 1,
         entities: {},
         lastUpdated: testTimestamp,
-        lastWorkspace: 'test-workspace',
       };
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockCache));
@@ -72,7 +70,6 @@ describe('cache', () => {
       expect(result.version).toBe(1);
       expect(result).toHaveProperty('entities');
       expect(result).toHaveProperty('lastUpdated');
-      expect(result).toHaveProperty('lastWorkspace');
     });
 
     it('should return default cache if cache is expired', async () => {
@@ -80,7 +77,6 @@ describe('cache', () => {
         version: 1,
         entities: {},
         lastUpdated: Date.now() - SLACK_CACHE_TTL * 2, // Double TTL ago
-        lastWorkspace: 'old-workspace',
       };
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockCache));
@@ -93,7 +89,6 @@ describe('cache', () => {
         version: 1,
         entities: {},
         lastUpdated: 0,
-        lastWorkspace: 'test-workspace',
       });
     });
   });
@@ -103,7 +98,6 @@ describe('cache', () => {
       GlobalContext.cache = {
         lastUpdated: Date.now(),
         entities: {},
-        lastWorkspace: 'test-workspace',
         version: 1,
       };
 

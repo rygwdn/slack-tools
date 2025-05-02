@@ -1,13 +1,9 @@
 import { Level } from 'level';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
-import type { WorkspaceTokens, SlackConfig } from './types';
 import { GlobalContext } from './context';
 import { existsSync } from 'node:fs';
 
-/**
- * Get the path to Slack's LevelDB storage based on the platform
- */
 function getLevelDBPath(): string {
   if (platform() !== 'darwin') {
     throw new Error('only works on macOS');
@@ -32,20 +28,13 @@ function getLevelDBPath(): string {
   throw new Error("Could not find Slack's Local Storage directory");
 }
 
-/**
- * Extract personal tokens from the Slack desktop app's local storage.
- * @param context Command context for debugging
- * @returns Promise<WorkspaceTokens> Object containing workspace tokens
- * @throws Error if the database is locked or tokens cannot be found
- */
-export async function getTokens(): Promise<WorkspaceTokens> {
+export async function getToken(workspace?: string): Promise<string> {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
 
   try {
     await db.open();
 
-    // Find the localConfig entry
     const entries = await db.iterator().all();
 
     const configValues = entries
@@ -64,17 +53,22 @@ export async function getTokens(): Promise<WorkspaceTokens> {
       throw new Error('Slack has multiple localConfig_v2 values');
     }
 
-    const config = JSON.parse(configValues[0].slice(1)) as SlackConfig;
-    const tokens: WorkspaceTokens = {};
+    const config = JSON.parse(configValues[0].slice(1)) as {
+      teams: Record<string, { name: string; token: string }>;
+    };
+
+    GlobalContext.log.debug(
+      'Config:',
+      Object.values(config.teams).map((t) => t.name),
+    );
 
     for (const team of Object.values(config.teams)) {
-      tokens[team.url] = {
-        token: team.token,
-        name: team.name,
-      };
+      if (!workspace || team.name === workspace) {
+        return team.token;
+      }
     }
 
-    return tokens;
+    throw new Error(`No token found for workspace: ${workspace}`);
   } catch (error) {
     // Always log errors to console.error regardless of mode
     console.error('Error:', error);

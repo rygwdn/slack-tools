@@ -28,8 +28,31 @@ npx -y github:rygwdn/slack-tools [options] [command]
 
 Global options:
 - `-w, --workspace <workspace>` - Specify Slack workspace URL or name
-- `-l, --last-workspace` - Use the last used workspace
 - `-d, --debug` - Enable debug mode for detailed logging
+
+### Environment Variables
+
+The following environment variables can be used instead of command line options:
+
+- `SLACK_TOOLS_WORKSPACE` - Specify Slack workspace URL or name
+- `SLACK_TOOLS_TOKEN` - Directly specify a Slack token (must start with `xoxc-`)
+- `SLACK_TOOLS_COOKIE` - Directly specify a Slack cookie value (must start with `xoxd-`)
+- `SLACK_TOOLS_DEBUG` - Set to 'true' to enable debug mode
+
+You can mix and match environment variables with values fetched from the Slack desktop app. For example, you can provide just the token via environment variable and the tool will automatically fetch the cookie from the Slack app, or vice versa.
+
+Using environment variables is particularly useful for automated scripts, CI/CD pipelines, or when the Slack desktop app isn't available.
+
+Examples:
+```bash
+# Use just the workspace environment variable
+SLACK_TOOLS_WORKSPACE=Build npx -y github:rygwdn/slack-tools status "In a meeting"
+
+# Use token and cookie, but specify workspace via command line
+SLACK_TOOLS_TOKEN=xoxc-your-token SLACK_TOOLS_COOKIE=xoxd-your-cookie npx -y github:rygwdn/slack-tools -w Build status "In a meeting"
+
+# Use all environment variables together
+SLACK_TOOLS_WORKSPACE=Build SLACK_TOOLS_TOKEN=xoxc-your-token SLACK_TOOLS_COOKIE=xoxd-your-cookie SLACK_TOOLS_DEBUG=true npx -y github:rygwdn/slack-tools status "In a meeting"
 
 ### MCP Command
 

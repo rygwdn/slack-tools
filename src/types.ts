@@ -1,38 +1,9 @@
 import { Tool } from 'fastmcp';
 import { ZodObject, ZodRawShape } from 'zod';
 
-export interface WorkspaceToken {
-  token: string;
-  name: string;
-}
-
-export interface WorkspaceTokens {
-  [url: string]: WorkspaceToken;
-}
-
-export interface SlackConfig {
-  teams: {
-    [key: string]: {
-      token: string;
-      name: string;
-      url: string;
-      [key: string]: unknown;
-    };
-  };
-}
-
-export interface SlackCookie {
-  name: string;
-  value: string;
-}
-
 export interface SlackAuth {
-  tokens: WorkspaceTokens;
-  cookie: SlackCookie;
-}
-
-export interface WorkspaceAuthOptions {
-  workspace?: string;
+  token: string;
+  cookie: string;
 }
 
 export function tool<

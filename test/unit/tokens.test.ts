@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getTokens } from '../../src/tokens';
+import { getToken } from '../../src/tokens';
 import * as os from 'node:os';
 
 // Mock the os module
@@ -28,7 +28,7 @@ describe('tokens', () => {
       // Mock Windows platform
       vi.mocked(os.platform).mockReturnValue('win32');
 
-      await expect(getTokens()).rejects.toThrow('only works on macOS');
+      await expect(getToken()).rejects.toThrow('only works on macOS');
     });
   });
 });

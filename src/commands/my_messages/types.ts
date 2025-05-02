@@ -27,7 +27,6 @@ export interface SlackChannelInfo {
 export interface SlackCache {
   version: number;
   lastUpdated: number;
-  lastWorkspace?: string;
   entities: {
     [id: string]: SlackChannelInfo | SlackUserInfo;
   };
