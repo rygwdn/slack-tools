@@ -5,12 +5,14 @@ import { registerTestCommand } from './test';
 import { registerMcpCommand } from './mcp';
 import { registerToolAsCommand } from './auto-register-tools';
 import { mcpTools } from './mcp-tools';
+import { registerAuthFromCurlCommand } from './auth-from-curl';
 
 export function registerCommands(program: Command): void {
   registerClearCommand(program);
   registerPrintCommand(program);
   registerTestCommand(program);
   registerMcpCommand(program);
+  registerAuthFromCurlCommand(program);
 
   // Register all MCP tools as commands
   for (const tool of mcpTools) {

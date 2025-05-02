@@ -1,4 +1,5 @@
-import { beforeAll, vi } from 'vitest';
+import { beforeAll, beforeEach, vi } from 'vitest';
+import { GlobalContext } from '../src/context';
 
 vi.mock('keytar', () => ({
   getPassword: vi.fn().mockResolvedValue('mock-password'),
@@ -12,19 +13,31 @@ vi.mock('keytar', () => ({
 
 vi.mock('level');
 
+vi.mock('../src/context', () => ({
+  GlobalContext: {},
+}));
+
 beforeAll(() => {
   process.env.TZ = 'EST';
 });
 
-vi.mock('../src/context', () => ({
-  GlobalContext: {
-    workspace: 'test-workspace',
-    debug: true,
-    hasWorkspace: true,
-    currentUser: {
-      user_id: 'U123',
-      ok: true,
-    },
-    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-  },
-}));
+beforeEach(() => {
+  resetGlobalContext(GlobalContext);
+});
+
+const resetGlobalContext = (context: any) => {
+  context.workspace = 'test-workspace';
+  context.debug = true;
+  context.hasWorkspace = true;
+  context.currentUser = {
+    user_id: 'U123',
+    ok: true,
+  };
+  context.log = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  return context;
+};

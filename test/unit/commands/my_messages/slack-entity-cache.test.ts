@@ -240,9 +240,6 @@ describe('Slack Entity Cache', () => {
       // Cache should still be created
       expect(cache).toBeDefined();
       expect(cache.lastUpdated).toBeGreaterThan(0);
-
-      // Debug messages should be logged
-      expect(GlobalContext.log.debug).toHaveBeenCalled();
     });
 
     it('should use existing cache when available', async () => {

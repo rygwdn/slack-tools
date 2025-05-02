@@ -97,8 +97,8 @@ describe('Print Command', () => {
     });
 
     it('should print tokens for a specific workspace when selected', async () => {
-      Object.defineProperty(GlobalContext, 'hasWorkspace', { get: () => true });
       GlobalContext.workspace = 'team1';
+      GlobalContext.hasWorkspace = true;
 
       // Setup command execution
       let actionCallback: ((options: { quiet: boolean }) => Promise<void>) | null = null;

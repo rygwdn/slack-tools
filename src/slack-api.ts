@@ -28,7 +28,7 @@ function createWebClient(token: string, cookie: string): WebClient {
   });
 }
 
-async function validateAuth(auth: SlackAuth) {
+export async function validateAuth(auth: SlackAuth) {
   try {
     const client = createWebClient(auth.token, auth.cookie);
     const response = await client.auth.test();

@@ -1469,6 +1469,92 @@ async function optionAction(shape, options, tool2, commandName) {
     console.log(result);
   }
 }
+function extractToken(curlCommand) {
+  const tokenMatch = curlCommand.match(/(xoxc-[a-zA-Z0-9-]+)/);
+  return tokenMatch ? tokenMatch[1] : null;
+}
+function extractCookie(curlCommand) {
+  const cookieMatch = curlCommand.match(/(xoxd-[a-zA-Z0-9-]+)/);
+  return cookieMatch ? cookieMatch[1] : null;
+}
+async function verifyAuth(auth) {
+  try {
+    const client = new WebClient(auth.token, {
+      headers: {
+        Cookie: `d=${auth.cookie}`
+      }
+    });
+    const response = await client.auth.test();
+    if (!response.ok) {
+      throw new Error("Auth test failed: API returned not ok");
+    }
+    console.log(
+      `Authentication verified successfully. You are ${response.user} from team ${response.team}`
+    );
+  } catch (error) {
+    console.error("Auth test API call failed:", error);
+    throw new Error(
+      `Auth verification failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+function registerAuthFromCurlCommand(program2) {
+  program2.command("auth-from-curl [curlCommand...]").description("Extract and store Slack authentication from a curl command").helpOption("-h, --help", "Display help for command").option("--skip-verification", "Skip verification of auth before storing").allowUnknownOption(true).action(async (curlArgs, options, command) => {
+    try {
+      let allArgs = curlArgs || [];
+      if (command.args && command.args.length > 0) {
+        allArgs = allArgs.concat(command.args);
+      }
+      if (allArgs.length === 0) {
+        program2.error(
+          "Error: No curl command provided. Usage: slack auth-from-curl curl [options...]"
+        );
+        return;
+      }
+      const curlCommand = allArgs.join(" ");
+      GlobalContext.log.debug("Parsing curl command:", curlCommand);
+      if (!GlobalContext.workspace) {
+        program2.error(
+          "Error: No workspace specified. Please specify a workspace with -w or --workspace"
+        );
+        return;
+      }
+      const token = extractToken(curlCommand);
+      if (!token) {
+        program2.error("Error: Could not extract token from the curl command");
+        return;
+      }
+      const cookie = extractCookie(curlCommand);
+      if (!cookie) {
+        program2.error("Error: Could not extract cookie from the curl command");
+        return;
+      }
+      const auth = {
+        token,
+        cookie
+      };
+      if (!options.skipVerification) {
+        console.log("Verifying authentication with Slack...");
+        try {
+          await verifyAuth(auth);
+        } catch (error) {
+          program2.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+          return;
+        }
+      } else {
+        console.log("Skipping authentication verification");
+      }
+      await storeAuth(GlobalContext.workspace, auth);
+      console.log(
+        `Successfully extracted and stored authentication for workspace: ${GlobalContext.workspace}`
+      );
+      console.log(`Token: ${token}`);
+      console.log(`Cookie: ${cookie}`);
+    } catch (error) {
+      program2.error(error.toString());
+    }
+  });
+}
 
 // src/commands/register-commands.ts
 function registerCommands(program2) {
@@ -1476,6 +1562,7 @@ function registerCommands(program2) {
   registerPrintCommand(program2);
   registerTestCommand(program2);
   registerMcpCommand(program2);
+  registerAuthFromCurlCommand(program2);
   for (const tool2 of mcpTools) {
     registerToolAsCommand(program2, tool2);
   }
