@@ -6,10 +6,34 @@ import { SlackAuth } from '../types';
 import * as readline from 'readline';
 
 /**
+ * Reads input from stdin (used for piped input)
+ */
+async function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    let data = '';
+    process.stdin.on('readable', () => {
+      const chunk = process.stdin.read();
+      if (chunk !== null) {
+        data += chunk;
+      }
+    });
+
+    process.stdin.on('end', () => {
+      resolve(data.trim());
+    });
+  });
+}
+
+/**
  * Prompts the user to enter a curl command with support for multi-line input
  * Handles bash-style line continuations (lines ending with \)
  */
 async function promptForCurlCommand(): Promise<string> {
+  // Check if stdin is not a TTY (e.g., piped input)
+  if (!process.stdin.isTTY) {
+    return readStdin();
+  }
+
   console.log('Please paste your curl command below (press Enter twice to finish):');
 
   return new Promise((resolve) => {
@@ -71,14 +95,52 @@ async function promptForCurlCommand(): Promise<string> {
   });
 }
 
-/**
- * Extracts token and cookie from a curl command
- */
-function extractAuthFromCurl(curlCommand: string): SlackAuth | null {
-  const token = curlCommand.match('Authorization: Bearer (xoxc-[a-zA-Z0-9-]+)')?.[1];
-  const cookie = curlCommand.match('Cookie: d=(xoxd-[a-zA-Z0-9-]+)')?.[1];
+function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
+  const tokenPattern = /(\b|\\n)(xoxc-[a-zA-Z0-9-]{20,})/g;
+  const tokens = Array.from(curlCommand.matchAll(tokenPattern), (match) => match[2]);
 
-  return token && cookie ? { token, cookie } : null;
+  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
+  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
+
+  if (tokens.length === 0) {
+    throw new Error('No tokens found in the curl command');
+  }
+
+  if (cookies.length === 0) {
+    throw new Error('No cookies found in the curl command');
+  }
+
+  GlobalContext.log.debug(`Found ${tokens.length} tokens and ${cookies.length} cookies`, {
+    tokens,
+    cookies,
+  });
+
+  // Create all possible combinations
+  const combinations: SlackAuth[] = [];
+  for (const token of tokens) {
+    for (const cookie of cookies) {
+      combinations.push({ token, cookie });
+    }
+  }
+
+  return combinations;
+}
+
+async function findValidAuth(authCombinations: SlackAuth[]): Promise<SlackAuth> {
+  for (const auth of authCombinations) {
+    try {
+      validateSlackAuth(auth);
+      await createWebClient(auth);
+      return auth; // Return immediately when a valid auth is found
+    } catch (error) {
+      GlobalContext.log.debug(
+        `Auth validation failed for ${auth.token}/${auth.cookie}: ${(error as Error).message}`,
+      );
+      continue;
+    }
+  }
+
+  throw new Error('No valid auth combination found in the curl command');
 }
 
 export function registerAuthFromCurlCommand(program: Command): void {
@@ -103,9 +165,12 @@ Examples:
   npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
   npx -y github:rygwdn/slack-tools auth-from-curl --store
   (This will prompt you to paste the curl command interactively)
+  cat curl-command.txt | npx -y github:rygwdn/slack-tools auth-from-curl --store
+  (You can also pipe curl commands from a file or another command)
 
 Notes:
   - The curl command must include both token (xoxc-) and cookie (xoxd-)
+  - Tokens can be extracted from either Authorization headers or form data
   - If no curl command is provided, you will be prompted to enter it interactively
   - Multi-line curl commands are supported (use backslash at end of line for continuation)
   - Use --store to save credentials in your system keychain
@@ -129,22 +194,21 @@ Notes:
 
         GlobalContext.log.debug('Parsing curl command:', curlCommand);
 
-        const auth = extractAuthFromCurl(curlCommand);
-        if (!auth) {
-          program.error('Error: Could not extract auth from the curl command');
-        }
+        const authCombinations = extractAuthFromCurl(curlCommand);
 
-        // Validate format
-        validateSlackAuth(auth);
-        await createWebClient(auth);
+        GlobalContext.log.debug(`Found ${authCombinations.length} possible auth combinations`);
+
+        // Try all auth combinations and find the first valid one
+        const validAuth = await findValidAuth(authCombinations);
+
+        console.log(`Token: ${validAuth.token}`);
+        console.log(`Cookie: ${validAuth.cookie}`);
 
         if (options.store) {
-          await storeAuth({ token: auth.token, cookie: auth.cookie });
-          GlobalContext.log.info('Credentials stored successfully.');
+          await storeAuth(validAuth);
+          console.log();
+          console.log('Credentials stored successfully.');
         }
-
-        console.log(`Token: ${auth.token}`);
-        console.log(`Cookie: ${auth.cookie}`);
       } catch (error) {
         program.error((error as Error).message);
       }

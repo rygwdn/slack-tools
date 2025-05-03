@@ -48,6 +48,7 @@ There are two ways to authenticate with Slack:
      3. Perform any action (e.g., send a message)
      4. Find a request to api.slack.com, right-click and select "Copy as cURL"
      5. Paste the curl command as shown above (or paste into the interactive prompt)
+     - Tokens can be found in either Authorization headers or form data
      - If no curl command is provided, you'll be prompted to enter it interactively
      - Multi-line curl commands are supported with proper escaping
      - The `--store` flag saves credentials to your system keychain for future use

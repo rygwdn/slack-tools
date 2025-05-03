@@ -8,6 +8,7 @@ import { WebClient, LogLevel } from '@slack/web-api';
 import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { homedir } from 'os';
+import * as readline from 'readline';
 import { Level } from 'level';
 import { join as join$1 } from 'node:path';
 import { platform, homedir as homedir$1 } from 'node:os';
@@ -158,7 +159,7 @@ function registerTestCommand(program2) {
 }
 
 // package.json
-var version = "1.0.3";
+var version = "1.0.4";
 
 // src/utils/date-utils.ts
 async function getDateRange(options) {
@@ -1223,12 +1224,101 @@ async function optionAction(shape, options, tool2, commandName) {
     console.log(result);
   }
 }
-
-// src/commands/auth-from-curl.ts
+async function readStdin() {
+  return new Promise((resolve) => {
+    let data = "";
+    process.stdin.on("readable", () => {
+      const chunk = process.stdin.read();
+      if (chunk !== null) {
+        data += chunk;
+      }
+    });
+    process.stdin.on("end", () => {
+      resolve(data.trim());
+    });
+  });
+}
+async function promptForCurlCommand() {
+  if (!process.stdin.isTTY) {
+    return readStdin();
+  }
+  console.log("Please paste your curl command below (press Enter twice to finish):");
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    let curlCommand = "";
+    let isMultiLine = false;
+    rl.on("line", (line) => {
+      if (!curlCommand && !line.trim()) {
+        return;
+      }
+      if (line.endsWith("\\")) {
+        isMultiLine = true;
+        curlCommand += line.slice(0, -1) + " ";
+      } else {
+        if (isMultiLine) {
+          curlCommand += line + " ";
+          isMultiLine = false;
+        } else if (!curlCommand || curlCommand.trim()) {
+          curlCommand += line + " ";
+        } else {
+          rl.close();
+          return;
+        }
+      }
+      if (line.trim() && !isMultiLine && curlCommand.includes("curl") && (curlCommand.includes("xoxc-") || curlCommand.includes("xoxd-"))) {
+        setTimeout(() => {
+          rl.question("Is this the complete curl command? (Y/n): ", (answer) => {
+            if (!answer || answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
+              rl.close();
+            }
+          });
+        }, 100);
+      }
+    });
+    rl.on("close", () => {
+      resolve(curlCommand.trim());
+    });
+  });
+}
 function extractAuthFromCurl(curlCommand) {
-  const token = curlCommand.match("Authorization: Bearer (xoxc-[a-zA-Z0-9-]+)")?.[1];
-  const cookie = curlCommand.match("Cookie: d=(xoxd-[a-zA-Z0-9-]+)")?.[1];
-  return token && cookie ? { token, cookie } : null;
+  const tokenPattern = /\b(xoxc-[a-zA-Z0-9-]+)(?=[^\w-]|$)/g;
+  const tokens = [];
+  let match;
+  while ((match = tokenPattern.exec(curlCommand)) !== null) {
+    if (!tokens.includes(match[1])) {
+      tokens.push(match[1]);
+    }
+  }
+  const cookiePattern = /\bd=(xoxd-[a-zA-Z0-9%+/=._-]+)/g;
+  const cookies = [];
+  while ((match = cookiePattern.exec(curlCommand)) !== null) {
+    if (!cookies.includes(match[1])) {
+      cookies.push(match[1]);
+    }
+  }
+  const combinations = [];
+  for (const token of tokens) {
+    for (const cookie of cookies) {
+      combinations.push({ token, cookie });
+    }
+  }
+  return combinations;
+}
+async function findValidAuth(authCombinations) {
+  for (const auth of authCombinations) {
+    try {
+      validateSlackAuth(auth);
+      await createWebClient(auth);
+      return auth;
+    } catch (error) {
+      GlobalContext.log.debug(`Auth validation failed for ${auth.token}/${auth.cookie}: ${error.message}`);
+      continue;
+    }
+  }
+  throw new Error("No valid auth combination found in the curl command");
 }
 function registerAuthFromCurlCommand(program2) {
   program2.command("auth-from-curl [curlCommand...]").description("Extract and store Slack authentication from a curl command").option("--store", "Store the extracted auth in the system keychain for future use").helpOption("-h, --help", "Display help for command").allowUnknownOption(true).addHelpText(
@@ -1242,31 +1332,45 @@ How to get a curl command:
   5. Right-click and select "Copy as cURL"
   6. Paste the entire curl command after this command
 
-Example:
+Examples:
   npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
+  npx -y github:rygwdn/slack-tools auth-from-curl --store
+  (This will prompt you to paste the curl command interactively)
+  cat curl-command.txt | npx -y github:rygwdn/slack-tools auth-from-curl --store
+  (You can also pipe curl commands from a file or another command)
 
 Notes:
   - The curl command must include both token (xoxc-) and cookie (xoxd-)
+  - Tokens can be extracted from either Authorization headers or form data
+  - If no curl command is provided, you will be prompted to enter it interactively
+  - Multi-line curl commands are supported (use backslash at end of line for continuation)
   - Use --store to save credentials in your system keychain
   - Once stored, credentials will be automatically used for future commands
   - The command will output the extracted token and cookie values for verification
 `
   ).action(async (curlArgs, options) => {
     try {
-      const curlCommand = curlArgs.join(" ");
+      let curlCommand = curlArgs.join(" ");
+      if (!curlCommand) {
+        curlCommand = await promptForCurlCommand();
+        if (!curlCommand.trim()) {
+          program2.error("Error: No curl command provided");
+        }
+      }
       GlobalContext.log.debug("Parsing curl command:", curlCommand);
-      const auth = extractAuthFromCurl(curlCommand);
-      if (!auth) {
+      const authCombinations = extractAuthFromCurl(curlCommand);
+      if (authCombinations.length === 0) {
         program2.error("Error: Could not extract auth from the curl command");
       }
-      validateSlackAuth(auth);
-      await createWebClient(auth);
+      GlobalContext.log.debug(`Found ${authCombinations.length} possible auth combinations`);
+      const validAuth = await findValidAuth(authCombinations);
       if (options.store) {
-        await storeAuth({ token: auth.token, cookie: auth.cookie });
+        await storeAuth(validAuth);
         GlobalContext.log.info("Credentials stored successfully.");
       }
-      console.log(`Token: ${auth.token}`);
-      console.log(`Cookie: ${auth.cookie}`);
+      console.log(`Found ${authCombinations.length} possible combinations`);
+      console.log(`Token: ${validAuth.token}`);
+      console.log(`Cookie: ${validAuth.cookie}`);
     } catch (error) {
       program2.error(error.message);
     }
