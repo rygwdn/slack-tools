@@ -160,7 +160,7 @@ function registerTestCommand(program2) {
 }
 
 // package.json
-var version = "1.0.4";
+var version = "1.1.0";
 
 // src/utils/date-utils.ts
 async function getDateRange(options) {
