@@ -1,3 +1,5 @@
+import { GlobalContext } from '../context';
+
 type MarkdownLines = readonly (string | MarkdownKeyValue | MarkdownHeader)[];
 type MarkdownKeyValue = { [key: string]: string };
 
@@ -45,7 +47,9 @@ function* objectToMarkdownLines(
       previousWasHeading = false;
     }
   } else {
-    assertNever(obj);
+    // Handle unexpected types more gracefully
+    yield `${JSON.stringify(obj)}`;
+    GlobalContext.log.debug('Unexpected object type in markdown conversion:', obj);
   }
 }
 

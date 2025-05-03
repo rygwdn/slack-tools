@@ -93,23 +93,18 @@ export async function getSlackStatus() {
 }
 
 /**
- * Create a reminder in Slack
+ * Create a reminder in Slack for the current user
  */
-export async function createSlackReminder(text: string, time: string, user?: string) {
+export async function createSlackReminder(text: string, time: string) {
   try {
     GlobalContext.log.debug('Reminder text:', text);
     GlobalContext.log.debug('Reminder time:', time);
-
-    if (user) {
-      GlobalContext.log.debug('Reminder for user:', user);
-    }
 
     // Get client and create reminder
     const client = await createWebClient();
     const response = await client.reminders.add({
       text,
       time,
-      user,
     });
 
     GlobalContext.log.debug('API response:', response);

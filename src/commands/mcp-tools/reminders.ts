@@ -9,17 +9,11 @@ const reminderParams = z.object({
     .describe(
       'When to send the reminder. Supports unix timestamp, ISO datetime (YYYY-MM-DDTHH:MM:SS), or natural language like "in 5 minutes", "tomorrow at 9am", "next Monday"',
     ),
-  user: z
-    .string()
-    .optional()
-    .describe(
-      'Slack user ID to create the reminder for. If omitted, creates reminder for the current user. Must start with "U" followed by alphanumeric characters.',
-    ),
 });
 
 export const reminderTool = tool({
   name: 'slack_create_reminder',
-  description: 'Create a reminder in Slack for yourself or another user.',
+  description: 'Create a reminder in Slack for yourself.',
   parameters: reminderParams,
   annotations: {
     openWorldHint: true,
@@ -27,14 +21,13 @@ export const reminderTool = tool({
     idempotentHint: false,
     title: 'Create a reminder in Slack',
   },
-  execute: async ({ text, time, user }) => {
-    const result = await createSlackReminder(text, time, user);
+  execute: async ({ text, time }) => {
+    const result = await createSlackReminder(text, time);
 
     return objectToMarkdown({
       [`Reminder Created`]: {
-        text,
-        time,
-        user,
+        text: text.toString(),
+        time: time.toString(),
         success: result.success ? '✅' : '❌',
       },
     });

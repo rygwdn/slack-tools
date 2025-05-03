@@ -3,12 +3,6 @@ import { generateMyMessagesSummary } from '../../services/my-messages-service';
 import { tool } from '../../types';
 
 const myMessagesParams = z.object({
-  username: z
-    .string()
-    .optional()
-    .describe(
-      'Username or display name to fetch messages for. If omitted, fetches messages for the current user.',
-    ),
   since: z
     .string()
     .optional()
