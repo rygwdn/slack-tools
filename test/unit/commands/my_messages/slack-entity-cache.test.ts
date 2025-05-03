@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getCacheForMessages } from '../../../../src/commands/my_messages/slack-entity-cache';
-import { GlobalContext } from '../../../../src/context';
 import {
   SlackCache,
   SlackChannelInfo,

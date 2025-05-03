@@ -1,9 +1,8 @@
 import { Command } from 'commander';
 import { GlobalContext } from '../context';
-import { getStoredAuth } from '../keychain.js';
-import { getCookie } from '../cookies.js';
-import { getToken } from '../tokens.js';
+import { getStoredAuth } from '../auth';
 
+// TODO: delete this command
 export function registerPrintCommand(program: Command): void {
   program
     .command('print')
@@ -11,22 +10,20 @@ export function registerPrintCommand(program: Command): void {
     .option('-q, --quiet', 'Suppress output and only show tokens/cookies')
     .action(async (cmdOptions) => {
       try {
-        const storedAuth = await getStoredAuth(GlobalContext.workspace);
-        if (!cmdOptions.quiet && !storedAuth) {
-          console.log('No stored auth found, fetching fresh credentials...');
+        const auth = await getStoredAuth();
+        if (!auth) {
+          program.error(
+            'No authentication credentials found. Please run the auth-from-app or auth-from-curl command first.',
+          );
         }
 
-        const auth = storedAuth || {
-          cookie: await getCookie(),
-          token: await getToken(),
-        };
-
         if (!cmdOptions.quiet) {
-          console.log('\nFound token for workspace:\n');
-          console.log(`Workspace URL: ${GlobalContext.workspace}`);
+          console.log('\nFound authentication credentials:\n');
+          if (GlobalContext.workspace) {
+            console.log(`Workspace URL: ${GlobalContext.workspace}`);
+          }
           console.log(`Token: ${auth.token}\n`);
-
-          console.log('Found cookie:');
+          console.log('Cookie:');
           console.log(`${auth.cookie}\n`);
         } else {
           console.log(auth.token);

@@ -27,16 +27,14 @@ npx -y github:rygwdn/slack-tools [options] [command]
 ```
 
 Global options:
-- `-w, --workspace <workspace>` - Specify Slack workspace URL or name
 - `-d, --debug` - Enable debug mode for detailed logging
 
 ### Environment Variables
 
 The following environment variables can be used instead of command line options:
 
-- `SLACK_TOOLS_WORKSPACE` - Specify Slack workspace URL or name
-- `SLACK_TOOLS_TOKEN` - Directly specify a Slack token (must start with `xoxc-`)
-- `SLACK_TOOLS_COOKIE` - Directly specify a Slack cookie value (must start with `xoxd-`)
+- `SLACK_TOKEN` - Directly specify a Slack token (must start with `xoxc-`)
+- `SLACK_COOKIE` - Directly specify a Slack cookie value (must start with `xoxd-`)
 - `SLACK_TOOLS_DEBUG` - Set to 'true' to enable debug mode
 
 You can mix and match environment variables with values fetched from the Slack desktop app. For example, you can provide just the token via environment variable and the tool will automatically fetch the cookie from the Slack app, or vice versa.
@@ -45,14 +43,14 @@ Using environment variables is particularly useful for automated scripts, CI/CD 
 
 Examples:
 ```bash
-# Use just the workspace environment variable
-SLACK_TOOLS_WORKSPACE=Build npx -y github:rygwdn/slack-tools status "In a meeting"
+# Use with default auth
+npx -y github:rygwdn/slack-tools status "In a meeting"
 
-# Use token and cookie, but specify workspace via command line
-SLACK_TOOLS_TOKEN=xoxc-your-token SLACK_TOOLS_COOKIE=xoxd-your-cookie npx -y github:rygwdn/slack-tools -w Build status "In a meeting"
+# Use token and cookie via environment variables
+SLACK_TOKEN=xoxc-your-token SLACK_COOKIE=xoxd-your-cookie npx -y github:rygwdn/slack-tools status "In a meeting"
 
-# Use all environment variables together
-SLACK_TOOLS_WORKSPACE=Build SLACK_TOOLS_TOKEN=xoxc-your-token SLACK_TOOLS_COOKIE=xoxd-your-cookie SLACK_TOOLS_DEBUG=true npx -y github:rygwdn/slack-tools status "In a meeting"
+# Use with environment variables and debug
+SLACK_TOKEN=xoxc-your-token SLACK_COOKIE=xoxd-your-cookie SLACK_TOOLS_DEBUG=true npx -y github:rygwdn/slack-tools status "In a meeting"
 
 ### MCP Command
 
@@ -60,8 +58,8 @@ The MCP server is the default command when no command is specified. Start a Mode
 
 ```bash
 # These commands are equivalent
-npx -y github:rygwdn/slack-tools -w <workspace>
-npx -y github:rygwdn/slack-tools mcp -w <workspace>
+npx -y github:rygwdn/slack-tools
+npx -y github:rygwdn/slack-tools mcp
 ```
 
 The MCP server provides the following tools:
@@ -77,12 +75,10 @@ The MCP server provides the following tools:
 
 This command is especially useful for integrating Slack with AI assistants like Claude that support the Model Context Protocol. All tool responses are formatted in markdown for easy readability.
 
-**Note:** A workspace must be specified when using this command.
-
 Example:
 ```bash
-# Start MCP server with a specific workspace
-npx -y github:rygwdn/slack-tools -w Build
+# Start MCP server
+npx -y github:rygwdn/slack-tools
 ```
 
 ### Status Command
@@ -90,7 +86,7 @@ npx -y github:rygwdn/slack-tools -w Build
 Set your Slack status:
 
 ```bash
-npx -y github:rygwdn/slack-tools status -w <workspace> [options] <text>
+npx -y github:rygwdn/slack-tools status [options] <text>
 ```
 
 Options:
@@ -100,16 +96,16 @@ Options:
 Examples:
 ```bash
 # Set status with emoji and 1-hour duration
-npx -y github:rygwdn/slack-tools status -w Build "In a meeting" --emoji calendar --duration 60
+npx -y github:rygwdn/slack-tools status "In a meeting" --emoji calendar --duration 60
 
 # Set status with emoji and no expiration
-npx -y github:rygwdn/slack-tools status -w Build "Working remotely" --emoji house
+npx -y github:rygwdn/slack-tools status "Working remotely" --emoji house
 
 # Clear status by passing empty text
-npx -y github:rygwdn/slack-tools status -w Build ""
+npx -y github:rygwdn/slack-tools status ""
 
 # Set "away" status with no emoji and no expiration
-npx -y github:rygwdn/slack-tools status -w Build away
+npx -y github:rygwdn/slack-tools status away
 ```
 
 ### Create Reminder Command
@@ -117,7 +113,7 @@ npx -y github:rygwdn/slack-tools status -w Build away
 Create a new Slack reminder:
 
 ```bash
-npx -y github:rygwdn/slack-tools create-reminder -w <workspace> [options] <text>
+npx -y github:rygwdn/slack-tools create-reminder [options] <text>
 ```
 
 Options:
@@ -127,13 +123,13 @@ Options:
 Examples:
 ```bash
 # Create a reminder for 30 minutes from now (default)
-npx -y github:rygwdn/slack-tools create-reminder -w Build "Call the team"
+npx -y github:rygwdn/slack-tools create-reminder "Call the team"
 
 # Create a reminder for a specific time
-npx -y github:rygwdn/slack-tools create-reminder -w Build "Weekly report" --time "tomorrow at 9am"
+npx -y github:rygwdn/slack-tools create-reminder "Weekly report" --time "tomorrow at 9am"
 
 # Create a reminder with a custom relative time
-npx -y github:rygwdn/slack-tools create-reminder -w Build "Check on project status" --time "in 2 hours"
+npx -y github:rygwdn/slack-tools create-reminder "Check on project status" --time "in 2 hours"
 ```
 
 ### Thread Command
@@ -141,7 +137,7 @@ npx -y github:rygwdn/slack-tools create-reminder -w Build "Check on project stat
 Get replies in a Slack thread:
 
 ```bash
-npx -y github:rygwdn/slack-tools thread -w <workspace> [options] <channel> <timestamp>
+npx -y github:rygwdn/slack-tools thread [options] <channel> <timestamp>
 ```
 
 Options:
@@ -150,10 +146,10 @@ Options:
 Examples:
 ```bash
 # Get replies in a thread (default limit of 20)
-npx -y github:rygwdn/slack-tools thread -w Build C01234ABCDE 1620000000.123456
+npx -y github:rygwdn/slack-tools thread C01234ABCDE 1620000000.123456
 
 # Get up to 50 replies in a thread
-npx -y github:rygwdn/slack-tools thread -w Build C01234ABCDE 1620000000.123456 --limit 50
+npx -y github:rygwdn/slack-tools thread C01234ABCDE 1620000000.123456 --limit 50
 ```
 
 ### Activity Command
@@ -161,7 +157,7 @@ npx -y github:rygwdn/slack-tools thread -w Build C01234ABCDE 1620000000.123456 -
 Get activity statistics for a Slack user:
 
 ```bash
-npx -y github:rygwdn/slack-tools activity -w <workspace> [options]
+npx -y github:rygwdn/slack-tools activity [options]
 ```
 
 Options:
@@ -171,13 +167,13 @@ Options:
 Examples:
 ```bash
 # Get your own activity stats (default 100 messages)
-npx -y github:rygwdn/slack-tools activity -w Build
+npx -y github:rygwdn/slack-tools activity
 
 # Get activity for a specific user
-npx -y github:rygwdn/slack-tools activity -w Build --user U01234ABCDE
+npx -y github:rygwdn/slack-tools activity --user U01234ABCDE
 
 # Analyze more messages for better statistics
-npx -y github:rygwdn/slack-tools activity -w Build --count 500
+npx -y github:rygwdn/slack-tools activity --count 500
 ```
 
 ### Search Command
@@ -185,7 +181,7 @@ npx -y github:rygwdn/slack-tools activity -w Build --count 500
 Search Slack messages and output results as markdown:
 
 ```bash
-npx -y github:rygwdn/slack-tools search -w <workspace> [options] <query>
+npx -y github:rygwdn/slack-tools search [options] <query>
 ```
 
 Options:
@@ -195,13 +191,13 @@ Options:
 Examples:
 ```bash
 # Search for messages containing "project update"
-npx -y github:rygwdn/slack-tools search -w Build "project update"
+npx -y github:rygwdn/slack-tools search "project update"
 
 # Search for messages from a specific user
-npx -y github:rygwdn/slack-tools search -w Build "from:@username project"
+npx -y github:rygwdn/slack-tools search "from:@username project"
 
 # Search with more results and save to file
-npx -y github:rygwdn/slack-tools search -w Build "deadline" --count 200 --output search-results.md
+npx -y github:rygwdn/slack-tools search "deadline" --count 200 --output search-results.md
 ```
 
 ### My Messages Command
@@ -209,7 +205,7 @@ npx -y github:rygwdn/slack-tools search -w Build "deadline" --count 200 --output
 Generate a summary of your Slack activity:
 
 ```bash
-npx -y github:rygwdn/slack-tools my-messages -w <workspace> [options]
+npx -y github:rygwdn/slack-tools my-messages [options]
 ```
 
 Options:
@@ -222,13 +218,13 @@ Options:
 Examples:
 ```bash
 # Get today's activity summary
-npx -y github:rygwdn/slack-tools my-messages -w Build
+npx -y github:rygwdn/slack-tools my-messages
 
 # Get activity for a specific date range
-npx -y github:rygwdn/slack-tools my-messages -w Build -s 2023-03-01 -e 2023-03-31
+npx -y github:rygwdn/slack-tools my-messages -s 2023-03-01 -e 2023-03-31
 
 # Save the summary to a file
-npx -y github:rygwdn/slack-tools my-messages -w Build -o activity-report.md
+npx -y github:rygwdn/slack-tools my-messages -o activity-report.md
 ```
 
 ## Requirements

@@ -10,9 +10,13 @@ vi.mock('@slack/web-api', () => ({
       test: vi.fn().mockResolvedValue({ ok: true, user: 'test-user', team: 'test-team' }),
     },
   })),
+  LogLevel: { DEBUG: 0, ERROR: 2 }
 }));
 
 vi.mock('../../../src/keychain.js');
+vi.mock('../../../src/slack-api', () => ({
+  validateAuth: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe('Auth From Curl Command', () => {
   let program: Command;
@@ -54,31 +58,33 @@ describe('Auth From Curl Command', () => {
     ]);
 
     // Verify that storeAuth was called with correct parameters
-    expect(storeAuth).toHaveBeenCalledWith('test-workspace', {
+    expect(storeAuth).toHaveBeenCalledWith('default', {
       token: 'xoxc-1234567890',
       cookie: 'xoxd-abcdef1234',
     });
   });
 
-  it('should fail if no workspace is specified', async () => {
+  it('should work even if no workspace is specified', async () => {
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-curl');
     GlobalContext.workspace = '';
 
-    await expect(
-      command!.parseAsync([
-        'node',
-        'auth-from-curl',
-        'curl',
-        'https://slack.com/api/some.method',
-        '-H',
-        'Authorization: Bearer xoxc-1234567890',
-        '-H',
-        'Cookie: d=xoxd-abcdef1234',
-      ]),
-    ).rejects.toThrow();
+    // Since we removed the workspace check, this should now pass
+    await command!.parseAsync([
+      'node',
+      'auth-from-curl',
+      'curl',
+      'https://slack.com/api/some.method',
+      '-H',
+      'Authorization: Bearer xoxc-1234567890',
+      '-H',
+      'Cookie: d=xoxd-abcdef1234',
+    ]);
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('No workspace specified'));
-    expect(storeAuth).not.toHaveBeenCalled();
+    // Verify that storeAuth was called with correct parameters
+    expect(storeAuth).toHaveBeenCalledWith('default', {
+      token: 'xoxc-1234567890',
+      cookie: 'xoxd-abcdef1234',
+    });
   });
 
   it('should fail if no token can be extracted', async () => {

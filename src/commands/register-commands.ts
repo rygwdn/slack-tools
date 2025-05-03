@@ -6,6 +6,7 @@ import { registerMcpCommand } from './mcp';
 import { registerToolAsCommand } from './auto-register-tools';
 import { mcpTools } from './mcp-tools';
 import { registerAuthFromCurlCommand } from './auth-from-curl';
+import { registerAuthFromAppCommand } from './auth-from-app';
 
 export function registerCommands(program: Command): void {
   registerClearCommand(program);
@@ -13,6 +14,7 @@ export function registerCommands(program: Command): void {
   registerTestCommand(program);
   registerMcpCommand(program);
   registerAuthFromCurlCommand(program);
+  registerAuthFromAppCommand(program);
 
   // Register all MCP tools as commands
   for (const tool of mcpTools) {

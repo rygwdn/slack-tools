@@ -1,9 +1,11 @@
 import { Command } from 'commander';
 import { GlobalContext } from '../context';
-import { storeAuth } from '../keychain.js';
+import { storeAuth, validateSlackAuth, validateAuthWithApi } from '../auth';
 import { SlackAuth } from '../types.js';
-import { validateAuth } from '../slack-api';
 
+/**
+ * Extracts token and cookie from a curl command
+ */
 function extractAuthFromCurl(curlCommand: string): SlackAuth | null {
   const token = curlCommand.match('Authorization: Bearer (xoxc-[a-zA-Z0-9-]+)')?.[1];
   const cookie = curlCommand.match('Cookie: d=(xoxd-[a-zA-Z0-9-]+)')?.[1];
@@ -23,20 +25,20 @@ export function registerAuthFromCurlCommand(program: Command): void {
         const curlCommand = curlArgs.join(' ');
         GlobalContext.log.debug('Parsing curl command:', curlCommand);
 
-        if (!GlobalContext.workspace) {
-          program.error('Error: No workspace specified');
-        }
-
         const auth = extractAuthFromCurl(curlCommand);
         if (!auth) {
           program.error('Error: Could not extract auth from the curl command');
         }
 
-        await validateAuth(auth);
+        // Validate format
+        validateSlackAuth(auth);
+
+        // Validate with API
+        await validateAuthWithApi(auth);
 
         if (options.store) {
-          await storeAuth(GlobalContext.workspace, auth);
-          console.log(`Stored authentication for workspace: ${GlobalContext.workspace}`);
+          await storeAuth('default', auth);
+          console.log('Stored authentication successfully');
         }
 
         console.log(`Token: ${auth.token}`);
