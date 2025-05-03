@@ -23,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Imports: Use ES modules, sort imports logically
 - Error handling: Always handle Promise rejections explicitly
 - Testing: Write unit tests for all functionality
+- Comments: Do not add comments to code unless absolutely necessary for clarity
 - Quality: All code must pass lint, format, and type checks before completion
 
 Always run quality checks (`npm run check`) before considering a task complete.
