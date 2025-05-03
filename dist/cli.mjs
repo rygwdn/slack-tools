@@ -18,6 +18,7 @@ import { exec as exec$1 } from 'child_process';
 import Database from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
+import readline2 from 'node:readline/promises';
 
 // src/context.ts
 var GlobalContext = {
@@ -1347,8 +1348,16 @@ Notes:
       const authCombinations = extractAuthFromCurl(curlCommand);
       GlobalContext.log.debug(`Found ${authCombinations.length} possible auth combinations`);
       const validAuth = await findValidAuth(authCombinations);
-      console.log(`Token: ${validAuth.token}`);
-      console.log(`Cookie: ${validAuth.cookie}`);
+      console.log(
+        JSON.stringify(
+          {
+            SLACK_TOKEN: validAuth.token,
+            SLACK_COOKIE: validAuth.cookie
+          },
+          null,
+          2
+        )
+      );
       if (options.store) {
         await storeAuth(validAuth);
         console.log();
@@ -1378,7 +1387,7 @@ function getLevelDBPath() {
   }
   throw new Error("Could not find Slack's Local Storage directory");
 }
-async function fetchTokenFromApp(workspace) {
+async function getAvailableWorkspaces() {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
   try {
@@ -1396,17 +1405,12 @@ async function fetchTokenFromApp(workspace) {
       throw new Error("Slack has multiple localConfig_v2 values");
     }
     const config = JSON.parse(configValues[0].slice(1));
+    const workspaces = Object.values(config.teams);
     GlobalContext.log.debug(
-      "Config:",
-      Object.values(config.teams).map((t) => t.name)
+      "Found workspaces:",
+      workspaces.map((w) => w.name)
     );
-    const teams = Object.values(config.teams);
-    for (const team of teams) {
-      if (team.name === workspace) {
-        return team.token;
-      }
-    }
-    throw new Error(`No token found for workspace: ${workspace}`);
+    return workspaces;
   } catch (error) {
     console.error("Error:", error);
     if (error && typeof error === "object" && "code" in error) {
@@ -1543,40 +1547,68 @@ async function fetchCookieFromApp() {
     );
   }
 }
-
-// src/commands/auth-from-app.ts
 function registerAuthFromAppCommand(program2) {
   program2.command("auth-from-app").description("Extract and store Slack authentication directly from the Slack app").option("-w, --workspace <workspace>", "Specify Slack workspace name to extract token for").option("--store", "Store the extracted auth in the system keychain for future use").helpOption("-h, --help", "Display help for command").addHelpText(
     "after",
     `
 Notes:
   - The Slack desktop app must be CLOSED while running this command
-  - If you're logged into multiple workspaces, use the --workspace option
+  - If you're logged into multiple workspaces, you'll be prompted to select one
+    (or use the --workspace option to specify directly)
   - Use --store to save credentials in your system keychain
   - Once stored, credentials will be automatically used for future commands
   - The command will output the extracted token and cookie values for verification
 `
   ).action(async (options) => {
     try {
-      const workspace = options.workspace;
-      GlobalContext.log.debug(
-        "Extracting auth from Slack app" + (workspace ? ` for workspace: ${workspace}` : "")
-      );
-      GlobalContext.log.info(`Fetching credentials for workspace: ${options.workspace}`);
-      const token = await fetchTokenFromApp(options.workspace);
+      GlobalContext.log.debug("Extracting available workspaces from Slack app");
+      const workspaces = await getAvailableWorkspaces();
       const cookie = await fetchCookieFromApp();
+      if (workspaces.length === 0) {
+        throw new Error("No Slack workspaces found");
+      }
+      const selectedWorkspace = options.workspace || await selectWorkspace(workspaces);
+      GlobalContext.log.info(`Fetching credentials for workspace: ${selectedWorkspace}`);
+      const token = workspaces.find((ws) => ws.name === selectedWorkspace)?.token;
+      if (!token) {
+        throw new Error(`No token found for workspace: ${selectedWorkspace}`);
+      }
       const auth = { token, cookie };
       await createWebClient(auth);
       if (options.store) {
         await storeAuth(auth);
         GlobalContext.log.info("Credentials stored successfully.");
       }
-      console.log(`Token: ${auth.token}`);
-      console.log(`Cookie: ${auth.cookie}`);
+      console.log(
+        JSON.stringify(
+          {
+            SLACK_TOKEN: auth.token,
+            SLACK_COOKIE: auth.cookie
+          },
+          null,
+          2
+        )
+      );
     } catch (error) {
       program2.error(error.message);
     }
   });
+}
+async function selectWorkspace(workspaces) {
+  workspaces.forEach((ws, index) => {
+    console.log(`${index + 1}. ${ws.name} ${ws.url}`);
+  });
+  const rl = readline2.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  const answer = await rl.question("Enter the number of the workspace to use: ");
+  rl.close();
+  const selection = parseInt(answer.trim(), 10);
+  if (isNaN(selection) || selection < 1 || selection > workspaces.length) {
+    throw new Error(`Invalid selection: ${answer}`);
+  }
+  return workspaces[selection - 1].name;
 }
 
 // src/commands/register-commands.ts

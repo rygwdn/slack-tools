@@ -31,17 +31,21 @@ function getLevelDBPath(): string {
   throw new Error("Could not find Slack's Local Storage directory");
 }
 
+export interface WorkspaceInfo {
+  name: string;
+  url: string;
+  token: string;
+}
+
 /**
- * Extracts a token directly from the Slack desktop app's LevelDB database
- * This should only be used by the auth-from-app command
+ * Gets all available workspaces from Slack's LevelDB
  */
-export async function fetchTokenFromApp(workspace: string): Promise<string> {
+export async function getAvailableWorkspaces(): Promise<WorkspaceInfo[]> {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
 
   try {
     await db.open();
-
     const entries = await db.iterator().all();
 
     const configValues = entries
@@ -61,23 +65,17 @@ export async function fetchTokenFromApp(workspace: string): Promise<string> {
     }
 
     const config = JSON.parse(configValues[0].slice(1)) as {
-      teams: Record<string, { name: string; token: string }>;
+      teams: Record<string, WorkspaceInfo>;
     };
 
+    const workspaces = Object.values(config.teams);
+
     GlobalContext.log.debug(
-      'Config:',
-      Object.values(config.teams).map((t) => t.name),
+      'Found workspaces:',
+      workspaces.map((w) => w.name),
     );
 
-    const teams = Object.values(config.teams);
-
-    // If workspace is specified, find that team
-    for (const team of teams) {
-      if (team.name === workspace) {
-        return team.token;
-      }
-    }
-    throw new Error(`No token found for workspace: ${workspace}`);
+    return workspaces;
   } catch (error) {
     // Always log errors to console.error regardless of mode
     console.error('Error:', error);

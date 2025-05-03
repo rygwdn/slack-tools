@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { registerAuthFromAppCommand } from '../../../src/commands/auth-from-app';
 import { storeAuth } from '../../../src/auth/keychain.js';
 import { fetchCookieFromApp } from '../../../src/auth/cookie-extractor.js';
-import { fetchTokenFromApp } from '../../../src/auth/token-extractor.js';
+import { getAvailableWorkspaces } from '../../../src/auth/token-extractor.js';
 import { createWebClient } from '../../../src/slack-api';
 
 // Mock all dependencies
@@ -23,10 +23,26 @@ vi.mock('../../../src/auth/cookie-extractor.js', () => ({
   fetchCookieFromApp: vi.fn().mockResolvedValue('xoxd-test-cookie'),
 }));
 vi.mock('../../../src/auth/token-extractor.js', () => ({
-  fetchTokenFromApp: vi.fn().mockResolvedValue('xoxc-test-token'),
+  getAvailableWorkspaces: vi.fn().mockResolvedValue([
+    {
+      name: 'test-workspace',
+      token: 'xoxc-test-token',
+      url: 'https://test.slack.com',
+    },
+  ]),
 }));
 vi.mock('../../../src/slack-api', () => ({
   createWebClient: vi.fn().mockResolvedValue({ auth: { test: vi.fn() } }), // Mock createWebClient
+}));
+
+// Mock readline
+vi.mock('node:readline/promises', () => ({
+  default: {
+    createInterface: vi.fn().mockReturnValue({
+      question: vi.fn().mockResolvedValue('1'),
+      close: vi.fn(),
+    }),
+  },
 }));
 
 describe('Auth From App Command', () => {
@@ -36,7 +52,13 @@ describe('Auth From App Command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(fetchTokenFromApp).mockResolvedValue('xoxc-test-token');
+    vi.mocked(getAvailableWorkspaces).mockResolvedValue([
+      {
+        name: 'test-workspace',
+        token: 'xoxc-test-token',
+        url: 'https://test.slack.com',
+      },
+    ]);
     vi.mocked(fetchCookieFromApp).mockResolvedValue('xoxd-test-cookie');
     vi.mocked(storeAuth).mockClear();
     vi.mocked(createWebClient).mockClear();
@@ -63,8 +85,8 @@ describe('Auth From App Command', () => {
 
     await command!.parseAsync(['node', 'auth-from-app', '--store']);
 
-    // Verify that getToken and getCookie were called
-    expect(fetchTokenFromApp).toHaveBeenCalled();
+    // Verify that tokens are retrieved and getCookie is called
+    expect(getAvailableWorkspaces).toHaveBeenCalled();
     expect(fetchCookieFromApp).toHaveBeenCalled();
 
     expect(storeAuth).toHaveBeenCalledWith({
@@ -86,8 +108,7 @@ describe('Auth From App Command', () => {
       'test-workspace',
     ]);
 
-    // Verify that getToken was called with the workspace parameter
-    expect(fetchTokenFromApp).toHaveBeenCalledWith('test-workspace');
+    // Verify that the correct workspace was used
     expect(fetchCookieFromApp).toHaveBeenCalled();
 
     expect(storeAuth).toHaveBeenCalledWith({
@@ -100,12 +121,12 @@ describe('Auth From App Command', () => {
   it('should fail if token validation fails', async () => {
     // Mock an error in the validation process
     const tokenExtractionError = new Error('Token error');
-    vi.mocked(fetchTokenFromApp).mockRejectedValueOnce(tokenExtractionError);
+    vi.mocked(getAvailableWorkspaces).mockRejectedValueOnce(tokenExtractionError);
 
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-app');
 
     try {
-      await command!.parseAsync(['node', 'auth-from-app']);
+      await command!.parseAsync(['node', 'auth-from-app', '--workspace', 'test-workspace']);
       expect.fail('command!.parseAsync should have thrown an error.');
     } catch {
       // Expected path: parseAsync threw an error
@@ -122,10 +143,19 @@ describe('Auth From App Command', () => {
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-app');
     const consoleSpy = vi.spyOn(console, 'log');
 
-    await command!.parseAsync(['node', 'auth-from-app']);
+    await command!.parseAsync(['node', 'auth-from-app', '--workspace', 'test-workspace']);
 
-    expect(consoleSpy).toHaveBeenCalledWith('Token: xoxc-test-token');
-    expect(consoleSpy).toHaveBeenCalledWith('Cookie: xoxd-test-cookie');
+    // Since we're using --workspace flag, we bypass the workspace selection
+    // and directly output the JSON
+    expect(consoleSpy).toHaveBeenCalled();
+
+    // The JSON output should be the only call or the last call
+    const lastCall = consoleSpy.mock.calls[consoleSpy.mock.calls.length - 1][0];
+    expect(lastCall).toContain('"SLACK_TOKEN"');
+    expect(lastCall).toContain('"SLACK_COOKIE"');
+    expect(lastCall).toContain('xoxc-test-token');
+    expect(lastCall).toContain('xoxd-test-cookie');
+
     expect(errorSpy).not.toHaveBeenCalled();
   });
 });

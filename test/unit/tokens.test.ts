@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
-import { fetchTokenFromApp } from '../../src/auth/token-extractor';
+import { getAvailableWorkspaces } from '../../src/auth/token-extractor';
 
 // Mock the os module
 vi.mock('node:os', () => {
@@ -28,7 +28,7 @@ describe('tokens', () => {
       // Mock Windows platform
       vi.mocked(os.platform).mockReturnValue('win32');
 
-      await expect(fetchTokenFromApp('test')).rejects.toThrow('only works on macOS');
+      await expect(getAvailableWorkspaces()).rejects.toThrow('only works on macOS');
     });
   });
 });

@@ -203,8 +203,16 @@ Notes:
         // Try all auth combinations and find the first valid one
         const validAuth = await findValidAuth(authCombinations);
 
-        console.log(`Token: ${validAuth.token}`);
-        console.log(`Cookie: ${validAuth.cookie}`);
+        console.log(
+          JSON.stringify(
+            {
+              SLACK_TOKEN: validAuth.token,
+              SLACK_COOKIE: validAuth.cookie,
+            },
+            null,
+            2,
+          ),
+        );
 
         if (options.store) {
           await storeAuth(validAuth);
