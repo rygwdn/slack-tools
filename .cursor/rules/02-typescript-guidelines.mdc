@@ -3,7 +3,6 @@ description: TypeScript standards and best practices for the project
 globs: ["**/*.ts", "**/*.tsx"]
 alwaysApply: true
 ---
-
 # TypeScript Guidelines
 
 ## General TypeScript Guidelines
@@ -25,6 +24,7 @@ alwaysApply: true
 - Prefer const over let, avoid var
 - Use optional chaining and nullish coalescing operators
 - Explicitly handle Promise rejections and errors
+- **Minimize comments:** Write clear, self-documenting code. Avoid comments that restate the obvious. Use comments only for complex logic or non-obvious choices.
 
 ## Configuration
 
