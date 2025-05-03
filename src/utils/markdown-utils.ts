@@ -72,8 +72,3 @@ function isHeader(obj: MarkdownHeader | MarkdownLines | MarkdownKeyValue): obj i
   return typeof obj === 'object' && obj !== null && !isLines(obj) && !isKeyValue(obj);
 }
 
-function assertNever(_value: never): never {
-  throw new Error(
-    `ERROR! Reached forbidden guard function with unexpected value: ${JSON.stringify(_value)}`,
-  );
-}
