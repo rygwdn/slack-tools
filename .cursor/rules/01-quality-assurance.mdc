@@ -14,7 +14,7 @@ The easiest way to run all quality checks is using the check script:
 npm run check
 ```
 
-This runs ESLint, Prettier checks, TypeScript type checking, and tests in parallel, then builds the project.
+This runs ESLint, Prettier checks, TypeScript type checking, security audit, and tests in parallel, then builds the project.
 
 ## Individual Checks
 
@@ -43,7 +43,12 @@ You can also run individual checks:
    npm run typecheck
    ```
 
-4. **Build** - Compile the project:
+4. **Security Audit** - Check for vulnerabilities in dependencies:
+   ```bash
+   npm run audit
+   ```
+
+5. **Build** - Compile the project:
    ```bash
    npm run build
    ```
@@ -53,6 +58,16 @@ You can also run individual checks:
 ## Development Workflow
 
 1. Make your code changes
-2. Run all checks: `npm run check` (or individual checks as needed)
-3. Fix any issues found in the checks
-4. Commit your changes only after all checks pass
+2. Update CHANGELOG.md with notable changes under [Unreleased] section
+3. Run all checks: `npm run check` (or individual checks as needed)
+4. Fix any issues found in the checks
+5. Commit your changes only after all checks pass
+
+## Changelog Management
+
+Always document notable changes in CHANGELOG.md:
+
+1. Add new entries under the [Unreleased] section as you work
+2. Focus on functional changes that affect users
+3. Categorize changes as Added, Changed, Fixed, or Removed
+4. During release, move [Unreleased] changes to the version section with date

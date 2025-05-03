@@ -18,7 +18,8 @@
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-    "check": "npm-run-all --parallel lint format:check typecheck --serial test build"
+    "check": "npm-run-all --parallel lint format:check typecheck audit --serial test build",
+    "audit": "npm audit --production"
   },
   "keywords": [
     "slack",
@@ -37,7 +38,6 @@
     "level": "^10.0.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
-    "tsx": "^4.19.4",
     "zod": "^3.24.3"
   },
   "devDependencies": {
@@ -50,13 +50,25 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
     "tsup": "^8.4.0",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.1.1"
   },
   "files": [
-    "src",
     "dist",
-    "README.md"
-  ]
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rygwdn/slack-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rygwdn/slack-tools/issues"
+  },
+  "homepage": "https://github.com/rygwdn/slack-tools#readme"
 }
