@@ -36,14 +36,20 @@ There are two ways to authenticate with Slack:
 
    - **Extract from curl command:**
      ```bash
+     # Provide curl command as argument:
      npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
+     
+     # Or use interactive prompt:
+     npx -y github:rygwdn/slack-tools auth-from-curl --store
      ```
      This extracts authentication from a Slack API curl command:
      1. In Chrome/Firefox, open Slack in your browser
      2. Open Developer Tools (F12) and go to the Network tab
      3. Perform any action (e.g., send a message)
      4. Find a request to api.slack.com, right-click and select "Copy as cURL"
-     5. Paste the curl command as shown above
+     5. Paste the curl command as shown above (or paste into the interactive prompt)
+     - If no curl command is provided, you'll be prompted to enter it interactively
+     - Multi-line curl commands are supported with proper escaping
      - The `--store` flag saves credentials to your system keychain for future use
      - Command outputs the extracted token and cookie for verification or manual use
 
