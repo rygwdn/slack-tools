@@ -8,7 +8,13 @@ This tool provides programmatic access to the [Slack](https://slack.com/) ecosys
 
 ## Installation
 
-No installation required! You can run the tool directly using npx:
+No installation required! You can run the tool directly using npx with the npm package:
+
+```bash
+npx -y slack-tools-mcp [options] [command]
+```
+
+Alternatively, you can run the latest version directly from GitHub:
 
 ```bash
 npx -y github:rygwdn/slack-tools [options] [command]
@@ -26,7 +32,7 @@ There are two ways to authenticate with Slack:
 
    - **Extract from Slack desktop app:**
      ```bash
-     npx -y github:rygwdn/slack-tools auth-from-app --store
+     npx -y slack-tools-mcp auth-from-app --store
      ```
      This will extract your Slack token and cookie directly from the Slack desktop app's local storage. 
      - The Slack app must be closed while running this command
@@ -37,10 +43,10 @@ There are two ways to authenticate with Slack:
    - **Extract from curl command:**
      ```bash
      # Provide curl command as argument:
-     npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
+     npx -y slack-tools-mcp auth-from-curl --store "curl -X POST https://slack.com/api/..."
      
      # Or use interactive prompt:
-     npx -y github:rygwdn/slack-tools auth-from-curl --store
+     npx -y slack-tools-mcp auth-from-curl --store
      ```
      This extracts authentication from a Slack API curl command:
      1. In Chrome/Firefox, open Slack in your browser
