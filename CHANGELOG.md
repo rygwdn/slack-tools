@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - May 2025
+
 ### Changed
 - Improved production readiness with optimized build configuration
 - Updated package structure for more efficient npm distribution
