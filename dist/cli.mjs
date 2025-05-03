@@ -460,7 +460,8 @@ function* objectToMarkdownLines(obj, level = 1, previousWasHeading = false) {
       previousWasHeading = false;
     }
   } else {
-    assertNever(obj);
+    yield `${JSON.stringify(obj)}`;
+    GlobalContext.log.debug("Unexpected object type in markdown conversion:", obj);
   }
 }
 function isKeyValue(obj) {
@@ -471,11 +472,6 @@ function isLines(obj) {
 }
 function isHeader(obj) {
   return typeof obj === "object" && obj !== null && !isLines(obj) && !isKeyValue(obj);
-}
-function assertNever(_value) {
-  throw new Error(
-    `ERROR! Reached forbidden guard function with unexpected value: ${JSON.stringify(_value)}`
-  );
 }
 
 // src/services/formatting-service.ts
@@ -758,9 +754,6 @@ function tool(tool2) {
 
 // src/commands/mcp-tools/my-messages.ts
 var myMessagesParams = z.object({
-  username: z.string().optional().describe(
-    "Username or display name to fetch messages for. If omitted, fetches messages for the current user."
-  ),
   since: z.string().optional().describe(
     'Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.'
   ),
@@ -849,18 +842,14 @@ async function getSlackStatus() {
     throw new Error(`Status retrieval failed: ${error}`);
   }
 }
-async function createSlackReminder(text, time, user) {
+async function createSlackReminder(text, time) {
   try {
     GlobalContext.log.debug("Reminder text:", text);
     GlobalContext.log.debug("Reminder time:", time);
-    if (user) {
-      GlobalContext.log.debug("Reminder for user:", user);
-    }
     const client = await createWebClient();
     const response = await client.reminders.add({
       text,
-      time,
-      user
+      time
     });
     GlobalContext.log.debug("API response:", response);
     return {
@@ -1009,14 +998,11 @@ var reminderParams = z.object({
   text: z.string().describe("The reminder text (what you want to be reminded about)"),
   time: z.string().describe(
     'When to send the reminder. Supports unix timestamp, ISO datetime (YYYY-MM-DDTHH:MM:SS), or natural language like "in 5 minutes", "tomorrow at 9am", "next Monday"'
-  ),
-  user: z.string().optional().describe(
-    'Slack user ID to create the reminder for. If omitted, creates reminder for the current user. Must start with "U" followed by alphanumeric characters.'
   )
 });
 var reminderTool = tool({
   name: "slack_create_reminder",
-  description: "Create a reminder in Slack for yourself or another user.",
+  description: "Create a reminder in Slack for yourself.",
   parameters: reminderParams,
   annotations: {
     openWorldHint: true,
@@ -1024,13 +1010,12 @@ var reminderTool = tool({
     idempotentHint: false,
     title: "Create a reminder in Slack"
   },
-  execute: async ({ text, time, user }) => {
-    const result = await createSlackReminder(text, time, user);
+  execute: async ({ text, time }) => {
+    const result = await createSlackReminder(text, time);
     return objectToMarkdown({
       [`Reminder Created`]: {
-        text,
-        time,
-        user,
+        text: text.toString(),
+        time: time.toString(),
         success: result.success ? "\u2705" : "\u274C"
       }
     });
@@ -1284,21 +1269,20 @@ async function promptForCurlCommand() {
   });
 }
 function extractAuthFromCurl(curlCommand) {
-  const tokenPattern = /\b(xoxc-[a-zA-Z0-9-]+)(?=[^\w-]|$)/g;
-  const tokens = [];
-  let match;
-  while ((match = tokenPattern.exec(curlCommand)) !== null) {
-    if (!tokens.includes(match[1])) {
-      tokens.push(match[1]);
-    }
+  const tokenPattern = /(\b|\\n)(xoxc-[a-zA-Z0-9-]{20,})/g;
+  const tokens = Array.from(curlCommand.matchAll(tokenPattern), (match) => match[2]);
+  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
+  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
+  if (tokens.length === 0) {
+    throw new Error("No tokens found in the curl command");
   }
-  const cookiePattern = /\bd=(xoxd-[a-zA-Z0-9%+/=._-]+)/g;
-  const cookies = [];
-  while ((match = cookiePattern.exec(curlCommand)) !== null) {
-    if (!cookies.includes(match[1])) {
-      cookies.push(match[1]);
-    }
+  if (cookies.length === 0) {
+    throw new Error("No cookies found in the curl command");
   }
+  GlobalContext.log.debug(`Found ${tokens.length} tokens and ${cookies.length} cookies`, {
+    tokens,
+    cookies
+  });
   const combinations = [];
   for (const token of tokens) {
     for (const cookie of cookies) {
@@ -1314,7 +1298,9 @@ async function findValidAuth(authCombinations) {
       await createWebClient(auth);
       return auth;
     } catch (error) {
-      GlobalContext.log.debug(`Auth validation failed for ${auth.token}/${auth.cookie}: ${error.message}`);
+      GlobalContext.log.debug(
+        `Auth validation failed for ${auth.token}/${auth.cookie}: ${error.message}`
+      );
       continue;
     }
   }
@@ -1359,18 +1345,15 @@ Notes:
       }
       GlobalContext.log.debug("Parsing curl command:", curlCommand);
       const authCombinations = extractAuthFromCurl(curlCommand);
-      if (authCombinations.length === 0) {
-        program2.error("Error: Could not extract auth from the curl command");
-      }
       GlobalContext.log.debug(`Found ${authCombinations.length} possible auth combinations`);
       const validAuth = await findValidAuth(authCombinations);
-      if (options.store) {
-        await storeAuth(validAuth);
-        GlobalContext.log.info("Credentials stored successfully.");
-      }
-      console.log(`Found ${authCombinations.length} possible combinations`);
       console.log(`Token: ${validAuth.token}`);
       console.log(`Cookie: ${validAuth.cookie}`);
+      if (options.store) {
+        await storeAuth(validAuth);
+        console.log();
+        console.log("Credentials stored successfully.");
+      }
     } catch (error) {
       program2.error(error.message);
     }

@@ -1,0 +1,5 @@
+# Hide dist/cli.mjs changes in diffs
+dist/cli.mjs -diff
+
+# Treat all generated files as binary
+dist/* binary
