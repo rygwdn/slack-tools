@@ -1,13 +1,10 @@
 import { Command } from 'commander';
-import { GlobalContext } from '../context';
-import { storeAuth } from '../auth/keychain';
-import { createWebClient, validateSlackAuth } from '../slack-api';
-import { SlackAuth } from '../types';
+import { GlobalContext } from '../context.js';
+import { storeAuth } from '../auth/keychain.js';
+import { createWebClient, validateSlackAuth } from '../slack-api.js';
+import { SlackAuth } from '../types.js';
 import * as readline from 'readline';
 
-/**
- * Reads input from stdin (used for piped input)
- */
 async function readStdin(): Promise<string> {
   return new Promise((resolve) => {
     let data = '';
@@ -24,12 +21,7 @@ async function readStdin(): Promise<string> {
   });
 }
 
-/**
- * Prompts the user to enter a curl command with support for multi-line input
- * Handles bash-style line continuations (lines ending with \)
- */
 async function promptForCurlCommand(): Promise<string> {
-  // Check if stdin is not a TTY (e.g., piped input)
   if (!process.stdin.isTTY) {
     return readStdin();
   }
@@ -99,7 +91,6 @@ export function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
   const tokenPattern = /(\b|\\n)(xoxc-[a-zA-Z0-9-]{20,})/g;
   const tokens = Array.from(curlCommand.matchAll(tokenPattern), (match) => match[2]);
 
-  // Check for tokens first
   if (tokens.length === 0) {
     throw new Error('No tokens found in the curl command');
   }
@@ -107,7 +98,6 @@ export function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
   const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
   const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
 
-  // Then check for cookies
   if (cookies.length === 0) {
     throw new Error('No cookies found in the curl command');
   }
@@ -117,7 +107,6 @@ export function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
     cookies,
   });
 
-  // Create all possible combinations
   const combinations: SlackAuth[] = [];
   for (const token of tokens) {
     for (const cookie of cookies) {
@@ -133,7 +122,7 @@ export async function findValidAuth(authCombinations: SlackAuth[]): Promise<Slac
     try {
       validateSlackAuth(auth);
       await createWebClient(auth);
-      return auth; // Return immediately when a valid auth is found
+      return auth;
     } catch (error) {
       GlobalContext.log.debug(
         `Auth validation failed for ${auth.token}/${auth.cookie}: ${(error as Error).message}`,
@@ -142,7 +131,9 @@ export async function findValidAuth(authCombinations: SlackAuth[]): Promise<Slac
     }
   }
 
-  throw new Error('No valid auth combination found in the curl command');
+  throw new Error(
+    'No valid authentication combination found in the curl command. Please make sure your curl command contains both valid token (xoxc-) and cookie (xoxd-) values.',
+  );
 }
 
 export function registerAuthFromCurlCommand(program: Command): void {
@@ -184,11 +175,9 @@ Notes:
       try {
         let curlCommand = curlArgs.join(' ');
 
-        // If no curl command is provided, prompt for it
         if (!curlCommand) {
           curlCommand = await promptForCurlCommand();
 
-          // If still no command after prompting, show error
           if (!curlCommand.trim()) {
             program.error('Error: No curl command provided');
           }
@@ -200,7 +189,6 @@ Notes:
 
         GlobalContext.log.debug(`Found ${authCombinations.length} possible auth combinations`);
 
-        // Try all auth combinations and find the first valid one
         const validAuth = await findValidAuth(authCombinations);
 
         console.log(
@@ -220,7 +208,7 @@ Notes:
           console.log('Credentials stored successfully.');
         }
       } catch (error) {
-        program.error((error as Error).message);
+        program.error(`Authentication extraction failed. ${(error as Error).message}`);
       }
     });
 }

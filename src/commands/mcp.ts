@@ -3,7 +3,8 @@ import { FastMCP } from 'fastmcp';
 import { version } from '../../package.json';
 import { mcpTools } from './mcp-tools/index';
 import { createWebClient } from '../slack-api';
-import { getStoredAuth } from '../auth/keychain';
+import { getAuth } from '../auth/keychain';
+import { handleCommandError } from '../utils/auth-error';
 
 export function registerMcpCommand(program: Command): void {
   program
@@ -12,7 +13,7 @@ export function registerMcpCommand(program: Command): void {
     .description('Start an MCP server with search and status capabilities')
     .action(async () => {
       try {
-        const auth = await getStoredAuth();
+        const auth = await getAuth();
         await createWebClient(auth);
 
         const server = new FastMCP({
@@ -28,7 +29,7 @@ export function registerMcpCommand(program: Command): void {
           transportType: 'stdio',
         });
       } catch (error) {
-        program.error((error as Error).message);
+        handleCommandError(error, program);
       }
     });
 }

@@ -39,7 +39,7 @@ describe('Test Command', () => {
         }),
       },
     };
-    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
     vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
 
     // Mock console methods

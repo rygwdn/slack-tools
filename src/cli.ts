@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { registerCommands } from './commands/register-commands';
-import { GlobalContext } from './context';
-
+import { registerCommands } from './commands/register-commands.js';
+import { GlobalContext } from './context.js';
+import { handleCommandError } from './utils/auth-error.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
@@ -22,6 +22,10 @@ registerCommands(program);
 program.hook('preAction', async (thisCommand) => {
   const options = thisCommand.opts();
   GlobalContext.debug = options.debug || process.env.SLACK_TOOLS_DEBUG === 'true';
+});
+
+process.on('uncaughtException', (error) => {
+  handleCommandError(error, program);
 });
 
 program.parse(process.argv);

@@ -1,1 +1,0 @@
-- only requrie and set the cookie if using a personal token

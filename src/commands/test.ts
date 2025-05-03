@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { getStoredAuth } from '../auth/keychain';
-import { GlobalContext } from '../context';
+import { getAuth } from '../auth/keychain';
 import { createWebClient } from '../slack-api';
+import { handleCommandError } from '../utils/auth-error';
 
 export function registerTestCommand(program: Command): void {
   program
@@ -9,7 +9,7 @@ export function registerTestCommand(program: Command): void {
     .description('Test authentication with Slack API')
     .action(async (_options) => {
       try {
-        const auth = await getStoredAuth();
+        const auth = await getAuth();
         const client = await createWebClient(auth);
 
         console.log('Calling auth.test API endpoint');
@@ -19,8 +19,7 @@ export function registerTestCommand(program: Command): void {
         console.log('\nAPI Response:');
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
-        GlobalContext.log.debug('Error detail', error as Error);
-        program.error((error as Error).message);
+        handleCommandError(error, program);
       }
     });
 }

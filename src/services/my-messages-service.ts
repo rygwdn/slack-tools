@@ -7,7 +7,7 @@ import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse.js';
 import { SlackCache } from '../commands/my_messages/types.js';
-import { getStoredAuth } from '../auth/keychain';
+import { getAuth } from '../auth/keychain';
 
 export interface MyMessagesOptions {
   count?: number;
@@ -46,7 +46,7 @@ export async function generateMyMessagesSummary(
 ): Promise<MyMessagesSummaryResult> {
   const { count = 200 } = options; // Default count to 200
   const dateRange = await getDateRange(options);
-  const auth = await getStoredAuth();
+  const auth = await getAuth();
   if (!auth) {
     throw new Error('Authentication required');
   }

@@ -2,58 +2,81 @@ import { WebClient, LogLevel } from '@slack/web-api';
 import { SlackAuth } from './types.js';
 import { GlobalContext } from './context.js';
 import { redactLog } from './utils/log-utils.js';
-import { getStoredAuth } from './auth/keychain.js';
+import { getAuth } from './auth/keychain.js';
+import { AuthError } from './utils/auth-error.js';
 
 export async function createWebClient(auth?: SlackAuth): Promise<WebClient> {
   if (!auth) {
-    auth = await getStoredAuth();
+    auth = await getAuth();
   }
 
-  validateSlackAuth(auth);
+  const validAuth = validateSlackAuth(auth);
 
-  const webClient = new WebClient(auth.token, {
+  const webClient = new WebClient(validAuth.token, {
+    logger: getLogger(),
     headers: {
-      Cookie: `d=${auth.cookie}`,
-    },
-    logger: {
-      debug: (message: string, ...args: unknown[]) =>
-        GlobalContext.log.debug(...redactLog(message, ...args)),
-      info: (message: string, ...args: unknown[]) =>
-        GlobalContext.log.info(...redactLog(message, ...args)),
-      warn: (message: string, ...args: unknown[]) =>
-        GlobalContext.log.warn(...redactLog(message, ...args)),
-      error: (message: string, ...args: unknown[]) =>
-        GlobalContext.log.error(...redactLog(message, ...args)),
-      setLevel: () => {},
-      getLevel: () => (GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR),
-      setName: () => {},
+      Cookie: `d=${validAuth.cookie}`,
     },
   });
 
-  const response = await webClient.auth.test();
-  if (!response.ok) {
-    throw new Error('Auth test failed: API returned not ok');
+  try {
+    const response = await webClient.auth.test();
+    if (!response.ok) {
+      throw new AuthError(`Slack API rejected the credentials: ${response.error}`);
+    }
+
+    GlobalContext.currentUser = response;
+    return webClient;
+  } catch (error) {
+    throw new AuthError((error as Error).message);
   }
-
-  GlobalContext.currentUser = response;
-
-  return webClient;
 }
 
-export function validateSlackAuth(auth: SlackAuth): void {
-  if (!auth.token) {
-    throw new Error('Auth validation failed: token is required');
+export function validateSlackAuth(auth: {
+  token?: string | null;
+  cookie?: string | null;
+}): SlackAuth {
+  const errors: string[] = [];
+  if (!auth?.token && !auth?.cookie) {
+    throw new AuthError('No authentication credentials found');
   }
 
-  if (!auth.cookie) {
-    throw new Error('Auth validation failed: cookie is required');
+  if (!auth?.token) {
+    errors.push('token is required');
   }
 
-  if (!auth.token.startsWith('xoxc-')) {
-    throw new Error(`Invalid token format: token should start with 'xoxc-'. Got: ${auth.token}`);
+  if (!auth?.cookie) {
+    errors.push('cookie is required');
   }
 
-  if (!auth.cookie.startsWith('xoxd-')) {
-    throw new Error(`Invalid cookie format: cookie should start with 'xoxd-'. Got: ${auth.cookie}`);
+  if (auth.token && !auth.token.startsWith('xoxc-')) {
+    errors.push('invalid token format');
   }
+
+  // If cookie exists, check format
+  if (auth.cookie && !auth.cookie.startsWith('xoxd-')) {
+    errors.push('invalid cookie format');
+  }
+
+  if (errors.length > 0) {
+    throw new AuthError(`Authentication validation failed: ${errors.join(', ')}`);
+  }
+
+  return { token: auth.token!, cookie: auth.cookie! } as SlackAuth;
+}
+
+function getLogger() {
+  return {
+    debug: (message: string, ...args: unknown[]) =>
+      GlobalContext.log.debug(...redactLog(message, ...args)),
+    info: (message: string, ...args: unknown[]) =>
+      GlobalContext.log.info(...redactLog(message, ...args)),
+    warn: (message: string, ...args: unknown[]) =>
+      GlobalContext.log.warn(...redactLog(message, ...args)),
+    error: (message: string, ...args: unknown[]) =>
+      GlobalContext.log.error(...redactLog(message, ...args)),
+    setLevel: () => {},
+    getLevel: () => (GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR),
+    setName: () => {},
+  } satisfies WebClient['logger'];
 }

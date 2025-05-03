@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { Tool } from 'fastmcp';
 import { ZodObject, ZodTypeAny, ZodError, ZodRawShape } from 'zod';
 import { GlobalContext } from '../context';
+import { handleCommandError } from '../utils/auth-error';
 
 function toKebabCase(str: string): string {
   const withoutPrefix = str.replace(/^slack_/, '');
@@ -53,8 +54,7 @@ export function registerToolAsCommand<TObj extends ZodRawShape>(
     try {
       await optionAction<TObj>(shape, options, tool, commandName);
     } catch (error) {
-      GlobalContext.log.debug('Error detail', error as Error);
-      program.error((error as Error).message);
+      handleCommandError(error, program);
     }
   });
 }

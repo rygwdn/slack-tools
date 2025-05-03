@@ -1,10 +1,10 @@
 import { Command } from 'commander';
-import { storeAuth } from '../auth/keychain';
-import { getAvailableWorkspaces, WorkspaceInfo } from '../auth/token-extractor';
-import { fetchCookieFromApp } from '../auth/cookie-extractor';
-import { createWebClient } from '../slack-api';
-import { GlobalContext } from '../context';
-import { SlackAuth } from '../types';
+import { storeAuth } from '../auth/keychain.js';
+import { getAvailableWorkspaces, WorkspaceInfo } from '../auth/token-extractor.js';
+import { fetchCookieFromApp } from '../auth/cookie-extractor.js';
+import { createWebClient } from '../slack-api.js';
+import { GlobalContext } from '../context.js';
+import { SlackAuth } from '../types.js';
 import readline from 'node:readline/promises';
 
 export function registerAuthFromAppCommand(program: Command): void {
@@ -28,7 +28,6 @@ Notes:
     )
     .action(async (options) => {
       try {
-        // Get all available workspaces first
         GlobalContext.log.debug('Extracting available workspaces from Slack app');
         const workspaces = await getAvailableWorkspaces();
         const cookie = await fetchCookieFromApp();
@@ -45,7 +44,6 @@ Notes:
           throw new Error(`No token found for workspace: ${selectedWorkspace}`);
         }
 
-        // Test the credentials
         const auth: SlackAuth = { token, cookie };
         await createWebClient(auth);
 
@@ -65,7 +63,7 @@ Notes:
           ),
         );
       } catch (error) {
-        program.error((error as Error).message);
+        program.error(`Authentication extraction failed. ${(error as Error).message}`);
       }
     });
 }

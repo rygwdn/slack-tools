@@ -96,7 +96,7 @@ describe('My Messages Service', () => {
 
     // Setup mocks
     vi.mocked(dateUtils.getDateRange).mockResolvedValue(mockDateRange);
-    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
     vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
     vi.mocked(slackService.searchMessages).mockImplementation(
       async (_client, _username, _dateRange, _count) => {
@@ -114,8 +114,8 @@ describe('My Messages Service', () => {
     vi.mocked(slackApi.createWebClient).mockReset();
     vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
 
-    vi.mocked(keychain.getStoredAuth).mockReset();
-    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(keychain.getAuth).mockReset();
+    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
   });
 
   it('should generate a my messages summary with default options', async () => {
@@ -124,7 +124,7 @@ describe('My Messages Service', () => {
 
     // Check if all the required functions were called
     expect(dateUtils.getDateRange).toHaveBeenCalledWith({ count: 200 });
-    expect(keychain.getStoredAuth).toHaveBeenCalled();
+    expect(keychain.getAuth).toHaveBeenCalled();
     // Check that createWebClient was called with the auth object
     expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
     expect(slackService.searchMessages).toHaveBeenCalledWith(
@@ -184,7 +184,7 @@ describe('My Messages Service', () => {
   it('should throw error if auth fails', async () => {
     const authError = new Error('Authentication required');
     vi.mocked(slackApi.createWebClient).mockRejectedValueOnce(authError);
-    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
 
     const options: MyMessagesOptions = { timeRange: 'today' };
 
