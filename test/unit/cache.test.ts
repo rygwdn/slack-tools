@@ -38,9 +38,6 @@ describe('cache', () => {
     it('should return default cache if cache file does not exist', async () => {
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('File not found'));
 
-      // Setup GlobalContext.workspace before the test
-      GlobalContext.workspace = 'test-workspace';
-
       const result = await loadSlackCache();
       expect(result).toEqual({
         version: 1,
@@ -80,9 +77,6 @@ describe('cache', () => {
       };
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockCache));
-
-      // Setup GlobalContext.workspace before the test
-      GlobalContext.workspace = 'test-workspace';
 
       const result = await loadSlackCache();
       expect(result).toEqual({

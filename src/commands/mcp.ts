@@ -1,8 +1,9 @@
 import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
 import { version } from '../../package.json';
-import { mcpTools } from './mcp-tools';
-import { getSlackClient } from '../slack-api';
+import { mcpTools } from './mcp-tools/index';
+import { createWebClient } from '../slack-api';
+import { getStoredAuth } from '../auth/keychain';
 
 export function registerMcpCommand(program: Command): void {
   program
@@ -14,8 +15,9 @@ export function registerMcpCommand(program: Command): void {
         throw new Error('Invalid version format');
       }
 
-      // validate the auth
-      await getSlackClient();
+      // Load and validate current auth
+      const auth = await getStoredAuth();
+      await createWebClient(auth);
 
       const server = new FastMCP({
         name: 'slack-tools-server',

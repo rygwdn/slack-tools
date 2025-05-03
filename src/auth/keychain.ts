@@ -1,6 +1,6 @@
 import keytar from 'keytar';
-import type { SlackAuth } from '../types.js';
-import { validateSlackAuth } from './validation.js';
+import { SlackAuth } from '../types.js';
+import { validateSlackAuth } from '../slack-api.js';
 
 const SERVICE_NAME = 'slack-tools';
 const TOKEN_KEY = 'slack-token';
@@ -12,7 +12,7 @@ export const envToken = process.env.SLACK_TOKEN;
 /**
  * Store the auth credentials in the system keychain
  */
-export async function storeAuth(_workspace: string, auth: SlackAuth): Promise<void> {
+export async function storeAuth(auth: SlackAuth): Promise<void> {
   await keytar.setPassword(SERVICE_NAME, COOKIE_KEY, auth.cookie);
   await keytar.setPassword(SERVICE_NAME, TOKEN_KEY, auth.token);
 }
@@ -20,28 +20,23 @@ export async function storeAuth(_workspace: string, auth: SlackAuth): Promise<vo
 /**
  * Get stored auth credentials from keychain or environment variables
  */
-export async function getStoredAuth(_workspace?: string): Promise<SlackAuth | null> {
-  try {
-    const cookie = envCookie || (await keytar.getPassword(SERVICE_NAME, COOKIE_KEY));
-    if (!cookie) {
-      return null;
-    }
-
-    const token = envToken || (await keytar.getPassword(SERVICE_NAME, TOKEN_KEY));
-    if (!token) {
-      return null;
-    }
-
-    const auth: SlackAuth = { token, cookie };
-
-    // Validate token and cookie formats
-    validateSlackAuth(auth);
-
-    return auth;
-  } catch (error) {
-    console.error('Failed to read auth from keychain:', error);
-    return null;
+export async function getStoredAuth(): Promise<SlackAuth> {
+  const cookie = envCookie || (await keytar.getPassword(SERVICE_NAME, COOKIE_KEY));
+  if (!cookie) {
+    throw new Error('No cookie found in keychain');
   }
+
+  const token = envToken || (await keytar.getPassword(SERVICE_NAME, TOKEN_KEY));
+  if (!token) {
+    throw new Error('No token found in keychain');
+  }
+
+  const auth: SlackAuth = { token, cookie };
+
+  // Validate token and cookie formats
+  validateSlackAuth(auth);
+
+  return auth;
 }
 
 /**

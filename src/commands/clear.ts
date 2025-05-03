@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { clearStoredAuth } from '../auth';
+import { clearStoredAuth } from '../auth/keychain';
 
 export function registerClearCommand(program: Command): void {
   program

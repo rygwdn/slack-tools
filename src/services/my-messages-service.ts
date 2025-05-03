@@ -1,17 +1,19 @@
 import { GlobalContext } from '../context';
-import { getSlackClient } from '../slack-api';
+import { createWebClient } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
 import { searchMessages } from '../commands/my_messages/slack-service';
 import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
 import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
-import { SlackCache } from '../commands/my_messages/types';
+import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse.js';
+import { SlackCache } from '../commands/my_messages/types.js';
+import { getStoredAuth } from '../auth/keychain';
 
-interface MyMessagesOptions {
+export interface MyMessagesOptions {
+  count?: number;
+  timeRange?: string; // e.g., 'today', 'yesterday', 'last 7 days', 'YYYY-MM-DD..YYYY-MM-DD'
   since?: string;
   until?: string;
-  count: number;
 }
 
 export interface MyMessagesSummaryResult {
@@ -42,8 +44,13 @@ export interface MyMessagesSummaryResult {
 export async function generateMyMessagesSummary(
   options: MyMessagesOptions,
 ): Promise<MyMessagesSummaryResult> {
+  const { count = 200 } = options; // Default count to 200
   const dateRange = await getDateRange(options);
-  const client = await getSlackClient();
+  const auth = await getStoredAuth();
+  if (!auth) {
+    throw new Error('Authentication required');
+  }
+  const client = await createWebClient(auth);
   if (!GlobalContext.currentUser?.user_id) {
     throw new Error('No current user found');
   }
@@ -59,7 +66,7 @@ export async function generateMyMessagesSummary(
     client,
     `<@${userId}>`,
     dateRange,
-    options.count,
+    count,
   );
   const allMessages = [...messages, ...threadMessages, ...mentionMessages];
 

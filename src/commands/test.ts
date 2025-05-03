@@ -1,6 +1,7 @@
 import { Command } from 'commander';
-import { getSlackClient } from '../slack-api';
+import { getStoredAuth } from '../auth/keychain';
 import { GlobalContext } from '../context';
+import { createWebClient } from '../slack-api';
 
 export function registerTestCommand(program: Command): void {
   program
@@ -8,12 +9,9 @@ export function registerTestCommand(program: Command): void {
     .description('Test authentication with Slack API')
     .action(async (_options) => {
       try {
-        console.log('Testing auth for workspace:', GlobalContext.workspace);
+        const auth = await getStoredAuth();
+        const client = await createWebClient(auth);
 
-        // Get a configured Slack client for the workspace
-        const client = await getSlackClient();
-
-        // Use the client directly to call auth.test
         console.log('Calling auth.test API endpoint');
         const response = await client.auth.test();
         console.log('Full API response:', response);

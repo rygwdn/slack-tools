@@ -1,18 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as slackApi from '../../../src/slack-api';
+import * as keychain from '../../../src/auth/keychain';
 import { registerTestCommand } from '../../../src/commands/test';
 import { Command } from 'commander';
-import { WebClient } from '@slack/web-api';
+import { SlackAuth } from '../../../src/types';
 
 // Mock dependencies
 vi.mock('../../../src/slack-api', () => ({
-  getSlackClient: vi.fn(),
+  createWebClient: vi.fn(),
 }));
 
-// Import mocked functions
-import { getSlackClient } from '../../../src/slack-api';
+vi.mock('../../../src/auth/keychain', () => ({
+  getStoredAuth: vi.fn(),
+}));
+
+import { createWebClient } from '../../../src/slack-api';
 
 describe('Test Command', () => {
   let program: Command;
+  const mockAuth: SlackAuth = { token: 'test-token', cookie: 'test-cookie' };
   let mockClient: any;
 
   beforeEach(() => {
@@ -33,7 +39,8 @@ describe('Test Command', () => {
         }),
       },
     };
-    vi.mocked(getSlackClient).mockResolvedValue(mockClient as unknown as WebClient);
+    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
 
     // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -78,7 +85,6 @@ describe('Test Command', () => {
       expect(mockClient.auth.test).toHaveBeenCalled();
 
       // Check basic console output
-      expect(console.log).toHaveBeenCalledWith('Testing auth for workspace:', 'test-workspace');
       expect(console.log).toHaveBeenCalledWith('\nAPI Response:');
 
       // Instead of checking exact JSON, just verify some key parts of the response were logged
@@ -94,7 +100,7 @@ describe('Test Command', () => {
     it('should handle authentication errors', async () => {
       // Mock API error
       const authError = new Error('Authentication failed');
-      vi.mocked(getSlackClient).mockRejectedValueOnce(authError);
+      vi.mocked(createWebClient).mockRejectedValueOnce(authError);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;
@@ -117,7 +123,7 @@ describe('Test Command', () => {
     it('should not show debug tip if debug mode is enabled', async () => {
       // Mock API error
       const authError = new Error('Authentication failed');
-      vi.mocked(getSlackClient).mockRejectedValueOnce(authError);
+      vi.mocked(createWebClient).mockRejectedValueOnce(authError);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;

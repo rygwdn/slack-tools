@@ -26,9 +26,7 @@ beforeEach(() => {
 });
 
 const resetGlobalContext = (context: any) => {
-  context.workspace = 'test-workspace';
   context.debug = true;
-  context.hasWorkspace = true;
   context.currentUser = {
     user_id: 'U123',
     ok: true,

@@ -2,9 +2,7 @@ import { AuthTestResponse } from '@slack/web-api';
 import { SlackCache } from './commands/my_messages/types';
 interface SlackContext {
   cache?: SlackCache;
-  workspace: string;
   debug: boolean;
-  hasWorkspace: boolean;
   currentUser: AuthTestResponse | undefined;
   log: {
     debug: (message: string, ...args: unknown[]) => void;
@@ -15,11 +13,7 @@ interface SlackContext {
 }
 
 export const GlobalContext: SlackContext = {
-  workspace: '',
   debug: false,
-  get hasWorkspace() {
-    return this.workspace !== '';
-  },
   currentUser: undefined,
   log: {
     debug: (...args: unknown[]) => {

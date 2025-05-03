@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { GlobalContext } from '../context';
-import { storeAuth, validateSlackAuth } from '../auth';
-import { validateAuthWithApi } from '../slack-api';
-import { SlackAuth } from '../types.js';
+import { storeAuth } from '../auth/keychain';
+import { createWebClient, validateSlackAuth } from '../slack-api';
+import { SlackAuth } from '../types';
 
 /**
  * Extracts token and cookie from a curl command
@@ -33,13 +33,11 @@ export function registerAuthFromCurlCommand(program: Command): void {
 
         // Validate format
         validateSlackAuth(auth);
-
-        // Validate with API
-        await validateAuthWithApi(auth);
+        await createWebClient(auth);
 
         if (options.store) {
-          await storeAuth('default', auth);
-          console.log('Stored authentication successfully');
+          await storeAuth({ token: auth.token, cookie: auth.cookie });
+          GlobalContext.log.info('Credentials stored successfully.');
         }
 
         console.log(`Token: ${auth.token}`);

@@ -1,6 +1,7 @@
-import { getSlackClient } from '../slack-api';
-import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
+import type {} from '@slack/web-api';
+import { createWebClient } from '../slack-api';
 import { GlobalContext } from '../context';
+import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
 
 export function formatEmoji(emoji: string): string {
   if (!emoji) return '';
@@ -28,9 +29,6 @@ export function calculateExpirationTime(durationMinutes?: number): number {
  */
 export async function setSlackStatus(text: string, emoji?: string, durationMinutes?: number) {
   try {
-    GlobalContext.log.debug('Setting status for workspace:', GlobalContext.workspace);
-
-    // Format emoji
     const formattedEmoji = formatEmoji(emoji || '');
     if (formattedEmoji) {
       GlobalContext.log.debug('Using emoji:', formattedEmoji);
@@ -50,7 +48,7 @@ export async function setSlackStatus(text: string, emoji?: string, durationMinut
     }
 
     // Get client and set status
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.users.profile.set({
       profile: {
         status_text: text,
@@ -77,7 +75,7 @@ export async function setSlackStatus(text: string, emoji?: string, durationMinut
  */
 export async function getSlackStatus() {
   try {
-    const client = await getSlackClient();
+    const client = await createWebClient();
 
     // Get user profile
     const userProfile = await client.users.profile.get({});
@@ -99,7 +97,6 @@ export async function getSlackStatus() {
  */
 export async function createSlackReminder(text: string, time: string, user?: string) {
   try {
-    GlobalContext.log.debug('Creating reminder for workspace:', GlobalContext.workspace);
     GlobalContext.log.debug('Reminder text:', text);
     GlobalContext.log.debug('Reminder time:', time);
 
@@ -108,7 +105,7 @@ export async function createSlackReminder(text: string, time: string, user?: str
     }
 
     // Get client and create reminder
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.reminders.add({
       text,
       time,
@@ -131,7 +128,6 @@ export async function createSlackReminder(text: string, time: string, user?: str
  */
 export async function getSlackThreadReplies(channel: string, ts: string, limit?: number) {
   try {
-    GlobalContext.log.debug('Getting thread replies in workspace:', GlobalContext.workspace);
     GlobalContext.log.debug('Channel:', channel);
     GlobalContext.log.debug('Thread timestamp:', ts);
 
@@ -140,7 +136,7 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
     }
 
     // Get client and fetch thread replies
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.conversations.replies({
       channel,
       ts,
@@ -178,7 +174,7 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
  */
 export async function getUserProfile(userId: string) {
   try {
-    const client = await getSlackClient();
+    const client = await createWebClient();
 
     // First get basic user info
     const userInfo = await client.users.info({ user: userId });

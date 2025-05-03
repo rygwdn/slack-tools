@@ -35,7 +35,7 @@ function getLevelDBPath(): string {
  * Extracts a token directly from the Slack desktop app's LevelDB database
  * This should only be used by the auth-from-app command
  */
-export async function fetchTokenFromApp(workspace?: string): Promise<string> {
+export async function fetchTokenFromApp(workspace: string): Promise<string> {
   const leveldbPath = getLevelDBPath();
   const db = new Level(leveldbPath, { createIfMissing: false });
 
@@ -72,32 +72,12 @@ export async function fetchTokenFromApp(workspace?: string): Promise<string> {
     const teams = Object.values(config.teams);
 
     // If workspace is specified, find that team
-    if (workspace) {
-      for (const team of teams) {
-        if (team.name === workspace) {
-          return team.token;
-        }
+    for (const team of teams) {
+      if (team.name === workspace) {
+        return team.token;
       }
-      throw new Error(`No token found for workspace: ${workspace}`);
     }
-    
-    // If no workspace specified and there's only one team, use that
-    if (teams.length === 1) {
-      // Store the team name in the global context for reference
-      GlobalContext.workspace = teams[0].name;
-      return teams[0].token;
-    }
-    
-    // If there are multiple teams and no workspace is specified, use the first team
-    // but warn the user
-    if (teams.length > 1) {
-      const teamNames = teams.map(t => t.name).join(', ');
-      console.warn(`Multiple workspaces found (${teamNames}), using the first one: ${teams[0].name}`);
-      GlobalContext.workspace = teams[0].name;
-      return teams[0].token;
-    }
-
-    throw new Error('No Slack teams found');
+    throw new Error(`No token found for workspace: ${workspace}`);
   } catch (error) {
     // Always log errors to console.error regardless of mode
     console.error('Error:', error);

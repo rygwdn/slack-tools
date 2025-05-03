@@ -1,17 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateMyMessagesSummary } from '../../../src/services/my-messages-service';
+import {
+  generateMyMessagesSummary,
+  MyMessagesOptions,
+} from '../../../src/services/my-messages-service';
 import { WebClient } from '@slack/web-api';
-import { getDateRange } from '../../../src/utils/date-utils';
-import { searchMessages } from '../../../src/commands/my_messages/slack-service';
+import * as dateUtils from '../../../src/utils/date-utils';
+import * as slackApi from '../../../src/slack-api';
+import * as keychain from '../../../src/auth/keychain';
+import * as slackService from '../../../src/commands/my_messages/slack-service';
+import * as formatters from '../../../src/commands/my_messages/formatters';
 import { getCacheForMessages } from '../../../src/commands/my_messages/slack-entity-cache';
 import { SlackCache } from '../../../src/commands/my_messages/types';
-import { getSlackClient } from '../../../src/slack-api';
 import { saveSlackCache } from '../../../src/cache';
-import * as formatters from '../../../src/commands/my_messages/formatters';
+import { SlackAuth } from '../../../src/types';
 
 // Mock all the dependencies
 vi.mock('../../../src/slack-api', () => ({
-  getSlackClient: vi.fn(),
+  createWebClient: vi.fn(),
 }));
 
 vi.mock('../../../src/utils/date-utils', () => ({
@@ -36,6 +41,10 @@ vi.mock('../../../src/cache', () => ({
   saveSlackCache: vi.fn(),
 }));
 
+vi.mock('../../../src/auth/keychain', () => ({
+  getStoredAuth: vi.fn(),
+}));
+
 describe('My Messages Service', () => {
   let mockClient: WebClient;
   let mockDateRange: { startTime: Date; endTime: Date };
@@ -45,6 +54,7 @@ describe('My Messages Service', () => {
   let mockMentionMessages: any[];
   let mockAllMessages: any[];
   let mockMarkdown: string;
+  const mockAuth: SlackAuth = { token: 'test-token', cookie: 'test-cookie' };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,18 +95,27 @@ describe('My Messages Service', () => {
     mockMarkdown = '# My Messages Summary\n\nTest content';
 
     // Setup mocks
-    vi.mocked(getSlackClient).mockResolvedValue(mockClient);
-    vi.mocked(getDateRange).mockResolvedValue(mockDateRange);
-    vi.mocked(searchMessages).mockImplementation(async (_client, _username, _dateRange, _count) => {
-      return {
-        messages: mockMessages,
-        threadMessages: mockThreadMessages,
-        mentionMessages: mockMentionMessages,
-      };
-    });
+    vi.mocked(dateUtils.getDateRange).mockResolvedValue(mockDateRange);
+    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+    vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+    vi.mocked(slackService.searchMessages).mockImplementation(
+      async (_client, _username, _dateRange, _count) => {
+        return {
+          messages: mockMessages,
+          threadMessages: mockThreadMessages,
+          mentionMessages: mockMentionMessages,
+        };
+      },
+    );
     vi.mocked(getCacheForMessages).mockResolvedValue(mockCache);
     vi.mocked(formatters.generateMarkdown).mockReturnValue(mockMarkdown);
     vi.mocked(saveSlackCache).mockResolvedValue(undefined);
+
+    vi.mocked(slackApi.createWebClient).mockReset();
+    vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+
+    vi.mocked(keychain.getStoredAuth).mockReset();
+    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
   });
 
   it('should generate a my messages summary with default options', async () => {
@@ -104,11 +123,13 @@ describe('My Messages Service', () => {
     const result = await generateMyMessagesSummary({ count: 200 });
 
     // Check if all the required functions were called
-    expect(getSlackClient).toHaveBeenCalledWith();
-    expect(getDateRange).toHaveBeenCalledWith({ count: 200 });
-    expect(searchMessages).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
+    expect(dateUtils.getDateRange).toHaveBeenCalledWith({ count: 200 });
+    expect(keychain.getStoredAuth).toHaveBeenCalled();
+    // Check that createWebClient was called with the auth object
+    expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
+    expect(slackService.searchMessages).toHaveBeenCalledWith(
+      mockClient,
+      '<@U123>',
       mockDateRange,
       200,
     );
@@ -139,8 +160,8 @@ describe('My Messages Service', () => {
     const result = await generateMyMessagesSummary(customOptions);
 
     // Check if all the required functions were called with custom options
-    expect(getDateRange).toHaveBeenCalledWith(customOptions);
-    expect(searchMessages).toHaveBeenCalledWith(
+    expect(dateUtils.getDateRange).toHaveBeenCalledWith(customOptions);
+    expect(slackService.searchMessages).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(String),
       mockDateRange,
@@ -154,9 +175,21 @@ describe('My Messages Service', () => {
   it('should handle errors properly', async () => {
     // Setup error condition
     const testError = new Error('Test error');
-    vi.mocked(getDateRange).mockRejectedValueOnce(testError);
+    vi.mocked(dateUtils.getDateRange).mockRejectedValueOnce(testError);
 
     // Call the function and expect it to throw
     await expect(generateMyMessagesSummary({ count: 200 })).rejects.toThrow(testError);
+  });
+
+  it('should throw error if auth fails', async () => {
+    const authError = new Error('Authentication required');
+    vi.mocked(slackApi.createWebClient).mockRejectedValueOnce(authError);
+    vi.mocked(keychain.getStoredAuth).mockResolvedValue(mockAuth);
+
+    const options: MyMessagesOptions = { timeRange: 'today' };
+
+    await expect(generateMyMessagesSummary(options)).rejects.toThrow('Authentication required');
+
+    expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
   });
 });

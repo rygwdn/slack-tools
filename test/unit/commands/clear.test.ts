@@ -3,12 +3,12 @@ import { registerClearCommand } from '../../../src/commands/clear.js';
 import { Command } from 'commander';
 
 // Mock keychain functions
-vi.mock('../../../src/keychain.js', () => ({
+vi.mock('../../../src/auth/keychain.js', () => ({
   clearStoredAuth: vi.fn(),
 }));
 
 // Import mocked functions
-import { clearStoredAuth } from '../../../src/keychain.js';
+import { clearStoredAuth } from '../../../src/auth/keychain.js';
 
 describe('Clear Command', () => {
   let program: Command;

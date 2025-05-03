@@ -1,66 +1,26 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { readFileSync, promises, existsSync } from 'fs';
+import { readFileSync, existsSync as existsSync$1, promises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import keytar from 'keytar';
 import { WebClient, LogLevel } from '@slack/web-api';
+import { FastMCP } from 'fastmcp';
+import { z } from 'zod';
+import { homedir } from 'os';
 import { Level } from 'level';
 import { join as join$1 } from 'node:path';
-import { homedir as homedir$1, platform } from 'node:os';
-import { existsSync as existsSync$1 } from 'node:fs';
+import { platform, homedir as homedir$1 } from 'node:os';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { exec as exec$1 } from 'child_process';
 import Database from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
-import { homedir } from 'os';
-import { FastMCP } from 'fastmcp';
-import { z } from 'zod';
-
-// src/types.ts
-function tool(tool2) {
-  return tool2;
-}
-var SERVICE_NAME = "slack-tools";
-var TOKEN_KEY = "slack-token";
-var COOKIE_KEY = "slack-cookie";
-var envCookie = process.env.SLACK_COOKIE;
-var envToken = process.env.SLACK_TOKEN;
-async function storeAuth(_workspace, auth) {
-  await keytar.setPassword(SERVICE_NAME, COOKIE_KEY, auth.cookie);
-  await keytar.setPassword(SERVICE_NAME, TOKEN_KEY, auth.token);
-}
-async function getStoredAuth(_workspace) {
-  try {
-    const cookie = envCookie || await keytar.getPassword(SERVICE_NAME, COOKIE_KEY);
-    if (!cookie) {
-      return null;
-    }
-    const token = envToken || await keytar.getPassword(SERVICE_NAME, TOKEN_KEY);
-    if (!token) {
-      return null;
-    }
-    return { token, cookie };
-  } catch (error) {
-    console.error("Failed to read auth from keychain:", error);
-    return null;
-  }
-}
-async function clearStoredAuth() {
-  const credentials = await keytar.findCredentials(SERVICE_NAME);
-  for (const cred of credentials) {
-    await keytar.deletePassword(SERVICE_NAME, cred.account);
-  }
-}
 
 // src/context.ts
 var GlobalContext = {
-  workspace: "",
   debug: false,
-  get hasWorkspace() {
-    return this.workspace !== "";
-  },
   currentUser: void 0,
   log: {
     debug: (...args) => {
@@ -91,7 +51,35 @@ function redactLog(...args) {
   return args.map(redact);
 }
 
-// src/auth/validation.ts
+// src/slack-api.ts
+async function createWebClient(auth) {
+  if (!auth) {
+    auth = await getStoredAuth();
+  }
+  validateSlackAuth(auth);
+  const webClient = new WebClient(auth.token, {
+    headers: {
+      Cookie: `d=${auth.cookie}`
+    },
+    logger: {
+      debug: (message, ...args) => GlobalContext.log.debug(...redactLog(message, ...args)),
+      info: (message, ...args) => GlobalContext.log.info(...redactLog(message, ...args)),
+      warn: (message, ...args) => GlobalContext.log.warn(...redactLog(message, ...args)),
+      error: (message, ...args) => GlobalContext.log.error(...redactLog(message, ...args)),
+      setLevel: () => {
+      },
+      getLevel: () => GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR,
+      setName: () => {
+      }
+    }
+  });
+  const response = await webClient.auth.test();
+  if (!response.ok) {
+    throw new Error("Auth test failed: API returned not ok");
+  }
+  GlobalContext.currentUser = response;
+  return webClient;
+}
 function validateSlackAuth(auth) {
   if (!auth.token) {
     throw new Error("Auth validation failed: token is required");
@@ -106,246 +94,35 @@ function validateSlackAuth(auth) {
     throw new Error(`Invalid cookie format: cookie should start with 'xoxd-'. Got: ${auth.cookie}`);
   }
 }
-function createWebClient(token, cookie) {
-  return new WebClient(token, {
-    headers: {
-      Cookie: `d=${cookie}`
-    },
-    logger: {
-      debug: (message, ...args) => GlobalContext.log.debug(...redactLog(message, ...args)),
-      info: (message, ...args) => GlobalContext.log.info(...redactLog(message, ...args)),
-      warn: (message, ...args) => GlobalContext.log.warn(...redactLog(message, ...args)),
-      error: (message, ...args) => GlobalContext.log.error(...redactLog(message, ...args)),
-      setLevel: () => {
-      },
-      getLevel: () => GlobalContext.debug ? LogLevel.DEBUG : LogLevel.ERROR,
-      setName: () => {
-      }
-    }
-  });
-}
-async function validateAuthWithApi(auth) {
-  try {
-    validateSlackAuth(auth);
-    const client = createWebClient(auth.token, auth.cookie);
-    const response = await client.auth.test();
-    if (!response.ok) {
-      throw new Error("Auth test failed: API returned not ok");
-    }
-    GlobalContext.currentUser = response;
-    if (!GlobalContext.workspace && response.team) {
-      GlobalContext.workspace = response.team;
-    }
-  } catch (error) {
-    console.error("Auth test API call failed:", error);
-    throw new Error("Auth test failed: API call error");
-  }
-}
-function getLevelDBPath() {
-  if (platform() !== "darwin") {
-    throw new Error("Token extraction only works on macOS");
-  }
-  const paths = [
-    join$1(
-      homedir$1(),
-      "Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb"
-    ),
-    join$1(homedir$1(), "Library/Application Support/Slack/Local Storage/leveldb")
-  ];
-  for (const path of paths) {
-    if (existsSync$1(path)) {
-      GlobalContext.log.debug(`Found leveldb path: ${path}`);
-      return path;
-    }
-  }
-  throw new Error("Could not find Slack's Local Storage directory");
-}
-async function fetchTokenFromApp(workspace) {
-  const leveldbPath = getLevelDBPath();
-  const db = new Level(leveldbPath, { createIfMissing: false });
-  try {
-    await db.open();
-    const entries = await db.iterator().all();
-    const configValues = entries.filter(([key]) => key.toString().includes("localConfig_v2")).map(([_, value]) => value.toString());
-    GlobalContext.log.debug(
-      `Found ${configValues.length} localConfig_v2 values`,
-      configValues.map((v) => v.slice(0, 10))
-    );
-    if (configValues.length === 0) {
-      throw new Error("Slack's Local Storage not recognised: localConfig not found");
-    }
-    if (configValues.length > 1) {
-      throw new Error("Slack has multiple localConfig_v2 values");
-    }
-    const config = JSON.parse(configValues[0].slice(1));
-    GlobalContext.log.debug(
-      "Config:",
-      Object.values(config.teams).map((t) => t.name)
-    );
-    const teams = Object.values(config.teams);
-    if (workspace) {
-      for (const team of teams) {
-        if (team.name === workspace) {
-          return team.token;
-        }
-      }
-      throw new Error(`No token found for workspace: ${workspace}`);
-    }
-    if (teams.length === 1) {
-      GlobalContext.workspace = teams[0].name;
-      return teams[0].token;
-    }
-    if (teams.length > 1) {
-      const teamNames = teams.map((t) => t.name).join(", ");
-      console.warn(`Multiple workspaces found (${teamNames}), using the first one: ${teams[0].name}`);
-      GlobalContext.workspace = teams[0].name;
-      return teams[0].token;
-    }
-    throw new Error("No Slack teams found");
-  } catch (error) {
-    console.error("Error:", error);
-    if (error && typeof error === "object" && "code" in error) {
-      const dbError = error;
-      if (dbError.code === "LEVEL_DATABASE_NOT_OPEN" && dbError.cause?.code === "LEVEL_LOCKED") {
-        throw new Error(
-          "Slack's Local Storage database is locked. Please make sure Slack is completely closed:\n1. Quit Slack from the menu bar\n2. Check Activity Monitor/Task Manager to ensure no Slack processes are running\n3. Try running this command again"
-        );
-      }
-    }
-    throw error;
-  } finally {
-    if (GlobalContext.debug) {
-      GlobalContext.log.debug("Closing database");
-    }
-    if (db.status === "open") {
-      await db.close();
-    }
-  }
-}
-var exec = promisify(exec$1);
-function decryptCookieValue(encryptedValue, encryptionKey) {
-  try {
-    const prefix = encryptedValue.slice(0, 3).toString();
-    let ciphertext;
-    if (prefix === "v10" || prefix === "v11") {
-      ciphertext = encryptedValue.slice(3);
-    } else {
-      throw new Error("Unsupported cookie version");
-    }
-    const iv = Buffer.from(" ".repeat(16));
-    const decipher = crypto.createDecipheriv("aes-128-cbc", encryptionKey, iv);
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    let endPos = decrypted.length;
-    while (endPos > 0 && decrypted[endPos - 1] === 0) {
-      endPos--;
-    }
-    const result = decrypted.slice(0, endPos).toString("utf8");
-    GlobalContext.log.debug(`Decrypted cookie value: ${result}`);
-    return result;
-  } catch (error) {
-    throw new Error(
-      `Failed to decrypt cookie value: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-async function getEncryptionKey() {
-  try {
-    const { stdout } = await exec('security find-generic-password -wa "Slack App Store Key"');
-    const key = stdout.trim();
-    const salt = Buffer.from("saltysalt");
-    const keyLength = 16;
-    const iterations = 1003;
-    GlobalContext.log.debug(`Found encryption key`);
-    return crypto.pbkdf2Sync(key, salt, iterations, keyLength, "sha1");
-  } catch (error) {
-    throw new Error(
-      `Could not retrieve Slack encryption key from keychain: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
-function getCookiesDbPath() {
-  const paths = [
-    join$1(homedir$1(), "Library/Application Support/Slack/Cookies"),
-    join$1(
-      homedir$1(),
-      "Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies"
-    )
-  ];
-  for (const path of paths) {
-    if (existsSync(path)) {
-      GlobalContext.log.debug(`Using cookies database path: ${path}`);
-      return path;
-    }
-  }
-  throw new Error("Could not find Slack's cookies database");
-}
-async function fetchCookieFromApp() {
-  try {
-    const dbPath = getCookiesDbPath();
-    const encryptionKey = await getEncryptionKey();
-    const db = await open({
-      filename: dbPath,
-      driver: Database.Database,
-      mode: Database.OPEN_READONLY
-    });
-    try {
-      const results = await db.all(
-        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC'
-      );
-      if (!results || results.length === 0 || !results[0].encrypted_value) {
-        throw new Error('Could not find any Slack "d" cookies in cookies database');
-      }
-      if (results.length > 1) {
-        const uniqueTokens = /* @__PURE__ */ new Set();
-        const validResults = [];
-        for (const result2 of results) {
-          try {
-            const decrypted = decryptCookieValue(result2.encrypted_value, encryptionKey);
-            const xoxdIndex2 = decrypted.indexOf("xoxd-");
-            if (xoxdIndex2 !== -1) {
-              const token = decrypted.substring(xoxdIndex2);
-              uniqueTokens.add(token);
-              validResults.push({ ...result2, decryptedValue: token });
-            }
-          } catch {
-          }
-        }
-        if (uniqueTokens.size > 1) {
-          throw new Error(
-            `Found ${uniqueTokens.size} different Slack tokens in cookies. Please clear unused cookies.`
-          );
-        }
-      }
-      const result = results[0];
-      GlobalContext.log.debug("Found d= cookie");
-      const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
-      const xoxdIndex = decryptedValue.indexOf("xoxd-");
-      if (xoxdIndex !== -1) {
-        const fixedValue = decryptedValue.substring(xoxdIndex);
-        GlobalContext.log.debug(`Found xoxd- cookie`);
-        return fixedValue;
-      }
-      if (!decryptedValue.startsWith("xoxd-")) {
-        throw new Error("Decrypted cookie value does not have the required xoxd- prefix");
-      }
-      return decryptedValue;
-    } finally {
-      await db.close();
-    }
-  } catch (error) {
-    throw new Error(
-      `Failed to extract Slack cookie: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
 
-// src/auth/index.ts
-async function fetchAuthFromApp(workspace) {
-  const cookie = await fetchCookieFromApp();
-  const token = await fetchTokenFromApp(workspace);
+// src/auth/keychain.ts
+var SERVICE_NAME = "slack-tools";
+var TOKEN_KEY = "slack-token";
+var COOKIE_KEY = "slack-cookie";
+var envCookie = process.env.SLACK_COOKIE;
+var envToken = process.env.SLACK_TOKEN;
+async function storeAuth(auth) {
+  await keytar.setPassword(SERVICE_NAME, COOKIE_KEY, auth.cookie);
+  await keytar.setPassword(SERVICE_NAME, TOKEN_KEY, auth.token);
+}
+async function getStoredAuth() {
+  const cookie = envCookie || await keytar.getPassword(SERVICE_NAME, COOKIE_KEY);
+  if (!cookie) {
+    throw new Error("No cookie found in keychain");
+  }
+  const token = envToken || await keytar.getPassword(SERVICE_NAME, TOKEN_KEY);
+  if (!token) {
+    throw new Error("No token found in keychain");
+  }
   const auth = { token, cookie };
   validateSlackAuth(auth);
   return auth;
+}
+async function clearStoredAuth() {
+  const credentials = await keytar.findCredentials(SERVICE_NAME);
+  for (const cred of credentials) {
+    await keytar.deletePassword(SERVICE_NAME, cred.account);
+  }
 }
 
 // src/commands/clear.ts
@@ -362,101 +139,12 @@ function registerClearCommand(program2) {
   });
 }
 
-// src/commands/print.ts
-function registerPrintCommand(program2) {
-  program2.command("print").description("Print tokens and cookie").option("-q, --quiet", "Suppress output and only show tokens/cookies").action(async (cmdOptions) => {
-    try {
-      const auth = await getStoredAuth();
-      if (!auth) {
-        program2.error("No authentication credentials found. Please run the auth-from-app or auth-from-curl command first.");
-      }
-      if (!cmdOptions.quiet) {
-        console.log("\nFound authentication credentials:\n");
-        if (GlobalContext.workspace) {
-          console.log(`Workspace URL: ${GlobalContext.workspace}`);
-        }
-        console.log(`Token: ${auth.token}
-`);
-        console.log("Cookie:");
-        console.log(`${auth.cookie}
-`);
-      } else {
-        console.log(auth.token);
-        console.log(auth.cookie);
-      }
-    } catch (error) {
-      program2.error(error.toString());
-    }
-  });
-}
-var CONFIG_DIR = join(homedir(), ".slack-tools");
-var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
-var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
-async function ensureConfigDir() {
-  try {
-    await promises.mkdir(CONFIG_DIR, { recursive: true });
-  } catch (error) {
-    GlobalContext.log.error("Failed to create config directory:", error);
-    throw new Error(`Could not create cache directory: ${error.message}`);
-  }
-}
-function isCacheValid(cache, ttl) {
-  return cache.version === 1 && cache.lastUpdated > Date.now() - ttl && cache.entities && cache.lastUpdated > 0;
-}
-async function readCache(cacheFile, ttl) {
-  if (!existsSync(cacheFile)) {
-    GlobalContext.log.debug(`Cache for ${cacheFile} does not exist`);
-    return null;
-  }
-  const data = await promises.readFile(cacheFile, "utf-8");
-  const cache = JSON.parse(data);
-  if (!isCacheValid(cache, ttl)) {
-    GlobalContext.log.debug(`Cache for ${cacheFile} is invalid`);
-    return null;
-  }
-  return cache;
-}
-async function loadSlackCache() {
-  if (GlobalContext.cache && isCacheValid(GlobalContext.cache, SLACK_CACHE_TTL)) {
-    return GlobalContext.cache;
-  }
-  const cache = await readCache(SLACK_CACHE_FILE, SLACK_CACHE_TTL) || {
-    version: 1,
-    entities: {},
-    lastUpdated: 0
-  };
-  GlobalContext.cache = cache;
-  GlobalContext.log.debug(`Loaded cache from ${SLACK_CACHE_FILE}`);
-  return cache;
-}
-async function saveSlackCache() {
-  const cache = await loadSlackCache();
-  await ensureConfigDir();
-  await promises.writeFile(SLACK_CACHE_FILE, JSON.stringify(cache));
-}
-
-// src/slack-api.ts
-async function getSlackClient() {
-  const auth = await getStoredAuth();
-  if (!auth) {
-    throw new Error(
-      "No authentication credentials found. Please run the auth-from-app or auth-from-curl command first."
-    );
-  }
-  validateSlackAuth(auth);
-  if (!GlobalContext.currentUser) {
-    await validateAuthWithApi(auth);
-  }
-  await saveSlackCache();
-  return createWebClient(auth.token, auth.cookie);
-}
-
 // src/commands/test.ts
 function registerTestCommand(program2) {
   program2.command("test").description("Test authentication with Slack API").action(async (_options) => {
     try {
-      console.log("Testing auth for workspace:", GlobalContext.workspace);
-      const client = await getSlackClient();
+      const auth = await getStoredAuth();
+      const client = await createWebClient(auth);
       console.log("Calling auth.test API endpoint");
       const response = await client.auth.test();
       console.log("Full API response:", response);
@@ -606,6 +294,51 @@ async function searchSlackMessages(client, query, count) {
     }
   }
   return matches;
+}
+var CONFIG_DIR = join(homedir(), ".slack-tools");
+var SLACK_CACHE_FILE = join(CONFIG_DIR, "slack-cache.json");
+var SLACK_CACHE_TTL = 24 * 60 * 60 * 1e3;
+async function ensureConfigDir() {
+  try {
+    await promises.mkdir(CONFIG_DIR, { recursive: true });
+  } catch (error) {
+    GlobalContext.log.error("Failed to create config directory:", error);
+    throw new Error(`Could not create cache directory: ${error.message}`);
+  }
+}
+function isCacheValid(cache, ttl) {
+  return cache.version === 1 && cache.lastUpdated > Date.now() - ttl && cache.entities && cache.lastUpdated > 0;
+}
+async function readCache(cacheFile, ttl) {
+  if (!existsSync$1(cacheFile)) {
+    GlobalContext.log.debug(`Cache for ${cacheFile} does not exist`);
+    return null;
+  }
+  const data = await promises.readFile(cacheFile, "utf-8");
+  const cache = JSON.parse(data);
+  if (!isCacheValid(cache, ttl)) {
+    GlobalContext.log.debug(`Cache for ${cacheFile} is invalid`);
+    return null;
+  }
+  return cache;
+}
+async function loadSlackCache() {
+  if (GlobalContext.cache && isCacheValid(GlobalContext.cache, SLACK_CACHE_TTL)) {
+    return GlobalContext.cache;
+  }
+  const cache = await readCache(SLACK_CACHE_FILE, SLACK_CACHE_TTL) || {
+    version: 1,
+    entities: {},
+    lastUpdated: 0
+  };
+  GlobalContext.cache = cache;
+  GlobalContext.log.debug(`Loaded cache from ${SLACK_CACHE_FILE}`);
+  return cache;
+}
+async function saveSlackCache() {
+  const cache = await loadSlackCache();
+  await ensureConfigDir();
+  await promises.writeFile(SLACK_CACHE_FILE, JSON.stringify(cache));
 }
 
 // src/commands/my_messages/slack-entity-cache.ts
@@ -980,8 +713,13 @@ function generateMarkdown(messages, cache, userId) {
 
 // src/services/my-messages-service.ts
 async function generateMyMessagesSummary(options) {
+  const { count = 200 } = options;
   const dateRange = await getDateRange(options);
-  const client = await getSlackClient();
+  const auth = await getStoredAuth();
+  if (!auth) {
+    throw new Error("Authentication required");
+  }
+  const client = await createWebClient(auth);
   if (!GlobalContext.currentUser?.user_id) {
     throw new Error("No current user found");
   }
@@ -994,7 +732,7 @@ async function generateMyMessagesSummary(options) {
     client,
     `<@${userId}>`,
     dateRange,
-    options.count
+    count
   );
   const allMessages = [...messages, ...threadMessages, ...mentionMessages];
   GlobalContext.log.debug(
@@ -1013,6 +751,11 @@ async function generateMyMessagesSummary(options) {
     dateRange,
     cache
   };
+}
+
+// src/types.ts
+function tool(tool2) {
+  return tool2;
 }
 
 // src/commands/mcp-tools/my-messages.ts
@@ -1061,7 +804,6 @@ function calculateExpirationTime(durationMinutes) {
 }
 async function setSlackStatus(text, emoji, durationMinutes) {
   try {
-    GlobalContext.log.debug("Setting status for workspace:", GlobalContext.workspace);
     const formattedEmoji = formatEmoji(emoji || "");
     if (formattedEmoji) {
       GlobalContext.log.debug("Using emoji:", formattedEmoji);
@@ -1077,7 +819,7 @@ async function setSlackStatus(text, emoji, durationMinutes) {
     } else {
       GlobalContext.log.debug("Setting permanent status (no expiration)");
     }
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.users.profile.set({
       profile: {
         status_text: text,
@@ -1098,7 +840,7 @@ async function setSlackStatus(text, emoji, durationMinutes) {
 }
 async function getSlackStatus() {
   try {
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const userProfile = await client.users.profile.get({});
     return {
       status: userProfile.profile?.status_text || "",
@@ -1111,13 +853,12 @@ async function getSlackStatus() {
 }
 async function createSlackReminder(text, time, user) {
   try {
-    GlobalContext.log.debug("Creating reminder for workspace:", GlobalContext.workspace);
     GlobalContext.log.debug("Reminder text:", text);
     GlobalContext.log.debug("Reminder time:", time);
     if (user) {
       GlobalContext.log.debug("Reminder for user:", user);
     }
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.reminders.add({
       text,
       time,
@@ -1134,13 +875,12 @@ async function createSlackReminder(text, time, user) {
 }
 async function getSlackThreadReplies(channel, ts, limit) {
   try {
-    GlobalContext.log.debug("Getting thread replies in workspace:", GlobalContext.workspace);
     GlobalContext.log.debug("Channel:", channel);
     GlobalContext.log.debug("Thread timestamp:", ts);
     if (limit) {
       GlobalContext.log.debug("Limit:", limit);
     }
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const response = await client.conversations.replies({
       channel,
       ts,
@@ -1167,7 +907,7 @@ async function getSlackThreadReplies(channel, ts, limit) {
 }
 async function getUserProfile(userId) {
   try {
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const userInfo = await client.users.info({ user: userId });
     if (!userInfo.ok || !userInfo.user) {
       throw new Error(`User not found: ${userId}`);
@@ -1261,7 +1001,7 @@ var searchTool = tool({
     title: "Search Slack"
   },
   execute: async ({ query, count }) => {
-    const client = await getSlackClient();
+    const client = await createWebClient();
     const messages = await searchSlackMessages(client, query, count);
     const cache = await getCacheForMessages(client, messages);
     return generateSearchResultsMarkdown(messages, cache);
@@ -1394,7 +1134,8 @@ function registerMcpCommand(program2) {
     if (!version.match(/^\d+\.\d+\.\d+$/)) {
       throw new Error("Invalid version format");
     }
-    await getSlackClient();
+    const auth = await getStoredAuth();
+    await createWebClient(auth);
     const server = new FastMCP({
       name: "slack-tools-server",
       version
@@ -1499,10 +1240,10 @@ function registerAuthFromCurlCommand(program2) {
         program2.error("Error: Could not extract auth from the curl command");
       }
       validateSlackAuth(auth);
-      await validateAuthWithApi(auth);
+      await createWebClient(auth);
       if (options.store) {
-        await storeAuth("default", auth);
-        console.log("Stored authentication successfully");
+        await storeAuth({ token: auth.token, cookie: auth.cookie });
+        GlobalContext.log.info("Credentials stored successfully.");
       }
       console.log(`Token: ${auth.token}`);
       console.log(`Cookie: ${auth.cookie}`);
@@ -1511,18 +1252,207 @@ function registerAuthFromCurlCommand(program2) {
     }
   });
 }
+function getLevelDBPath() {
+  if (platform() !== "darwin") {
+    throw new Error("Token extraction only works on macOS");
+  }
+  const paths = [
+    join$1(
+      homedir$1(),
+      "Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Local Storage/leveldb"
+    ),
+    join$1(homedir$1(), "Library/Application Support/Slack/Local Storage/leveldb")
+  ];
+  for (const path of paths) {
+    if (existsSync(path)) {
+      GlobalContext.log.debug(`Found leveldb path: ${path}`);
+      return path;
+    }
+  }
+  throw new Error("Could not find Slack's Local Storage directory");
+}
+async function fetchTokenFromApp(workspace) {
+  const leveldbPath = getLevelDBPath();
+  const db = new Level(leveldbPath, { createIfMissing: false });
+  try {
+    await db.open();
+    const entries = await db.iterator().all();
+    const configValues = entries.filter(([key]) => key.toString().includes("localConfig_v2")).map(([_, value]) => value.toString());
+    GlobalContext.log.debug(
+      `Found ${configValues.length} localConfig_v2 values`,
+      configValues.map((v) => v.slice(0, 10))
+    );
+    if (configValues.length === 0) {
+      throw new Error("Slack's Local Storage not recognised: localConfig not found");
+    }
+    if (configValues.length > 1) {
+      throw new Error("Slack has multiple localConfig_v2 values");
+    }
+    const config = JSON.parse(configValues[0].slice(1));
+    GlobalContext.log.debug(
+      "Config:",
+      Object.values(config.teams).map((t) => t.name)
+    );
+    const teams = Object.values(config.teams);
+    for (const team of teams) {
+      if (team.name === workspace) {
+        return team.token;
+      }
+    }
+    throw new Error(`No token found for workspace: ${workspace}`);
+  } catch (error) {
+    console.error("Error:", error);
+    if (error && typeof error === "object" && "code" in error) {
+      const dbError = error;
+      if (dbError.code === "LEVEL_DATABASE_NOT_OPEN" && dbError.cause?.code === "LEVEL_LOCKED") {
+        throw new Error(
+          "Slack's Local Storage database is locked. Please make sure Slack is completely closed:\n1. Quit Slack from the menu bar\n2. Check Activity Monitor/Task Manager to ensure no Slack processes are running\n3. Try running this command again"
+        );
+      }
+    }
+    throw error;
+  } finally {
+    if (GlobalContext.debug) {
+      GlobalContext.log.debug("Closing database");
+    }
+    if (db.status === "open") {
+      await db.close();
+    }
+  }
+}
+var exec = promisify(exec$1);
+function decryptCookieValue(encryptedValue, encryptionKey) {
+  try {
+    const prefix = encryptedValue.slice(0, 3).toString();
+    let ciphertext;
+    if (prefix === "v10" || prefix === "v11") {
+      ciphertext = encryptedValue.slice(3);
+    } else {
+      throw new Error("Unsupported cookie version");
+    }
+    const iv = Buffer.from(" ".repeat(16));
+    const decipher = crypto.createDecipheriv("aes-128-cbc", encryptionKey, iv);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    let endPos = decrypted.length;
+    while (endPos > 0 && decrypted[endPos - 1] === 0) {
+      endPos--;
+    }
+    const result = decrypted.slice(0, endPos).toString("utf8");
+    GlobalContext.log.debug(`Decrypted cookie value: ${result}`);
+    return result;
+  } catch (error) {
+    throw new Error(
+      `Failed to decrypt cookie value: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+async function getEncryptionKey() {
+  try {
+    const { stdout } = await exec('security find-generic-password -wa "Slack App Store Key"');
+    const key = stdout.trim();
+    const salt = Buffer.from("saltysalt");
+    const keyLength = 16;
+    const iterations = 1003;
+    GlobalContext.log.debug(`Found encryption key`);
+    return crypto.pbkdf2Sync(key, salt, iterations, keyLength, "sha1");
+  } catch (error) {
+    throw new Error(
+      `Could not retrieve Slack encryption key from keychain: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+function getCookiesDbPath() {
+  const paths = [
+    join$1(homedir$1(), "Library/Application Support/Slack/Cookies"),
+    join$1(
+      homedir$1(),
+      "Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies"
+    )
+  ];
+  for (const path of paths) {
+    if (existsSync$1(path)) {
+      GlobalContext.log.debug(`Using cookies database path: ${path}`);
+      return path;
+    }
+  }
+  throw new Error("Could not find Slack's cookies database");
+}
+async function fetchCookieFromApp() {
+  try {
+    const dbPath = getCookiesDbPath();
+    const encryptionKey = await getEncryptionKey();
+    const db = await open({
+      filename: dbPath,
+      driver: Database.Database,
+      mode: Database.OPEN_READONLY
+    });
+    try {
+      const results = await db.all(
+        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC'
+      );
+      if (!results || results.length === 0 || !results[0].encrypted_value) {
+        throw new Error('Could not find any Slack "d" cookies in cookies database');
+      }
+      if (results.length > 1) {
+        const uniqueTokens = /* @__PURE__ */ new Set();
+        const validResults = [];
+        for (const result2 of results) {
+          try {
+            const decrypted = decryptCookieValue(result2.encrypted_value, encryptionKey);
+            const xoxdIndex2 = decrypted.indexOf("xoxd-");
+            if (xoxdIndex2 !== -1) {
+              const token = decrypted.substring(xoxdIndex2);
+              uniqueTokens.add(token);
+              validResults.push({ ...result2, decryptedValue: token });
+            }
+          } catch {
+          }
+        }
+        if (uniqueTokens.size > 1) {
+          throw new Error(
+            `Found ${uniqueTokens.size} different Slack tokens in cookies. Please clear unused cookies.`
+          );
+        }
+      }
+      const result = results[0];
+      GlobalContext.log.debug("Found d= cookie");
+      const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
+      const xoxdIndex = decryptedValue.indexOf("xoxd-");
+      if (xoxdIndex !== -1) {
+        const fixedValue = decryptedValue.substring(xoxdIndex);
+        GlobalContext.log.debug(`Found xoxd- cookie`);
+        return fixedValue;
+      }
+      if (!decryptedValue.startsWith("xoxd-")) {
+        throw new Error("Decrypted cookie value does not have the required xoxd- prefix");
+      }
+      return decryptedValue;
+    } finally {
+      await db.close();
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to extract Slack cookie: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
 
 // src/commands/auth-from-app.ts
 function registerAuthFromAppCommand(program2) {
   program2.command("auth-from-app").description("Extract and store Slack authentication directly from the Slack app").option("-w, --workspace <workspace>", "Specify Slack workspace name to extract token for").option("--store", "Store the extracted auth").helpOption("-h, --help", "Display help for command").action(async (options) => {
     try {
       const workspace = options.workspace;
-      GlobalContext.log.debug("Extracting auth from Slack app" + (workspace ? ` for workspace: ${workspace}` : ""));
-      const auth = await fetchAuthFromApp(workspace);
-      await validateAuthWithApi(auth);
+      GlobalContext.log.debug(
+        "Extracting auth from Slack app" + (workspace ? ` for workspace: ${workspace}` : "")
+      );
+      GlobalContext.log.info(`Fetching credentials for workspace: ${options.workspace}`);
+      const token = await fetchTokenFromApp(options.workspace);
+      const cookie = await fetchCookieFromApp();
+      const auth = { token, cookie };
+      await createWebClient(auth);
       if (options.store) {
-        await storeAuth("default", auth);
-        console.log("Stored authentication successfully");
+        await storeAuth(auth);
+        GlobalContext.log.info("Credentials stored successfully.");
       }
       console.log(`Token: ${auth.token}`);
       console.log(`Cookie: ${auth.cookie}`);
@@ -1535,7 +1465,6 @@ function registerAuthFromAppCommand(program2) {
 // src/commands/register-commands.ts
 function registerCommands(program2) {
   registerClearCommand(program2);
-  registerPrintCommand(program2);
   registerTestCommand(program2);
   registerMcpCommand(program2);
   registerAuthFromCurlCommand(program2);

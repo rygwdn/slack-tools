@@ -1,9 +1,10 @@
 import { Command } from 'commander';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { registerAuthFromAppCommand } from '../../../src/commands/auth-from-app';
-import { storeAuth } from '../../../src/keychain.js';
-import { getCookie } from '../../../src/cookies.js';
-import { getToken } from '../../../src/tokens.js';
+import { storeAuth } from '../../../src/auth/keychain.js';
+import { fetchCookieFromApp } from '../../../src/auth/cookie-extractor.js';
+import { fetchTokenFromApp } from '../../../src/auth/token-extractor.js';
+import { createWebClient } from '../../../src/slack-api';
 
 // Mock all dependencies
 vi.mock('@slack/web-api', () => ({
@@ -12,18 +13,20 @@ vi.mock('@slack/web-api', () => ({
       test: vi.fn().mockResolvedValue({ ok: true, user: 'test-user', team: 'test-team' }),
     },
   })),
-  LogLevel: { DEBUG: 0, ERROR: 2 }
+  LogLevel: { DEBUG: 0, ERROR: 2 },
 }));
 
-vi.mock('../../../src/keychain.js');
-vi.mock('../../../src/cookies.js', () => ({
-  getCookie: vi.fn().mockResolvedValue('xoxd-test-cookie'),
+vi.mock('../../../src/auth/keychain.js', () => ({
+  storeAuth: vi.fn(),
 }));
-vi.mock('../../../src/tokens.js', () => ({
-  getToken: vi.fn().mockResolvedValue('xoxc-test-token'),
+vi.mock('../../../src/auth/cookie-extractor.js', () => ({
+  fetchCookieFromApp: vi.fn().mockResolvedValue('xoxd-test-cookie'),
+}));
+vi.mock('../../../src/auth/token-extractor.js', () => ({
+  fetchTokenFromApp: vi.fn().mockResolvedValue('xoxc-test-token'),
 }));
 vi.mock('../../../src/slack-api', () => ({
-  validateAuth: vi.fn().mockResolvedValue(undefined),
+  createWebClient: vi.fn().mockResolvedValue({ auth: { test: vi.fn() } }), // Mock createWebClient
 }));
 
 describe('Auth From App Command', () => {
@@ -33,6 +36,11 @@ describe('Auth From App Command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    vi.mocked(fetchTokenFromApp).mockResolvedValue('xoxc-test-token');
+    vi.mocked(fetchCookieFromApp).mockResolvedValue('xoxd-test-cookie');
+    vi.mocked(storeAuth).mockClear();
+    vi.mocked(createWebClient).mockClear();
+
     program = new Command();
     program.exitOverride();
     registerAuthFromAppCommand(program);
@@ -40,9 +48,9 @@ describe('Auth From App Command', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
-      throw new Error('Command error');
-    });
+    // Spy on program.error but don't throw, just record the call
+    // @ts-expect-error - exitOverride handles the throwing, we just need to spy.
+    errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -53,21 +61,17 @@ describe('Auth From App Command', () => {
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-app');
     expect(command).toBeDefined();
 
-    await command!.parseAsync([
-      'node',
-      'auth-from-app',
-      '--store',
-    ]);
+    await command!.parseAsync(['node', 'auth-from-app', '--store']);
 
     // Verify that getToken and getCookie were called
-    expect(getToken).toHaveBeenCalled();
-    expect(getCookie).toHaveBeenCalled();
+    expect(fetchTokenFromApp).toHaveBeenCalled();
+    expect(fetchCookieFromApp).toHaveBeenCalled();
 
-    // Verify that storeAuth was called with correct parameters
-    expect(storeAuth).toHaveBeenCalledWith('default', {
+    expect(storeAuth).toHaveBeenCalledWith({
       token: 'xoxc-test-token',
       cookie: 'xoxd-test-cookie',
     });
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('should extract auth for a specific workspace if provided', async () => {
@@ -83,30 +87,34 @@ describe('Auth From App Command', () => {
     ]);
 
     // Verify that getToken was called with the workspace parameter
-    expect(getToken).toHaveBeenCalledWith('test-workspace');
-    expect(getCookie).toHaveBeenCalled();
+    expect(fetchTokenFromApp).toHaveBeenCalledWith('test-workspace');
+    expect(fetchCookieFromApp).toHaveBeenCalled();
 
-    // Verify that storeAuth was called
-    expect(storeAuth).toHaveBeenCalledWith('default', {
+    expect(storeAuth).toHaveBeenCalledWith({
       token: 'xoxc-test-token',
       cookie: 'xoxd-test-cookie',
     });
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('should fail if token validation fails', async () => {
     // Mock an error in the validation process
-    vi.mocked(getToken).mockRejectedValueOnce(new Error('Token error'));
+    const tokenExtractionError = new Error('Token error');
+    vi.mocked(fetchTokenFromApp).mockRejectedValueOnce(tokenExtractionError);
 
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-app');
 
-    await expect(
-      command!.parseAsync([
-        'node',
-        'auth-from-app',
-      ]),
-    ).rejects.toThrow();
+    try {
+      await command!.parseAsync(['node', 'auth-from-app']);
+      expect.fail('command!.parseAsync should have thrown an error.');
+    } catch {
+      // Expected path: parseAsync threw an error
+      expect(errorSpy).toHaveBeenCalled();
+      const actualErrorMessage = errorSpy.mock.calls[0][0];
+      expect(actualErrorMessage).toBeTypeOf('string');
+      expect(actualErrorMessage).toContain('Token error');
+    }
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to extract auth from Slack app'));
     expect(storeAuth).not.toHaveBeenCalled();
   });
 
@@ -114,12 +122,10 @@ describe('Auth From App Command', () => {
     const command = program.commands.find((cmd) => cmd.name() === 'auth-from-app');
     const consoleSpy = vi.spyOn(console, 'log');
 
-    await command!.parseAsync([
-      'node',
-      'auth-from-app',
-    ]);
+    await command!.parseAsync(['node', 'auth-from-app']);
 
     expect(consoleSpy).toHaveBeenCalledWith('Token: xoxc-test-token');
     expect(consoleSpy).toHaveBeenCalledWith('Cookie: xoxd-test-cookie');
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

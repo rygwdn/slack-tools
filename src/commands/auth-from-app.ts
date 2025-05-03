@@ -1,26 +1,10 @@
 import { Command } from 'commander';
-import {
-  storeAuth,
-  fetchTokenFromApp,
-  fetchCookieFromApp,
-  validateSlackAuth,
-  SlackAuth,
-} from '../auth';
-import { validateAuthWithApi } from '../slack-api';
-import { GlobalContext } from '../context.js';
-
-/**
- * Function to fetch fresh auth from the Slack app
- */
-async function fetchAuthFromApp(workspace?: string): Promise<SlackAuth> {
-  const cookie = await fetchCookieFromApp();
-  const token = await fetchTokenFromApp(workspace);
-
-  const auth: SlackAuth = { token, cookie };
-  validateSlackAuth(auth);
-
-  return auth;
-}
+import { storeAuth } from '../auth/keychain';
+import { fetchTokenFromApp } from '../auth/token-extractor';
+import { fetchCookieFromApp } from '../auth/cookie-extractor';
+import { createWebClient } from '../slack-api';
+import { GlobalContext } from '../context';
+import { SlackAuth } from '../types';
 
 export function registerAuthFromAppCommand(program: Command): void {
   program
@@ -36,15 +20,15 @@ export function registerAuthFromAppCommand(program: Command): void {
           'Extracting auth from Slack app' + (workspace ? ` for workspace: ${workspace}` : ''),
         );
 
-        // Extract auth from the app
-        const auth = await fetchAuthFromApp(workspace);
-
-        // Validate with API
-        await validateAuthWithApi(auth);
+        GlobalContext.log.info(`Fetching credentials for workspace: ${options.workspace}`);
+        const token = await fetchTokenFromApp(options.workspace);
+        const cookie = await fetchCookieFromApp();
+        const auth: SlackAuth = { token, cookie };
+        await createWebClient(auth);
 
         if (options.store) {
-          await storeAuth('default', auth);
-          console.log('Stored authentication successfully');
+          await storeAuth(auth);
+          GlobalContext.log.info('Credentials stored successfully.');
         }
 
         console.log(`Token: ${auth.token}`);
