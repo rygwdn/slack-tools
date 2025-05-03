@@ -1271,11 +1271,11 @@ async function promptForCurlCommand() {
 function extractAuthFromCurl(curlCommand) {
   const tokenPattern = /(\b|\\n)(xoxc-[a-zA-Z0-9-]{20,})/g;
   const tokens = Array.from(curlCommand.matchAll(tokenPattern), (match) => match[2]);
-  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
-  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
   if (tokens.length === 0) {
     throw new Error("No tokens found in the curl command");
   }
+  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
+  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
   if (cookies.length === 0) {
     throw new Error("No cookies found in the curl command");
   }

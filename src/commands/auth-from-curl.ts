@@ -95,17 +95,19 @@ async function promptForCurlCommand(): Promise<string> {
   });
 }
 
-function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
+export function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
   const tokenPattern = /(\b|\\n)(xoxc-[a-zA-Z0-9-]{20,})/g;
   const tokens = Array.from(curlCommand.matchAll(tokenPattern), (match) => match[2]);
 
-  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
-  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
-
+  // Check for tokens first
   if (tokens.length === 0) {
     throw new Error('No tokens found in the curl command');
   }
 
+  const cookiePattern = /(\b|\\n)d=(xoxd-[^;"\s&)}']+)/g;
+  const cookies = Array.from(curlCommand.matchAll(cookiePattern), (match) => match[2]);
+
+  // Then check for cookies
   if (cookies.length === 0) {
     throw new Error('No cookies found in the curl command');
   }
@@ -126,7 +128,7 @@ function extractAuthFromCurl(curlCommand: string): SlackAuth[] {
   return combinations;
 }
 
-async function findValidAuth(authCombinations: SlackAuth[]): Promise<SlackAuth> {
+export async function findValidAuth(authCombinations: SlackAuth[]): Promise<SlackAuth> {
   for (const auth of authCombinations) {
     try {
       validateSlackAuth(auth);

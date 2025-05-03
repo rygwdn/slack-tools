@@ -71,4 +71,3 @@ function isLines(obj: MarkdownHeader | MarkdownLines | MarkdownKeyValue): obj is
 function isHeader(obj: MarkdownHeader | MarkdownLines | MarkdownKeyValue): obj is MarkdownHeader {
   return typeof obj === 'object' && obj !== null && !isLines(obj) && !isKeyValue(obj);
 }
-

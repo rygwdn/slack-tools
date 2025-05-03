@@ -18,7 +18,7 @@
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --ignore-pattern \"dist/**\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-    "check": "npm-run-all --parallel lint format:check typecheck test --serial build"
+    "check": "npm-run-all --parallel lint format:check typecheck --serial test build"
   },
   "keywords": [
     "slack",
