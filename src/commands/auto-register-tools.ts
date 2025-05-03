@@ -43,6 +43,8 @@ export function registerToolAsCommand<TObj extends ZodRawShape>(
     const option = command.createOption(getCommanderOption(key, param), param.description || '');
     if (param._def.defaultValue) {
       option.defaultValue = param._def.defaultValue();
+    } else if (param._def.typeName !== 'ZodOptional') {
+      option.required = true;
     }
     command.addOption(option);
   });
@@ -51,8 +53,8 @@ export function registerToolAsCommand<TObj extends ZodRawShape>(
     try {
       await optionAction<TObj>(shape, options, tool, commandName);
     } catch (error) {
-      console.error('Error:', error);
-      process.exit(1);
+      GlobalContext.log.debug('Error detail', error as Error);
+      program.error((error as Error).message);
     }
   });
 }

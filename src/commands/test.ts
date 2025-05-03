@@ -19,13 +19,8 @@ export function registerTestCommand(program: Command): void {
         console.log('\nAPI Response:');
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
-        console.error('Error:', error);
-
-        if (!GlobalContext.debug) {
-          console.log('\nTip: Run with -d/--debug flag for more troubleshooting information');
-        }
-
-        process.exit(1);
+        GlobalContext.log.debug('Error detail', error as Error);
+        program.error((error as Error).message);
       }
     });
 }

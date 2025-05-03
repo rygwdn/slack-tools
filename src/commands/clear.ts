@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { clearStoredAuth } from '../auth/keychain';
+import { GlobalContext } from '../context';
 
 export function registerClearCommand(program: Command): void {
   program
@@ -11,8 +12,8 @@ export function registerClearCommand(program: Command): void {
         await clearStoredAuth();
         console.error('Authentication cleared successfully.');
       } catch (error) {
-        console.error('Error:', error);
-        process.exit(1);
+        GlobalContext.log.debug('Error detail', error as Error);
+        program.error((error as Error).message);
       }
     });
 }

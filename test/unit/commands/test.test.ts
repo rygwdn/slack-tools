@@ -112,12 +112,19 @@ describe('Test Command', () => {
         }),
       } as any);
 
+      // Mock program.error by spying on it
+      const errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
+        // Return never to satisfy type
+        return process.exit(1) as never;
+      });
+
       registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});
 
-      expect(process.exit).toHaveBeenCalledWith(1);
+      // Check error handling
+      expect(errorSpy).toHaveBeenCalledWith(authError.message);
     });
 
     it('should not show debug tip if debug mode is enabled', async () => {
@@ -135,21 +142,25 @@ describe('Test Command', () => {
         }),
       } as any);
 
+      // Mock program.error by spying on it
+      const errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
+        // Return never to satisfy type
+        return process.exit(1) as never;
+      });
+
       registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});
 
       // Check error handling
-      expect(console.error).toHaveBeenCalledWith('Error:', authError);
+      expect(errorSpy).toHaveBeenCalledWith(authError.message);
 
       // Debug tip should not be shown
       const debugTipCalls = vi
         .mocked(console.log)
         .mock.calls.filter((call) => call[0] && call[0].toString().includes('--debug flag'));
       expect(debugTipCalls.length).toBe(0);
-
-      expect(process.exit).toHaveBeenCalledWith(1);
     });
   });
 });

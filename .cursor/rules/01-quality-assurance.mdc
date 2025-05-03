@@ -7,6 +7,19 @@ alwaysApply: true
 
 Before any task is considered complete, the following quality checks must be run:
 
+## Run All Checks in Parallel
+
+The easiest way to run all quality checks is using the check script:
+```bash
+npm run check
+```
+
+This runs ESLint, Prettier checks, TypeScript type checking, and tests in parallel, then builds the project.
+
+## Individual Checks
+
+You can also run individual checks:
+
 1. **ESLint** - Check for code style and potential errors:
    ```bash
    npm run lint
@@ -25,18 +38,21 @@ Before any task is considered complete, the following quality checks must be run
    npm run format:check
    ```
 
-3. **TypeScript Build** - Ensure all type checks pass:
+3. **TypeScript** - Ensure all type checks pass:
+   ```bash
+   npm run typecheck
+   ```
+
+4. **Build** - Compile the project:
    ```bash
    npm run build
    ```
 
-**Note:** No task should be considered complete until all the above checks have passed without errors.
+**Note:** No task should be considered complete until all checks have passed without errors.
 
 ## Development Workflow
 
 1. Make your code changes
-2. Run linting: `npm run lint`
-3. Fix any linting issues: `npm run lint:fix`
-4. Format your code: `npm run format`
-5. Ensure TypeScript builds without errors: `npm run build`
-6. Commit your changes only after all checks pass
+2. Run all checks: `npm run check` (or individual checks as needed)
+3. Fix any issues found in the checks
+4. Commit your changes only after all checks pass

@@ -1,4 +1,1 @@
-- allow the MCP to run even if there's no auth and/or workspace or the auth validation fails. have it output an error to stderr in this case and respond with an error to all tool calls.
-- update docs about user ids on search tool
-- ensure tool & readme are up to date
 - only requrie and set the cookie if using a personal token

@@ -83,14 +83,20 @@ describe('Clear Command', () => {
         }),
       } as any);
 
+      // Mock program.error by spying on it
+      const errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
+        // Return never to satisfy type
+        return process.exit(1) as never;
+      });
+
       registerClearCommand(program);
 
       // Execute the command action
       await actionCallback!();
 
       // Check error handling
-      expect(console.error).toHaveBeenCalledWith('Error:', clearError);
-      expect(process.exit).toHaveBeenCalledWith(1);
+      expect(errorSpy).toHaveBeenCalledWith(clearError.message);
+      // No need to check process.exit since it's handled by Commander internally
     });
   });
 });

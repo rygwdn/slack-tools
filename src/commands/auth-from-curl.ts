@@ -18,9 +18,30 @@ export function registerAuthFromCurlCommand(program: Command): void {
   program
     .command('auth-from-curl [curlCommand...]')
     .description('Extract and store Slack authentication from a curl command')
-    .option('--store', 'Store the extracted auth')
+    .option('--store', 'Store the extracted auth in the system keychain for future use')
     .helpOption('-h, --help', 'Display help for command')
     .allowUnknownOption(true) // Allow unknown options to support curl command flags
+    .addHelpText(
+      'after',
+      `
+How to get a curl command:
+  1. Open Slack in your browser (Chrome or Firefox)
+  2. Open Developer Tools (F12) and go to the Network tab
+  3. Perform any action in Slack (e.g., send a message)
+  4. Find a request to api.slack.com
+  5. Right-click and select "Copy as cURL"
+  6. Paste the entire curl command after this command
+
+Example:
+  npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
+
+Notes:
+  - The curl command must include both token (xoxc-) and cookie (xoxd-)
+  - Use --store to save credentials in your system keychain
+  - Once stored, credentials will be automatically used for future commands
+  - The command will output the extracted token and cookie values for verification
+`,
+    )
     .action(async (curlArgs, options) => {
       try {
         const curlCommand = curlArgs.join(' ');
@@ -43,7 +64,7 @@ export function registerAuthFromCurlCommand(program: Command): void {
         console.log(`Token: ${auth.token}`);
         console.log(`Cookie: ${auth.cookie}`);
       } catch (error) {
-        program.error((error as Error).toString());
+        program.error((error as Error).message);
       }
     });
 }

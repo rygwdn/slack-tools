@@ -11,8 +11,19 @@ export function registerAuthFromAppCommand(program: Command): void {
     .command('auth-from-app')
     .description('Extract and store Slack authentication directly from the Slack app')
     .option('-w, --workspace <workspace>', 'Specify Slack workspace name to extract token for')
-    .option('--store', 'Store the extracted auth')
+    .option('--store', 'Store the extracted auth in the system keychain for future use')
     .helpOption('-h, --help', 'Display help for command')
+    .addHelpText(
+      'after',
+      `
+Notes:
+  - The Slack desktop app must be CLOSED while running this command
+  - If you're logged into multiple workspaces, use the --workspace option
+  - Use --store to save credentials in your system keychain
+  - Once stored, credentials will be automatically used for future commands
+  - The command will output the extracted token and cookie values for verification
+`,
+    )
     .action(async (options) => {
       try {
         const workspace = options.workspace;
@@ -34,7 +45,7 @@ export function registerAuthFromAppCommand(program: Command): void {
         console.log(`Token: ${auth.token}`);
         console.log(`Cookie: ${auth.cookie}`);
       } catch (error) {
-        program.error((error as Error).toString());
+        program.error((error as Error).message);
       }
     });
 }

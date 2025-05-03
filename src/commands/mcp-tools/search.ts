@@ -9,7 +9,7 @@ const searchParams = z.object({
   query: z
     .string()
     .describe(
-      'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.',
+      'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:<@U12345> (with user ID), from:display.name (without quotes), from:@me (for current user), or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_get_user_profile tool first to find the correct user ID if needed.',
     ),
   count: z
     .number()

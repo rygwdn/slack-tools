@@ -133,8 +133,8 @@ function registerClearCommand(program2) {
       await clearStoredAuth();
       console.error("Authentication cleared successfully.");
     } catch (error) {
-      console.error("Error:", error);
-      process.exit(1);
+      GlobalContext.log.debug("Error detail", error);
+      program2.error(error.message);
     }
   });
 }
@@ -151,11 +151,8 @@ function registerTestCommand(program2) {
       console.log("\nAPI Response:");
       console.log(JSON.stringify(response, null, 2));
     } catch (error) {
-      console.error("Error:", error);
-      if (!GlobalContext.debug) {
-        console.log("\nTip: Run with -d/--debug flag for more troubleshooting information");
-      }
-      process.exit(1);
+      GlobalContext.log.debug("Error detail", error);
+      program2.error(error.message);
     }
   });
 }
@@ -987,7 +984,7 @@ var getStatusTool = tool({
 });
 var searchParams = z.object({
   query: z.string().describe(
-    'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:@username (e.g., from:@john.doe) or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_user_search or slack_channel_search tools first to find the correct format if needed.'
+    'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:<@U12345> (with user ID), from:display.name (without quotes), from:@me (for current user), or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_get_user_profile tool first to find the correct user ID if needed.'
   ),
   count: z.number().int().optional().default(100).describe("Maximum number of results to return (1-1000). Default is 100.")
 });
@@ -1130,22 +1127,23 @@ var mcpTools = [
 
 // src/commands/mcp.ts
 function registerMcpCommand(program2) {
-  program2.command("mcp").alias("").description("Start an MCP server with search and status capabilities").action(async () => {
-    if (!version.match(/^\d+\.\d+\.\d+$/)) {
-      throw new Error("Invalid version format");
+  program2.command("mcp", { isDefault: true }).alias("").description("Start an MCP server with search and status capabilities").action(async () => {
+    try {
+      const auth = await getStoredAuth();
+      await createWebClient(auth);
+      const server = new FastMCP({
+        name: "slack-tools-server",
+        version
+      });
+      for (const tool2 of mcpTools) {
+        server.addTool(tool2);
+      }
+      server.start({
+        transportType: "stdio"
+      });
+    } catch (error) {
+      program2.error(error.message);
     }
-    const auth = await getStoredAuth();
-    await createWebClient(auth);
-    const server = new FastMCP({
-      name: "slack-tools-server",
-      version
-    });
-    for (const tool2 of mcpTools) {
-      server.addTool(tool2);
-    }
-    server.start({
-      transportType: "stdio"
-    });
   });
 }
 
@@ -1176,6 +1174,8 @@ function registerToolAsCommand(program2, tool2) {
     const option = command.createOption(getCommanderOption(key, param), param.description || "");
     if (param._def.defaultValue) {
       option.defaultValue = param._def.defaultValue();
+    } else if (param._def.typeName !== "ZodOptional") {
+      option.required = true;
     }
     command.addOption(option);
   });
@@ -1183,8 +1183,8 @@ function registerToolAsCommand(program2, tool2) {
     try {
       await optionAction(shape, options, tool2, commandName);
     } catch (error) {
-      console.error("Error:", error);
-      process.exit(1);
+      GlobalContext.log.debug("Error detail", error);
+      program2.error(error.message);
     }
   });
 }
@@ -1231,7 +1231,27 @@ function extractAuthFromCurl(curlCommand) {
   return token && cookie ? { token, cookie } : null;
 }
 function registerAuthFromCurlCommand(program2) {
-  program2.command("auth-from-curl [curlCommand...]").description("Extract and store Slack authentication from a curl command").option("--store", "Store the extracted auth").helpOption("-h, --help", "Display help for command").allowUnknownOption(true).action(async (curlArgs, options) => {
+  program2.command("auth-from-curl [curlCommand...]").description("Extract and store Slack authentication from a curl command").option("--store", "Store the extracted auth in the system keychain for future use").helpOption("-h, --help", "Display help for command").allowUnknownOption(true).addHelpText(
+    "after",
+    `
+How to get a curl command:
+  1. Open Slack in your browser (Chrome or Firefox)
+  2. Open Developer Tools (F12) and go to the Network tab
+  3. Perform any action in Slack (e.g., send a message)
+  4. Find a request to api.slack.com
+  5. Right-click and select "Copy as cURL"
+  6. Paste the entire curl command after this command
+
+Example:
+  npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
+
+Notes:
+  - The curl command must include both token (xoxc-) and cookie (xoxd-)
+  - Use --store to save credentials in your system keychain
+  - Once stored, credentials will be automatically used for future commands
+  - The command will output the extracted token and cookie values for verification
+`
+  ).action(async (curlArgs, options) => {
     try {
       const curlCommand = curlArgs.join(" ");
       GlobalContext.log.debug("Parsing curl command:", curlCommand);
@@ -1248,7 +1268,7 @@ function registerAuthFromCurlCommand(program2) {
       console.log(`Token: ${auth.token}`);
       console.log(`Cookie: ${auth.cookie}`);
     } catch (error) {
-      program2.error(error.toString());
+      program2.error(error.message);
     }
   });
 }
@@ -1439,7 +1459,17 @@ async function fetchCookieFromApp() {
 
 // src/commands/auth-from-app.ts
 function registerAuthFromAppCommand(program2) {
-  program2.command("auth-from-app").description("Extract and store Slack authentication directly from the Slack app").option("-w, --workspace <workspace>", "Specify Slack workspace name to extract token for").option("--store", "Store the extracted auth").helpOption("-h, --help", "Display help for command").action(async (options) => {
+  program2.command("auth-from-app").description("Extract and store Slack authentication directly from the Slack app").option("-w, --workspace <workspace>", "Specify Slack workspace name to extract token for").option("--store", "Store the extracted auth in the system keychain for future use").helpOption("-h, --help", "Display help for command").addHelpText(
+    "after",
+    `
+Notes:
+  - The Slack desktop app must be CLOSED while running this command
+  - If you're logged into multiple workspaces, use the --workspace option
+  - Use --store to save credentials in your system keychain
+  - Once stored, credentials will be automatically used for future commands
+  - The command will output the extracted token and cookie values for verification
+`
+  ).action(async (options) => {
     try {
       const workspace = options.workspace;
       GlobalContext.log.debug(
@@ -1457,7 +1487,7 @@ function registerAuthFromAppCommand(program2) {
       console.log(`Token: ${auth.token}`);
       console.log(`Cookie: ${auth.cookie}`);
     } catch (error) {
-      program2.error(error.toString());
+      program2.error(error.message);
     }
   });
 }
@@ -1485,10 +1515,6 @@ program.hook("preAction", async (thisCommand) => {
   const options = thisCommand.opts();
   GlobalContext.debug = options.debug || process.env.SLACK_TOOLS_DEBUG === "true";
 });
-if (process.argv.some((arg) => program.commands.some((command) => command.name() === arg))) {
-  program.parse(process.argv);
-} else {
-  program.parse([...process.argv, "mcp"]);
-}
+program.parse(process.argv);
 //# sourceMappingURL=cli.mjs.map
 //# sourceMappingURL=cli.mjs.map

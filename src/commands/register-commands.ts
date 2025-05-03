@@ -14,7 +14,6 @@ export function registerCommands(program: Command): void {
   registerAuthFromCurlCommand(program);
   registerAuthFromAppCommand(program);
 
-  // Register all MCP tools as commands
   for (const tool of mcpTools) {
     registerToolAsCommand(program, tool);
   }
