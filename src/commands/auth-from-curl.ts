@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { GlobalContext } from '../context';
-import { storeAuth, validateSlackAuth, validateAuthWithApi } from '../auth';
+import { storeAuth, validateSlackAuth } from '../auth';
+import { validateAuthWithApi } from '../slack-api';
 import { SlackAuth } from '../types.js';
 
 /**

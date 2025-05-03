@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { registerClearCommand } from './clear';
-import { registerPrintCommand } from './print';
 import { registerTestCommand } from './test';
 import { registerMcpCommand } from './mcp';
 import { registerToolAsCommand } from './auto-register-tools';
@@ -10,7 +9,6 @@ import { registerAuthFromAppCommand } from './auth-from-app';
 
 export function registerCommands(program: Command): void {
   registerClearCommand(program);
-  registerPrintCommand(program);
   registerTestCommand(program);
   registerMcpCommand(program);
   registerAuthFromCurlCommand(program);

@@ -1,5 +1,6 @@
 import keytar from 'keytar';
 import type { SlackAuth } from '../types.js';
+import { validateSlackAuth } from './validation.js';
 
 const SERVICE_NAME = 'slack-tools';
 const TOKEN_KEY = 'slack-token';
@@ -31,9 +32,12 @@ export async function getStoredAuth(_workspace?: string): Promise<SlackAuth | nu
       return null;
     }
 
-    // TODO: validate the token and throw if it's not valid
+    const auth: SlackAuth = { token, cookie };
 
-    return { token, cookie };
+    // Validate token and cookie formats
+    validateSlackAuth(auth);
+
+    return auth;
   } catch (error) {
     console.error('Failed to read auth from keychain:', error);
     return null;
