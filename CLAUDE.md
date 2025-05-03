@@ -27,3 +27,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Quality: All code must pass lint, format, and type checks before completion
 
 Always run quality checks (`npm run check`) before considering a task complete.
+
+## Publishing Process
+
+1. Run checks: `npm run check` (fix any issues)
+2. Update version: `npm version patch|minor|major`
+3. Build: `npm run build`
+4. Push changes: `git push && git push --tags`
+5. Publish: `npm publish` (with `--otp=<code>` if 2FA enabled)
+6. Verify: `npx -y slack-tools-mcp --version`
