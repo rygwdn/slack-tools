@@ -14,12 +14,6 @@ No installation required! You can run the tool directly using npx with the npm p
 npx -y slack-tools-mcp [options] [command]
 ```
 
-Alternatively, you can run the latest version directly from GitHub:
-
-```bash
-npx -y github:rygwdn/slack-tools#main [options] [command]
-```
-
 ## Authentication
 
 There are two ways to authenticate with Slack:

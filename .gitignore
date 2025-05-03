@@ -2,8 +2,7 @@
 node_modules/
 
 # Build output
-dist/*
-!dist/cli.mjs
+dist/
 build/
 
 # TypeScript cache
