@@ -33,7 +33,7 @@ type CommandOptions = Record<string, string | boolean | number | undefined>;
 export function registerToolAsCommand<TObj extends ZodRawShape>(
   program: Command,
   tool: Required<Tool<Record<string, never> | undefined, ZodObject<TObj>>>,
-): void {
+): Command {
   const toolName = tool.name;
   const commandName = toKebabCase(toolName);
   const shape = tool.parameters.shape;
@@ -57,6 +57,8 @@ export function registerToolAsCommand<TObj extends ZodRawShape>(
       handleCommandError(error, program);
     }
   });
+
+  return command;
 }
 async function optionAction<TObj extends ZodRawShape>(
   shape: TObj,
@@ -95,7 +97,7 @@ async function optionAction<TObj extends ZodRawShape>(
 
   if (typeof result === 'string') {
     console.log(result);
-  } else if ('isError' in result && result.isError) {
+  } else if (result && 'isError' in result && result.isError) {
     console.error(result.content);
     process.exit(1);
   } else {

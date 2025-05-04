@@ -39,10 +39,11 @@ export interface WorkspaceInfo {
 
 /**
  * Gets all available workspaces from Slack's LevelDB
+ * @param leveldbPath Optional path to LevelDB directory (for testing)
  */
-export async function getAvailableWorkspaces(): Promise<WorkspaceInfo[]> {
-  const leveldbPath = getLevelDBPath();
-  const db = new Level(leveldbPath, { createIfMissing: false });
+export async function getAvailableWorkspaces(leveldbPath?: string): Promise<WorkspaceInfo[]> {
+  const dbPath = leveldbPath || getLevelDBPath(); // Use provided path or get default
+  const db = new Level(dbPath, { createIfMissing: false });
 
   try {
     await db.open();

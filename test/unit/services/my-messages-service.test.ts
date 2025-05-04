@@ -43,6 +43,7 @@ vi.mock('../../../src/cache', () => ({
 
 vi.mock('../../../src/auth/keychain', () => ({
   getStoredAuth: vi.fn(),
+  getAuth: vi.fn(),
 }));
 
 describe('My Messages Service', () => {

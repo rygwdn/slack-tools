@@ -10,7 +10,6 @@ vi.mock('@slack/web-api');
 vi.mock('../../src/auth/keychain');
 
 const mockAuth: SlackAuth = { token: 'xoxc-test-token', cookie: 'xoxd-test-cookie' };
-const mockInvalidAuth: SlackAuth = { token: 'invalid-token', cookie: 'invalid-cookie' };
 
 describe('Slack API Client', () => {
   let mockAuthTest: Mock;
@@ -56,56 +55,84 @@ describe('Slack API Client', () => {
 
       await expect(slackApi.createWebClient(mockAuth)).rejects.toThrow(AuthError);
       await expect(slackApi.createWebClient(mockAuth)).rejects.toThrow(
-        'Authentication test failed',
+        'Slack API rejected the credentials: auth_failed',
       );
       expect(mockAuthTest).toHaveBeenCalled(); // Ensure it was called
     });
   });
 
   describe('validateSlackAuth', () => {
-    it('should pass with valid auth', () => {
-      expect(() => slackApi.validateSlackAuth(mockAuth)).not.toThrow();
+    const validToken = 'xoxc-valid-token';
+    const validCookie = 'xoxd-valid-cookie';
+
+    it('should return valid auth object for correct token and cookie', () => {
+      const auth = { token: validToken, cookie: validCookie };
+      const result = slackApi.validateSlackAuth(auth);
+      expect(result).toEqual({ token: validToken, cookie: validCookie });
     });
 
-    it('should throw AuthError for missing token', () => {
-      const auth = { ...mockAuth, token: '' };
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow('token is required');
-    });
-
-    it('should throw AuthError for missing cookie', () => {
-      const auth = { ...mockAuth, cookie: '' };
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow('cookie is required');
-    });
-
-    it('should throw AuthError for invalid token format', () => {
-      expect(() => slackApi.validateSlackAuth(mockInvalidAuth)).toThrow(AuthError);
-      expect(() => slackApi.validateSlackAuth(mockInvalidAuth)).toThrow('invalid token format');
-    });
-
-    it('should throw AuthError for invalid cookie format', () => {
-      const auth = { token: 'xoxc-valid', cookie: 'invalid-cookie' };
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
-      expect(() => slackApi.validateSlackAuth(auth)).toThrow('invalid cookie format');
-    });
-
-    it('should aggregate multiple validation issues', () => {
-      const auth = { token: 'bad-token', cookie: 'bad-cookie' };
+    it('should throw AuthError if token is missing', () => {
+      const auth = { token: null, cookie: validCookie };
       expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
       expect(() => slackApi.validateSlackAuth(auth)).toThrow(
-        /invalid token format.*invalid cookie format/,
+        'Authentication validation failed: token is required',
       );
     });
 
-    it('should handle null and undefined values', () => {
-      expect(() => slackApi.validateSlackAuth({ token: null, cookie: null })).toThrow(
-        /token is required.*cookie is required/,
+    it('should throw AuthError if cookie is missing', () => {
+      const auth = { token: validToken, cookie: undefined };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(
+        'Authentication validation failed: cookie is required',
       );
-      expect(() => slackApi.validateSlackAuth({ token: undefined, cookie: undefined })).toThrow(
-        /token is required.*cookie is required/,
+    });
+
+    it('should throw AuthError if both token and cookie are missing', () => {
+      const auth = { token: null, cookie: null };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      // The message comes from the initial check
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow('No authentication credentials found');
+    });
+
+    it('should throw AuthError if token has invalid format', () => {
+      const auth = { token: 'invalid-token', cookie: validCookie };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(
+        'Authentication validation failed: invalid token format',
       );
-      expect(() => slackApi.validateSlackAuth({})).toThrow(/token is required.*cookie is required/);
+    });
+
+    it('should throw AuthError if cookie has invalid format', () => {
+      const auth = { token: validToken, cookie: 'invalid-cookie' };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(
+        'Authentication validation failed: invalid cookie format',
+      );
+    });
+
+    it('should throw AuthError with multiple reasons if both formats are invalid', () => {
+      const auth = { token: 'invalid-token', cookie: 'invalid-cookie' };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(
+        'Authentication validation failed: invalid token format, invalid cookie format',
+      );
+    });
+
+    it('should throw AuthError if token is missing and cookie is invalid', () => {
+      const auth = { token: null, cookie: 'invalid-cookie' };
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(AuthError);
+      expect(() => slackApi.validateSlackAuth(auth)).toThrow(
+        'Authentication validation failed: token is required, invalid cookie format',
+      );
+    });
+
+    it('should throw AuthError if auth object is null or undefined', () => {
+      // @ts-expect-error Testing invalid input
+      expect(() => slackApi.validateSlackAuth(null)).toThrow(AuthError);
+      // @ts-expect-error Testing invalid input
+      expect(() => slackApi.validateSlackAuth(undefined)).toThrow(AuthError);
+      // @ts-expect-error Testing invalid input
+      expect(() => slackApi.validateSlackAuth(null)).toThrow('No authentication credentials found');
     });
   });
 });

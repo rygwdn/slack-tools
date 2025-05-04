@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as slackApi from '../../../src/slack-api';
-import * as slackServices from '../../../src/services/slack-services';
+import {
+  formatEmoji,
+  calculateExpirationTime,
+  setSlackStatus,
+  getSlackStatus,
+  getUserProfile,
+} from '../../../src/services/slack-services';
 
 vi.mock('../../../src/slack-api');
 vi.mock('../../../src/auth/keychain');
@@ -20,33 +26,33 @@ describe('Slack Services', () => {
 
   describe('formatEmoji', () => {
     it('should return empty string for empty input', () => {
-      expect(slackServices.formatEmoji('')).toBe('');
-      expect(slackServices.formatEmoji(undefined as unknown as string)).toBe('');
+      expect(formatEmoji('')).toBe('');
+      expect(formatEmoji(undefined as unknown as string)).toBe('');
     });
 
     it('should add colons to emoji without colons', () => {
-      expect(slackServices.formatEmoji('smile')).toBe(':smile:');
+      expect(formatEmoji('smile')).toBe(':smile:');
     });
 
     it('should add missing trailing colon', () => {
-      expect(slackServices.formatEmoji(':smile')).toBe(':smile:');
+      expect(formatEmoji(':smile')).toBe(':smile:');
     });
 
     it('should add missing leading colon', () => {
       // The implementation adds a leading colon when missing
       // and then a trailing colon if missing, which can result in duplicates
-      expect(slackServices.formatEmoji('smile:')).toBe(':smile::');
+      expect(formatEmoji('smile:')).toBe(':smile::');
     });
 
     it('should keep correct emoji format unchanged', () => {
-      expect(slackServices.formatEmoji(':smile:')).toBe(':smile:');
+      expect(formatEmoji(':smile:')).toBe(':smile:');
     });
   });
 
   describe('calculateExpirationTime', () => {
     it('should return 0 for undefined or falsy duration', () => {
-      expect(slackServices.calculateExpirationTime(undefined)).toBe(0);
-      expect(slackServices.calculateExpirationTime(0)).toBe(0);
+      expect(calculateExpirationTime(undefined)).toBe(0);
+      expect(calculateExpirationTime(0)).toBe(0);
     });
 
     it('should calculate correct expiration time for minutes', () => {
@@ -60,11 +66,11 @@ describe('Slack Services', () => {
       try {
         // Test with 60 minutes (1 hour)
         const expectedTimestamp = Math.floor(mockTimestamp / 1000) + 60 * 60; // Add 3600 seconds
-        expect(slackServices.calculateExpirationTime(60)).toBe(expectedTimestamp);
+        expect(calculateExpirationTime(60)).toBe(expectedTimestamp);
 
         // Test with 30 minutes
         const expectedTimestamp2 = Math.floor(mockTimestamp / 1000) + 30 * 60; // Add 1800 seconds
-        expect(slackServices.calculateExpirationTime(30)).toBe(expectedTimestamp2);
+        expect(calculateExpirationTime(30)).toBe(expectedTimestamp2);
       } finally {
         // Restore the original Date.now
         global.Date.now = originalDateNow;
@@ -88,7 +94,7 @@ describe('Slack Services', () => {
     });
 
     it('should set status with text only', async () => {
-      const result = await slackServices.setSlackStatus('Working');
+      const result = await setSlackStatus('Working');
 
       // Check that client.users.profile.set was called with correct parameters
       expect(mockClient.users.profile.set).toHaveBeenCalledWith({
@@ -109,7 +115,7 @@ describe('Slack Services', () => {
     });
 
     it('should set status with emoji', async () => {
-      const result = await slackServices.setSlackStatus('Working', 'computer');
+      const result = await setSlackStatus('Working', 'computer');
 
       // Check proper emoji formatting
       expect(mockClient.users.profile.set).toHaveBeenCalledWith({
@@ -138,7 +144,7 @@ describe('Slack Services', () => {
       global.Date.now = vi.fn(() => mockTimestamp);
 
       try {
-        const result = await slackServices.setSlackStatus('In a meeting', 'calendar', 30);
+        const result = await setSlackStatus('In a meeting', 'calendar', 30);
 
         // Check that expiration was set correctly (30 minutes = 1800 seconds)
         const expectedExpiration = Math.floor(mockTimestamp / 1000) + 30 * 60;
@@ -170,7 +176,7 @@ describe('Slack Services', () => {
       mockClient.users.profile.set.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(slackServices.setSlackStatus('Failed')).rejects.toThrow(
+      await expect(setSlackStatus('Failed')).rejects.toThrow(
         'Status update failed: Error: API Error',
       );
     });
@@ -198,7 +204,7 @@ describe('Slack Services', () => {
     });
 
     it('should retrieve current status', async () => {
-      const result = await slackServices.getSlackStatus();
+      const result = await getSlackStatus();
 
       // Check that client.users.profile.get was called
       expect(mockClient.users.profile.get).toHaveBeenCalled();
@@ -215,7 +221,7 @@ describe('Slack Services', () => {
       // Override the profile.get mock for this test
       mockClient.users.profile.get.mockResolvedValueOnce({ profile: {} });
 
-      const result = await slackServices.getSlackStatus();
+      const result = await getSlackStatus();
 
       // Check result has empty values
       expect(result).toEqual({
@@ -231,9 +237,7 @@ describe('Slack Services', () => {
       mockClient.users.profile.get.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(slackServices.getSlackStatus()).rejects.toThrow(
-        'Status retrieval failed: Error: API Error',
-      );
+      await expect(getSlackStatus()).rejects.toThrow('Status retrieval failed: Error: API Error');
     });
   });
 
@@ -284,7 +288,7 @@ describe('Slack Services', () => {
 
     it('should retrieve user profile information', async () => {
       const userId = 'U12345';
-      const result = await slackServices.getUserProfile(userId);
+      const result = await getUserProfile(userId);
 
       // Check that client methods were called correctly
       expect(slackApi.createWebClient).toHaveBeenCalledWith();
@@ -330,7 +334,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await slackServices.getUserProfile('U12345');
+      const result = await getUserProfile('U12345');
 
       // Should use real_name as fallback for display_name
       expect(result.displayName).toBe('Test User');
@@ -346,7 +350,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await slackServices.getUserProfile('U12345');
+      const result = await getUserProfile('U12345');
 
       // Check that status fields have default values
       expect(result.status).toEqual({
@@ -363,7 +367,7 @@ describe('Slack Services', () => {
         error: 'user_not_found',
       });
 
-      await expect(slackServices.getUserProfile('U99999')).rejects.toThrow(/User not found/);
+      await expect(getUserProfile('U99999')).rejects.toThrow(/User not found/);
     });
 
     it('should throw an error if profile not found', async () => {
@@ -373,16 +377,14 @@ describe('Slack Services', () => {
         error: 'profile_not_found',
       });
 
-      await expect(slackServices.getUserProfile('U12345')).rejects.toThrow(/Profile not found/);
+      await expect(getUserProfile('U12345')).rejects.toThrow(/Profile not found/);
     });
 
     it('should throw an error if API request fails', async () => {
       // Make users.info throw an error
       mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
 
-      await expect(slackServices.getUserProfile('U12345')).rejects.toThrow(
-        /User profile retrieval failed/,
-      );
+      await expect(getUserProfile('U12345')).rejects.toThrow(/User profile retrieval failed/);
     });
   });
 });

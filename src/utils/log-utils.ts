@@ -1,7 +1,3 @@
-function redactMatch(match: string): string {
-  return `${match.substring(0, 5)}...${match.substring(match.length - 5)}`;
-}
-
 export function redact<T>(message: T): T {
   if (typeof message !== 'string') {
     return message;
@@ -9,8 +5,12 @@ export function redact<T>(message: T): T {
 
   let redactedMessage = message as string;
 
-  redactedMessage = redactedMessage.replace(/xoxc-[0-9a-zA-Z-]+/g, redactMatch);
-  redactedMessage = redactedMessage.replace(/d=[a-zA-Z0-9%_\-.]+/g, redactMatch);
+  redactedMessage = redactedMessage.replace(
+    /(xoxc-|xoxd-)([a-zA-Z0-9%_\-.]+)/g,
+    (_match, prefix: string, value: string) => {
+      return `${prefix}${value.substring(0, 3)}...${value.substring(value.length - 3)}`;
+    },
+  );
 
   return redactedMessage as T;
 }

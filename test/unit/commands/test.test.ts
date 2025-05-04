@@ -4,6 +4,7 @@ import * as keychain from '../../../src/auth/keychain';
 import { registerTestCommand } from '../../../src/commands/test';
 import { Command } from 'commander';
 import { SlackAuth } from '../../../src/types';
+import * as authErrorUtils from '../../../src/utils/auth-error';
 
 // Mock dependencies
 vi.mock('../../../src/slack-api', () => ({
@@ -11,14 +12,21 @@ vi.mock('../../../src/slack-api', () => ({
 }));
 
 vi.mock('../../../src/auth/keychain', () => ({
-  getStoredAuth: vi.fn(),
+  getAuth: vi.fn(),
 }));
 
-import { createWebClient } from '../../../src/slack-api';
+// Mock the auth error handler
+vi.mock('../../../src/utils/auth-error', async (importOriginal) => {
+  const actual = await importOriginal<typeof authErrorUtils>();
+  return {
+    ...actual,
+    handleCommandError: vi.fn(),
+  };
+});
 
 describe('Test Command', () => {
   let program: Command;
-  const mockAuth: SlackAuth = { token: 'test-token', cookie: 'test-cookie' };
+  const mockAuth: SlackAuth = { token: 'xoxc-test-token', cookie: 'xoxd-test-cookie' };
   let mockClient: any;
 
   beforeEach(() => {
@@ -44,8 +52,6 @@ describe('Test Command', () => {
 
     // Mock console methods
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
@@ -64,7 +70,7 @@ describe('Test Command', () => {
       expect(commandSpy).toHaveBeenCalledWith('test');
     });
 
-    it('should test authentication when executed', async () => {
+    it('should test authentication when executed successfully', async () => {
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;
 
@@ -97,10 +103,10 @@ describe('Test Command', () => {
       expect(joinedOutput).toContain('testuser');
     });
 
-    it('should handle authentication errors', async () => {
-      // Mock API error
-      const authError = new Error('Authentication failed');
-      vi.mocked(createWebClient).mockRejectedValueOnce(authError);
+    it('should call handleCommandError on authentication errors', async () => {
+      // Mock API error (e.g., AuthError)
+      const authFailureError = new authErrorUtils.AuthError('Invalid credentials');
+      vi.mocked(keychain.getAuth).mockRejectedValueOnce(authFailureError);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;
@@ -112,25 +118,21 @@ describe('Test Command', () => {
         }),
       } as any);
 
-      // Mock program.error by spying on it
-      const errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
-        // Return never to satisfy type
-        return process.exit(1) as never;
-      });
-
       registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});
 
-      // Check error handling
-      expect(errorSpy).toHaveBeenCalledWith(authError.message);
+      // Check that handleCommandError was called
+      expect(authErrorUtils.handleCommandError).toHaveBeenCalledWith(authFailureError, program);
     });
 
-    it('should not show debug tip if debug mode is enabled', async () => {
-      // Mock API error
-      const authError = new Error('Authentication failed');
-      vi.mocked(createWebClient).mockRejectedValueOnce(authError);
+    it('should call handleCommandError on other errors during execution', async () => {
+      // Mock a different error during auth.test call
+      const testApiError = new Error('Network Error');
+      mockClient.auth.test.mockRejectedValueOnce(testApiError);
+      vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+      vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;
@@ -142,25 +144,13 @@ describe('Test Command', () => {
         }),
       } as any);
 
-      // Mock program.error by spying on it
-      const errorSpy = vi.spyOn(program, 'error').mockImplementation(() => {
-        // Return never to satisfy type
-        return process.exit(1) as never;
-      });
-
       registerTestCommand(program);
 
       // Execute the command action
       await actionCallback!({});
 
-      // Check error handling
-      expect(errorSpy).toHaveBeenCalledWith(authError.message);
-
-      // Debug tip should not be shown
-      const debugTipCalls = vi
-        .mocked(console.log)
-        .mock.calls.filter((call) => call[0] && call[0].toString().includes('--debug flag'));
-      expect(debugTipCalls.length).toBe(0);
+      // Check that handleCommandError was called with the specific error
+      expect(authErrorUtils.handleCommandError).toHaveBeenCalledWith(testApiError, program);
     });
   });
 });

@@ -17,7 +17,7 @@ export function registerMcpCommand(program: Command): void {
         await createWebClient(auth);
 
         const server = new FastMCP({
-          name: 'slack-tools-server',
+          name: 'slack-tools-mcp',
           version: version as `${number}.${number}.${number}`,
         });
 

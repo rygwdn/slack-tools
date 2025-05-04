@@ -3,6 +3,15 @@ import { Command } from 'commander';
 import { z } from 'zod';
 import { registerToolAsCommand } from '../../../src/commands/auto-register-tools';
 import { tool } from '../../../src/types';
+import * as authErrorUtils from '../../../src/utils/auth-error';
+
+vi.mock('../../../src/utils/auth-error', async (importOriginal) => {
+  const actual = await importOriginal<typeof authErrorUtils>();
+  return {
+    ...actual,
+    handleCommandError: vi.fn(),
+  };
+});
 
 describe('auto-register-tools', () => {
   let program: Command;
@@ -32,13 +41,20 @@ describe('auto-register-tools', () => {
     program = new Command();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    program.exitOverride((err) => {
+      if (err.code !== 'commander.exit') {
+        throw err;
+      }
+    });
+
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`Process exited with code ${code}`);
     });
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('registerToolAsCommand', () => {
@@ -80,29 +96,26 @@ describe('auto-register-tools', () => {
     });
 
     it('should handle tools with no parameters', async () => {
-      type ActionHandler = (options: Record<string, any>) => Promise<void>;
-      let capturedActionHandler: ActionHandler | undefined;
+      const command = registerToolAsCommand(program, simpleToolNoParams);
 
-      const mockCommand = {
-        description: vi.fn().mockReturnThis(),
-        option: vi.fn().mockReturnThis(),
-        action: vi.fn().mockImplementation((handler: ActionHandler) => {
-          capturedActionHandler = handler;
-          return mockCommand;
-        }),
-      };
-      vi.spyOn(program, 'command').mockReturnValue(mockCommand as any);
+      await command.parseAsync([], { from: 'user' });
 
-      registerToolAsCommand(program, simpleToolNoParams);
+      expect(simpleToolNoParams.execute).toHaveBeenCalledWith({}, expect.anything());
+    });
 
-      if (capturedActionHandler) {
-        await capturedActionHandler({});
+    it('should call the tool function with parsed options on action', async () => {
+      const command = registerToolAsCommand(program, mockTool);
+      await command.parseAsync(['--text-param', 'testValue'], { from: 'user' });
 
-        expect(simpleToolNoParams.execute).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.anything(),
-        );
-      }
+      expect(mockTool.execute).toHaveBeenCalledWith(
+        {
+          textParam: 'testValue',
+          numParam: undefined,
+          boolParam: false,
+        },
+        expect.anything(),
+      );
+      expect(authErrorUtils.handleCommandError).not.toHaveBeenCalled();
     });
   });
 });
