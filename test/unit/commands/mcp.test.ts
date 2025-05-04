@@ -4,7 +4,6 @@ import { FastMCP } from 'fastmcp';
 import * as keychain from '../../../src/auth/keychain';
 import * as slackApi from '../../../src/slack-api';
 import { registerMcpCommand } from '../../../src/commands/mcp';
-import { mcpTools } from '../../../src/commands/mcp-tools/index'; // Assuming index exports the tools array
 import * as authErrorUtils from '../../../src/utils/auth-error';
 import { SlackAuth } from '../../../src/types';
 
@@ -25,7 +24,7 @@ describe('MCP Command', () => {
   let program: Command;
   const mockAuth: SlackAuth = { token: 'xoxc-mcp-token', cookie: 'xoxd-mcp-cookie' };
   let actionCallback: (() => Promise<void>) | null = null;
-  let commandSpy: ReturnType<typeof vi.spyOn> | null = null;
+  let commandSpy: any = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
