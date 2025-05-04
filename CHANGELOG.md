@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - May 2025
+
 ### Changed
 - Refactored authentication handling and improved error management
 
