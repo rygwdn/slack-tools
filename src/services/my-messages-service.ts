@@ -1,7 +1,7 @@
 import { GlobalContext } from '../context';
 import { createWebClient } from '../slack-api';
 import { getDateRange } from '../utils/date-utils';
-import { searchMessages } from '../commands/my_messages/slack-service';
+import { myMessages } from '../services/slack-services';
 import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
 import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
@@ -62,12 +62,7 @@ export async function generateMyMessagesSummary(
     `Date range: ${dateRange.startTime.toLocaleDateString()} to ${dateRange.endTime.toLocaleDateString()}`,
   );
 
-  const { messages, threadMessages, mentionMessages } = await searchMessages(
-    client,
-    `<@${userId}>`,
-    dateRange,
-    count,
-  );
+  const { messages, threadMessages, mentionMessages } = await myMessages(client, dateRange, count);
   const allMessages = [...messages, ...threadMessages, ...mentionMessages];
 
   GlobalContext.log.debug(

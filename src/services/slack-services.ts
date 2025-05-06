@@ -2,6 +2,11 @@ import type {} from '@slack/web-api';
 import { createWebClient } from '../slack-api';
 import { GlobalContext } from '../context';
 import { getCacheForMessages } from '../commands/my_messages/slack-entity-cache';
+import { SearchMessagesArguments, WebClient } from '@slack/web-api';
+import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
+import { formatDateForSearch, getDayAfter, getDayBefore } from '../utils/date-utils';
+import { enhanceSearchQuery } from '../utils/user-utils';
+import { SearchResult } from '../commands/my_messages/types';
 
 export function formatEmoji(emoji: string): string {
   if (!emoji) return '';
@@ -218,4 +223,72 @@ export async function getUserProfile(userId: string) {
   } catch (error) {
     throw new Error(`User profile retrieval failed: ${error}`);
   }
+}
+
+export async function myMessages(
+  client: WebClient,
+  dateRange: { startTime: Date; endTime: Date },
+  count: number,
+): Promise<SearchResult> {
+  const dayBeforeStart = getDayBefore(dateRange.startTime);
+  const dayAfterEnd = getDayAfter(dateRange.endTime);
+
+  const dayBeforeStartFormatted = formatDateForSearch(dayBeforeStart);
+  const dayAfterEndFormatted = formatDateForSearch(dayAfterEnd);
+
+  const searchQuery = `from:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
+  GlobalContext.log.debug(`Search query: ${searchQuery}`);
+  const searchResults = await searchSlackMessages(client, searchQuery, count);
+
+  const threadQuery = `is:thread with:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
+  GlobalContext.log.debug(`Thread query: ${threadQuery}`);
+  const threadResults = await searchSlackMessages(client, threadQuery, count);
+
+  const mentionQuery = `to:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
+  GlobalContext.log.debug(`Mention query: ${mentionQuery}`);
+  const mentionResults = await searchSlackMessages(client, mentionQuery, count);
+
+  return {
+    messages: searchResults,
+    threadMessages: threadResults,
+    mentionMessages: mentionResults,
+  };
+}
+
+export async function searchSlackMessages(
+  client: WebClient,
+  query: string,
+  count: number,
+): Promise<Match[]> {
+  GlobalContext.log.debug(`Original search query: ${query}`);
+
+  const enhancedQuery = await enhanceSearchQuery(client, query);
+  GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
+
+  const queryArgs: SearchMessagesArguments = {
+    query: enhancedQuery,
+    sort: 'timestamp',
+    sort_dir: 'asc',
+    count: Math.min(100, count),
+  };
+
+  const matches: Match[] = [];
+
+  let cursor: string | null = '*';
+  while (matches.length < count && cursor) {
+    const searchResults = await client.search.messages({
+      ...queryArgs,
+      cursor,
+    } as SearchMessagesArguments);
+
+    if (!searchResults.messages?.matches?.length) {
+      break;
+    }
+
+    matches.push(...searchResults.messages.matches);
+
+    const paging = searchResults.messages.paging;
+    cursor = paging && 'next_cursor' in paging ? (paging.next_cursor as string) : null;
+  }
+  return matches;
 }

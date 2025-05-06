@@ -7,7 +7,7 @@ import { WebClient } from '@slack/web-api';
 import * as dateUtils from '../../../src/utils/date-utils';
 import * as slackApi from '../../../src/slack-api';
 import * as keychain from '../../../src/auth/keychain';
-import * as slackService from '../../../src/commands/my_messages/slack-service';
+import * as slackService from '../../../src/services/slack-services';
 import * as formatters from '../../../src/commands/my_messages/formatters';
 import { getCacheForMessages } from '../../../src/commands/my_messages/slack-entity-cache';
 import { SlackCache } from '../../../src/commands/my_messages/types';
@@ -19,12 +19,16 @@ vi.mock('../../../src/slack-api', () => ({
   createWebClient: vi.fn(),
 }));
 
+vi.mock('../../../src/auth/keychain', () => ({
+  getAuth: vi.fn(),
+}));
+
 vi.mock('../../../src/utils/date-utils', () => ({
   getDateRange: vi.fn(),
 }));
 
-vi.mock('../../../src/commands/my_messages/slack-service', () => ({
-  searchMessages: vi.fn(),
+vi.mock('../../../src/services/slack-services', () => ({
+  myMessages: vi.fn(),
 }));
 
 vi.mock('../../../src/commands/my_messages/slack-entity-cache', () => ({
@@ -39,11 +43,6 @@ vi.mock('../../../src/commands/my_messages/formatters', () => ({
 
 vi.mock('../../../src/cache', () => ({
   saveSlackCache: vi.fn(),
-}));
-
-vi.mock('../../../src/auth/keychain', () => ({
-  getStoredAuth: vi.fn(),
-  getAuth: vi.fn(),
 }));
 
 describe('My Messages Service', () => {
@@ -99,15 +98,13 @@ describe('My Messages Service', () => {
     vi.mocked(dateUtils.getDateRange).mockResolvedValue(mockDateRange);
     vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
     vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
-    vi.mocked(slackService.searchMessages).mockImplementation(
-      async (_client, _username, _dateRange, _count) => {
-        return {
-          messages: mockMessages,
-          threadMessages: mockThreadMessages,
-          mentionMessages: mockMentionMessages,
-        };
-      },
-    );
+    vi.mocked(slackService.myMessages).mockImplementation(async (_client, _dateRange, _count) => {
+      return {
+        messages: mockMessages,
+        threadMessages: mockThreadMessages,
+        mentionMessages: mockMentionMessages,
+      };
+    });
     vi.mocked(getCacheForMessages).mockResolvedValue(mockCache);
     vi.mocked(formatters.generateMarkdown).mockReturnValue(mockMarkdown);
     vi.mocked(saveSlackCache).mockResolvedValue(undefined);
@@ -128,12 +125,7 @@ describe('My Messages Service', () => {
     expect(keychain.getAuth).toHaveBeenCalled();
     // Check that createWebClient was called with the auth object
     expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
-    expect(slackService.searchMessages).toHaveBeenCalledWith(
-      mockClient,
-      '<@U123>',
-      mockDateRange,
-      200,
-    );
+    expect(slackService.myMessages).toHaveBeenCalledWith(mockClient, mockDateRange, 200);
     expect(getCacheForMessages).toHaveBeenCalledWith(mockClient, mockAllMessages);
     expect(formatters.generateMarkdown).toHaveBeenCalledWith(mockAllMessages, mockCache, 'U123');
     expect(saveSlackCache).toHaveBeenCalled();
@@ -162,12 +154,7 @@ describe('My Messages Service', () => {
 
     // Check if all the required functions were called with custom options
     expect(dateUtils.getDateRange).toHaveBeenCalledWith(customOptions);
-    expect(slackService.searchMessages).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      mockDateRange,
-      50,
-    );
+    expect(slackService.myMessages).toHaveBeenCalledWith(expect.anything(), mockDateRange, 50);
 
     // Check the returned result
     expect(result).toHaveProperty('markdown', mockMarkdown);

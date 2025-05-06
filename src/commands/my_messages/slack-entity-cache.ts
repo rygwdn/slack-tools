@@ -22,8 +22,6 @@ function extractEntityIds(messages: Match[]): Set<string> {
 }
 
 async function fetchEntityInfo(id: string, loadingContext: LoadingContext): Promise<void> {
-  GlobalContext.log.debug(`Fetching entity info for ${id}`);
-
   const typeChar = id[0];
   const typeId = id.slice(1);
 
