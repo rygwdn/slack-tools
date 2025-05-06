@@ -69,8 +69,14 @@ export function validateSlackAuth(auth: {
 
 function getLogger() {
   return {
-    debug: (message: string, ...args: unknown[]) =>
-      GlobalContext.log.debug(...redactLog(message, ...args)),
+    debug: (message: string, ...args: unknown[]) => {
+      if (message.length > 1000) {
+        const truncatedMessage = message.slice(0, 400) + ' [[... SNIP ...]] ' + message.slice(-400);
+        GlobalContext.log.debug(truncatedMessage, ...args);
+      } else {
+        GlobalContext.log.debug(message, ...args);
+      }
+    },
     info: (message: string, ...args: unknown[]) =>
       GlobalContext.log.info(...redactLog(message, ...args)),
     warn: (message: string, ...args: unknown[]) =>
