@@ -1,5 +1,6 @@
 import { AuthTestResponse } from '@slack/web-api';
 import { SlackCache } from './commands/my_messages/types';
+import { Console } from 'node:console';
 interface SlackContext {
   cache?: SlackCache;
   debug: boolean;
@@ -12,17 +13,25 @@ interface SlackContext {
   };
 }
 
+const stderrLogger = new Console({ stdout: process.stderr, stderr: process.stderr });
+
 export const GlobalContext: SlackContext = {
   debug: false,
   currentUser: undefined,
   log: {
     debug: (...args: unknown[]) => {
       if (GlobalContext.debug) {
-        console.debug(...args);
+        stderrLogger.debug('[DEBUG]', ...args);
       }
     },
-    warn: (...args: unknown[]) => console.warn(...args),
-    info: (...args: unknown[]) => console.info(...args),
-    error: (...args: unknown[]) => console.error(...args),
+    warn: (...args: unknown[]) => {
+      stderrLogger.warn('[WARN]', ...args);
+    },
+    info: (...args: unknown[]) => {
+      stderrLogger.info('[INFO]', ...args);
+    },
+    error: (...args: unknown[]) => {
+      stderrLogger.error('[ERROR]', ...args);
+    },
   },
 };
