@@ -17,6 +17,8 @@ export async function createWebClient(auth?: SlackAuth): Promise<WebClient> {
     headers: {
       Cookie: `d=${validAuth.cookie}`,
     },
+    maxRequestConcurrency: 2,
+    rejectRateLimitedCalls: false,
   });
 
   try {

@@ -22,6 +22,8 @@ function extractEntityIds(messages: Match[]): Set<string> {
 }
 
 async function fetchEntityInfo(id: string, loadingContext: LoadingContext): Promise<void> {
+  GlobalContext.log.debug(`Fetching entity info for ${id}`);
+
   const typeChar = id[0];
   const typeId = id.slice(1);
 
@@ -54,6 +56,8 @@ async function fetchEntityInfo(id: string, loadingContext: LoadingContext): Prom
 }
 
 async function fetchUser(userId: string, loadingContext: LoadingContext): Promise<void> {
+  GlobalContext.log.debug(`Fetching user info for ${userId}`);
+
   const userResponse = await loadingContext.client.users.info({ user: userId });
   if (!userResponse.ok || !userResponse.user) {
     GlobalContext.log.warn(`Could not fetch info for DM user ${userId}:`, userResponse);
@@ -72,6 +76,8 @@ async function fetchUser(userId: string, loadingContext: LoadingContext): Promis
 }
 
 async function fetchChannel(channelId: string, loadingContext: LoadingContext): Promise<void> {
+  GlobalContext.log.debug(`Fetching channel info for ${channelId}`);
+
   const conversationResponse = await loadingContext.client.conversations.info({
     channel: channelId,
   });
@@ -83,13 +89,19 @@ async function fetchChannel(channelId: string, loadingContext: LoadingContext): 
 
   const channel = conversationResponse.channel;
   const channelName = channel.name || channelId;
-  const members = 'members' in channel ? (channel.members as string[]) : [];
+
+  const members: string[] = [];
+
+  if ('members' in channel) {
+    members.push(...(channel.members as string[]));
+  }
   if ('user' in channel) {
     members.push(channel.user as string);
   }
 
-  // Ensure that all members are loaded
-  await Promise.all(members.map((member) => fetchUser(member, loadingContext)));
+  if (members.length < 10) {
+    await Promise.all(members.map((member) => fetchEntityInfo(`@${member}`, loadingContext)));
+  }
 
   loadingContext.cache.entities[channelId] = {
     displayName: channelName,
