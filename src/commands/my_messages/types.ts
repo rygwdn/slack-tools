@@ -53,8 +53,8 @@ export interface SearchResult {
 
 export interface MyMessagesCommandOptions {
   username?: string;
-  since?: string;
-  until?: string;
+  after?: string;
+  before?: string;
   count: string;
   output?: string;
 }

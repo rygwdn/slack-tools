@@ -5,12 +5,19 @@ import { getCacheForMessages } from '../my_messages/slack-entity-cache';
 import { createWebClient } from '../../slack-api';
 import { searchSlackMessages } from '../my_messages/slack-service';
 
+const queryDescription = `
+Search query with Slack search modifiers.
+Available modifiers: in:<channel/user>, from:<user>, has:<emoji reaction>, is:thread, during:YYYY-MM-DD, before:YYYY-MM-DD, after:YYYY-MM-DD, has:pin, with:<user>.
+Identify users with "@me", "@display.name" or "<@U12345>".
+Identify channels with "#channel-name" or "<#C12345>".
+Exclude results with a dash (-) in front of the modifier.
+Use double quotes to search for an exact phrase.
+
+Example: marketing report in:#team-marketing from:@display.name after:2024-01-01
+`;
+
 const searchParams = z.object({
-  query: z
-    .string()
-    .describe(
-      'Search query with Slack search modifiers. Supports operators like "from:", "to:", "with:", "in:", "has:", etc. For user searches, use from:<@U12345> (with user ID), from:display.name (without quotes), from:@me (for current user), or from:"Display Name" (with quotes for names with spaces). For channel searches, use in:channel_name (e.g., in:general) or in:<#C12345> (using channel ID). Use the slack_get_user_profile tool first to find the correct user ID if needed.',
-    ),
+  query: z.string().describe(queryDescription),
   count: z
     .number()
     .int()

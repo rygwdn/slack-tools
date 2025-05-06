@@ -12,8 +12,8 @@ import { getAuth } from '../auth/keychain';
 export interface MyMessagesOptions {
   count?: number;
   timeRange?: string; // e.g., 'today', 'yesterday', 'last 7 days', 'YYYY-MM-DD..YYYY-MM-DD'
-  since?: string;
-  until?: string;
+  after?: string;
+  before?: string;
 }
 
 export interface MyMessagesSummaryResult {

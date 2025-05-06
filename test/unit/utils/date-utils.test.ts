@@ -14,20 +14,9 @@ describe('Date Utilities - getDateRange', () => {
     vi.useRealTimers();
   });
 
-  it("should throw error for invalid 'since' date format", async () => {
-    await expect(getDateRange({ since: 'invalid-date' })).rejects.toThrow(
+  it("should throw error for invalid 'after' date format", async () => {
+    await expect(getDateRange({ after: 'invalid-date' })).rejects.toThrow(
       'Invalid start date: invalid-date, use YYYY-MM-DD format',
     );
-  });
-
-  it("should throw error for invalid 'until' date format", async () => {
-    // Implementation uses `new Date()` which accepts YYYY/MM/DD, but the error message expects YYYY-MM-DD.
-    // Let's test with a clearly invalid format.
-    await expect(getDateRange({ until: 'not-a-date' })).rejects.toThrow(
-      'Invalid end date: not-a-date, use YYYY-MM-DD format',
-    );
-    // Test the YYYY/MM/DD case - this *should* pass if the implementation relies solely on `new Date()`
-    // but fails the spirit of the error message. If this test fails, the implementation is stricter.
-    // await expect(getDateRange({ until: '2024/05/01' })).not.toThrow();
   });
 });

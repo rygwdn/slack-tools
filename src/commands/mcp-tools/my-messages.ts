@@ -3,13 +3,13 @@ import { generateMyMessagesSummary } from '../../services/my-messages-service';
 import { tool } from '../../types';
 
 const myMessagesParams = z.object({
-  since: z
+  after: z
     .string()
     .optional()
     .describe(
       'Start date in YYYY-MM-DD format (e.g., "2023-01-15"). If omitted, defaults to the beginning of the current day.',
     ),
-  until: z
+  before: z
     .string()
     .optional()
     .describe(
@@ -31,8 +31,8 @@ export const myMessagesTool = tool({
     readOnlyHint: true,
     title: 'My Messages',
   },
-  execute: async ({ since, until, count }) => {
-    const result = await generateMyMessagesSummary({ since, until, count });
+  execute: async ({ after, before, count }) => {
+    const result = await generateMyMessagesSummary({ after, before, count });
     return result.markdown;
   },
 });

@@ -152,8 +152,8 @@ describe('My Messages Service', () => {
     // Setup custom options
     const customOptions = {
       username: 'customuser',
-      since: '2023-01-01',
-      until: '2023-01-02',
+      after: '2023-01-01',
+      before: '2023-01-02',
       count: 50,
     };
 

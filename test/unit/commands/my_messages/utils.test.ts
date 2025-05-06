@@ -39,9 +39,9 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMilliseconds()).toBe(999);
     });
 
-    it('should use provided since date', async () => {
-      const since = '2023-07-10';
-      const result = await getDateRange({ since });
+    it('should use provided after date', async () => {
+      const after = '2023-07-10';
+      const result = await getDateRange({ after });
 
       // Verify startTime is set to the provided date (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -64,9 +64,9 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMilliseconds()).toBe(999);
     });
 
-    it('should use provided until date', async () => {
-      const until = '2023-07-20';
-      const result = await getDateRange({ until });
+    it('should use provided before date', async () => {
+      const before = '2023-07-20';
+      const result = await getDateRange({ before });
 
       // Verify startTime is set to beginning of the current day (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -88,9 +88,9 @@ describe('My Messages Command Utils', () => {
     });
 
     it('should use both provided dates', async () => {
-      const since = '2023-07-10';
-      const until = '2023-07-20';
-      const result = await getDateRange({ since, until });
+      const after = '2023-07-10';
+      const before = '2023-07-20';
+      const result = await getDateRange({ after, before });
 
       // Verify startTime is set to the provided start date (in local time)
       expect(result.startTime.getMonth()).toBe(6); // July is 6 (0-indexed)
@@ -112,18 +112,18 @@ describe('My Messages Command Utils', () => {
       expect(result.endTime.getMilliseconds()).toBe(999);
     });
 
-    it('should throw for invalid since date', async () => {
-      const since = 'invalid-date';
+    it('should throw for invalid after date', async () => {
+      const after = 'invalid-date';
 
-      await expect(getDateRange({ since })).rejects.toThrow(
+      await expect(getDateRange({ after })).rejects.toThrow(
         'Invalid start date: invalid-date, use YYYY-MM-DD format',
       );
     });
 
-    it('should throw for invalid until date', async () => {
-      const until = 'invalid-date';
+    it('should throw for invalid before date', async () => {
+      const before = 'invalid-date';
 
-      await expect(getDateRange({ until })).rejects.toThrow(
+      await expect(getDateRange({ before })).rejects.toThrow(
         'Invalid end date: invalid-date, use YYYY-MM-DD format',
       );
     });

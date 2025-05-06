@@ -59,19 +59,19 @@ export function parseDateToTimestamp(dateString: string | undefined): number | u
 
 /**
  * Parses and validates date options, returning a date range
- * @param options Object containing since and until date strings
+ * @param options Object containing after and before date strings
  * @param context Command context for debugging
  * @returns Object with startTime and endTime Date objects
  */
 export async function getDateRange(options: {
-  since?: string;
-  until?: string;
+  after?: string;
+  before?: string;
 }): Promise<{ startTime: Date; endTime: Date }> {
   let startTime: Date;
-  if (options.since) {
-    startTime = new Date(options.since);
+  if (options.after) {
+    startTime = new Date(options.after);
     if (isNaN(startTime.getTime())) {
-      throw new Error(`Invalid start date: ${options.since}, use YYYY-MM-DD format`);
+      throw new Error(`Invalid start date: ${options.after}, use YYYY-MM-DD format`);
     }
   } else {
     const now = new Date();
@@ -81,10 +81,10 @@ export async function getDateRange(options: {
   }
 
   let endTime: Date;
-  if (options.until) {
-    endTime = new Date(options.until);
+  if (options.before) {
+    endTime = new Date(options.before);
     if (isNaN(endTime.getTime())) {
-      throw new Error(`Invalid end date: ${options.until}, use YYYY-MM-DD format`);
+      throw new Error(`Invalid end date: ${options.before}, use YYYY-MM-DD format`);
     }
     endTime.setHours(23, 59, 59, 999);
   } else {
