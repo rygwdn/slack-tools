@@ -208,7 +208,7 @@ describe('Formatting Service', () => {
     it('should handle user mentions with display name override', () => {
       const text = 'Hello <@U123|alice> and <@U456|bob>';
       const result = formatSlackText(text, mockCache);
-      expect(result).toBe('Hello @User One and @User Two');
+      expect(result).toBe('Hello @alice and @bob');
     });
 
     it('should use provided display name when user not in cache', () => {

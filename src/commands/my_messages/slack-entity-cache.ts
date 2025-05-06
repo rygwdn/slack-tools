@@ -58,7 +58,15 @@ async function fetchUser(userId: string, loadingContext: LoadingContext): Promis
 
   const userResponse = await loadingContext.client.users.info({ user: userId });
   if (!userResponse.ok || !userResponse.user) {
-    GlobalContext.log.warn(`Could not fetch info for DM user ${userId}:`, userResponse);
+    if (userResponse.error === 'user_not_found') {
+      loadingContext.cache.entities[userId] = {
+        displayName: '',
+        type: 'user',
+        isBot: false,
+      };
+    } else {
+      GlobalContext.log.warn(`Could not fetch info for DM user ${userId}:`, userResponse);
+    }
     return;
   }
 

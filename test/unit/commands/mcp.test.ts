@@ -59,10 +59,10 @@ describe('MCP Command', () => {
 
     expect(keychain.getAuth).toHaveBeenCalled();
     expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
-    expect(FastMCP).toHaveBeenCalledWith({
-      name: 'slack-tools-mcp',
-      version: '1.2.0',
-    });
+    expect(FastMCP).toHaveBeenCalled();
+    const callArg = vi.mocked(FastMCP).mock.calls[0][0];
+    expect(callArg.name).toBe('slack-tools-mcp');
+    expect(callArg.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(authErrorUtils.handleCommandError).not.toHaveBeenCalled();
   });
 

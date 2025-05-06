@@ -3,7 +3,7 @@ import { tool } from '../../types';
 import { generateSearchResultsMarkdown } from '../../services/formatting-service';
 import { getCacheForMessages } from '../my_messages/slack-entity-cache';
 import { createWebClient } from '../../slack-api';
-import { searchSlackMessages } from '../my_messages/slack-service';
+import { searchSlackMessages } from '../../services/slack-services';
 
 const queryDescription = `
 Search query with Slack search modifiers.

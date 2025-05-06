@@ -57,7 +57,7 @@ export function formatMessage(
   const timeString = formatTime(timestamp);
 
   let userName = message.username || 'Unknown User';
-  if (message.user && cache.entities[message.user]) {
+  if (message.user && cache.entities[message.user]?.displayName) {
     userName = cache.entities[message.user].displayName;
   }
 
@@ -126,7 +126,7 @@ export function getFriendlyChannelName(channelId: string, cache: SlackCache): st
   if (channel.type === 'im' && channel.members && channel.members.length > 0) {
     const otherUserId = channel.members[0];
     const otherUser = cache.entities[otherUserId];
-    const displayName = otherUser ? otherUser.displayName : channel.displayName;
+    const displayName = otherUser?.displayName || channel.displayName;
     return `DM with ${displayName}`;
   }
 
@@ -147,24 +147,27 @@ export function formatSlackText(text: string, cache: SlackCache): string {
   // Convert user mentions: <@U123ABC> -> @username
   // Also handle format with display name: <@U123ABC|display_name> -> @username
   text = text.replace(/<@([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, userId, displayName) => {
-    // If we have the user in cache, use their display name
-    const user = cache.entities[userId];
-    if (user) {
-      return `@${user.displayName}`;
-    }
-    // If not in cache but a display name was provided in the mention, use that
-    else if (displayName) {
+    if (displayName) {
       return `@${displayName}`;
     }
-    // Otherwise return the original match
+
+    const userDisplay = cache.entities[userId]?.displayName;
+    if (userDisplay) {
+      return `@${userDisplay}`;
+    }
+
     return match;
   });
 
   // Convert channel mentions: <#C123ABC> or <#C123ABC|channel-name> -> #channel-name
   text = text.replace(/<#([A-Z0-9]+)(?:\|([^>]+))?>/g, (match, channelId, channelName) => {
     if (channelName) return `#${channelName}`;
-    const channel = cache.entities[channelId];
-    return channel ? `#${channel.displayName}` : match;
+
+    const channelDisplay = cache.entities[channelId]?.displayName;
+    if (channelDisplay) {
+      return `#${channelDisplay}`;
+    }
+    return match;
   });
 
   // Convert links: <https://example.com|text> -> [text](https://example.com)
@@ -186,7 +189,6 @@ export function isValidThreadMessage(message: Match): message is ThreadMessage {
   return typeof message.ts === 'string';
 }
 
-// Function to extract thread_ts from permalink
 export function extractThreadTsFromPermalink(permalink?: string): string | undefined {
   if (!permalink) return undefined;
 
