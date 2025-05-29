@@ -12,7 +12,7 @@ const threadRepliesParams = z.object({
   ts: z
     .string()
     .describe(
-      'Unique identifier of either a thread’s parent message or a message in the thread. ts must be the timestamp of an existing message with 0 or more replies. If there are no replies then just the single message referenced by ts will return - it is just an ordinary, unthreaded message. convert TS to the form 1234567890.123456',
+      'Unique identifier of either a thread\'s parent message or a message in the thread. ts must be the timestamp of an existing message with 0 or more replies. If there are no replies then just the single message referenced by ts will return - it is just an ordinary, unthreaded message. convert TS to the form 1234567890.123456',
     ),
   limit: z
     .number()
@@ -43,7 +43,22 @@ export const threadRepliesTool = tool({
     const formattedReplies = result.replies.map((reply) => {
       const user = result.entities[reply.user ?? '']?.displayName || reply.user;
       const time = reply.ts ? new Date(parseInt(reply.ts) * 1000).toLocaleString() : 'Unknown time';
-      return `${user} - ${time}: ${reply.text}`;
+      let base = `${user} - ${time}: ${reply.text}`;
+
+      // Add context from attachments fields if present
+      if (Array.isArray(reply.attachments)) {
+        reply.attachments.forEach((attachment) => {
+          if (Array.isArray(attachment.fields)) {
+            attachment.fields.forEach((field) => {
+              if (field.title || field.value) {
+                base += `\n  *${field.title || ''}*: ${field.value || ''}`;
+              }
+            });
+          }
+        });
+      }
+
+      return base;
     });
 
     return objectToMarkdown({

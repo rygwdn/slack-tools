@@ -1,4 +1,4 @@
-import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
+import { Match, MatchBlock } from '@slack/web-api/dist/types/response/SearchMessagesResponse';
 import { GlobalContext } from '../context';
 import { SlackCache, ThreadMessage } from '../commands/my_messages/types';
 import { objectToMarkdown } from '../utils/markdown-utils';
@@ -47,6 +47,33 @@ export function generateSearchResultsMarkdown(
   });
 }
 
+
+function formatSlackBlocksToMarkdown(blocks: MatchBlock[]) {
+  return blocks.map(msg => {
+    // Format timestamp
+    let header = '';
+    let section = '';
+
+    if (Array.isArray(blocks)) {
+      for (const block of blocks) {
+        if (block.type === 'header' && block.text && block.text.text) {
+          header = block.text.text;
+        }
+        if (block.type === 'section' && block.text && block.text.text) {
+          section = block.text.text;
+        }
+      }
+    }
+
+    // Build markdown
+    return [
+      `### [${header || 'Message'}]`,
+      section ? `\n${section}` : '',
+      '---'
+    ].filter(Boolean).join('\n');
+  }).join('\n\n');
+}
+
 export function formatMessage(
   message: Match,
   cache: SlackCache,
@@ -64,7 +91,16 @@ export function formatMessage(
   const messageTs = message.ts || '';
   const permalink = message.permalink || '';
 
-  const formattedText = formatSlackText(message.text || '', cache);
+  // need to handle blocks as well
+  let messageText = '';
+
+  if (message.blocks && message.blocks.length > 0) {
+    messageText = formatSlackBlocksToMarkdown(message.blocks);
+  } else {
+    messageText = message.text || '';
+  }
+
+  const formattedText = formatSlackText(messageText, cache);
   const messageLines = formattedText.split('\n');
 
   let threadIndicator = '';

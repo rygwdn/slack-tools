@@ -111,6 +111,37 @@ describe('Formatting Service', () => {
       expect(earlierIndex).toBeLessThan(laterIndex);
     });
 
+    it('should format search results with blocks', () => {
+      const messages: Match[] = [
+        {
+          channel: { id: 'C123' },
+          ts: '1609459200.000000',
+          text: '',
+          permalink: 'https://slack.com/message/1',
+          blocks: [
+            {
+              type: 'header',
+              block_id: 'm2cmJ',
+              text: { type: 'plain_text', text: ':canary: Deploying to my server (canary)', emoji: true },
+            },
+            {
+              type: 'section',
+              block_id: '9Dggb',
+              text: { type: 'mrkdwn', text: 'Revision `8750b93` contains:\n- <@U03STEKTYLV>: Some cool code <https://github.com/Shopify/cool-code/pull/105498|#105498>', verbatim: false },
+            },
+          ],
+        },
+      ];
+
+      const result = generateSearchResultsMarkdown(messages, mockCache);
+
+      expect(result).toContain(':canary: Deploying to my server (canary)');
+      expect(result).toContain('Shopify/cool-code');
+      expect(result).toContain('Revision `8750b93` contains:');
+      expect(result).toContain('Some cool code');
+    });
+
+
     it('should handle messages without user data', () => {
       const messages: Match[] = [
         {

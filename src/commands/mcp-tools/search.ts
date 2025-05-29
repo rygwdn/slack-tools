@@ -8,6 +8,7 @@ import { searchSlackMessages } from '../../services/slack-services';
 const queryDescription = `
 Search query with Slack search modifiers.
 Available modifiers: in:<channel/user>, from:<user>, has:<emoji reaction>, is:thread, before:YYYY-MM-DD, after:YYYY-MM-DD, has:pin, with:<user>.
+Filtering by date is supported, but you cannot filter by a specific time.
 Identify users with "@me", "@display.name" or "<@U12345>".
 Identify channels with "#channel-name" or "<#C12345>".
 Exclude results with a dash (-) in front of the modifier.
