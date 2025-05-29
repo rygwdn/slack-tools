@@ -12,7 +12,7 @@ const threadRepliesParams = z.object({
   ts: z
     .string()
     .describe(
-      'Timestamp of the parent message in Unix epoch time format (e.g., "1234567890.123456")',
+      'Unique identifier of either a thread’s parent message or a message in the thread. ts must be the timestamp of an existing message with 0 or more replies. If there are no replies then just the single message referenced by ts will return - it is just an ordinary, unthreaded message. convert TS to the form 1234567890.123456',
     ),
   limit: z
     .number()
