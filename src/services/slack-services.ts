@@ -143,7 +143,7 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
       limit,
     });
 
-    const messages = response.messages?.filter((msg) => msg.ts !== ts) || [];
+    const messages = response.messages || [];
     GlobalContext.log.debug('Found replies:', messages.length);
 
     // Convert conversation replies to a format compatible with entity cache
@@ -259,6 +259,7 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
+  sort: 'asc' | 'desc'
 ): Promise<Match[]> {
   GlobalContext.log.debug(`Original search query: ${query}`);
 
@@ -268,7 +269,7 @@ export async function searchSlackMessages(
   const queryArgs: SearchMessagesArguments = {
     query: enhancedQuery,
     sort: 'timestamp',
-    sort_dir: 'asc',
+    sort_dir: sort,
     count: Math.min(100, count),
   };
 
