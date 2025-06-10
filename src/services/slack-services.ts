@@ -7,6 +7,7 @@ import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse
 import { formatDateForSearch, getDayAfter, getDayBefore } from '../utils/date-utils';
 import { enhanceSearchQuery } from '../utils/user-utils';
 import { SearchResult } from '../commands/my_messages/types';
+import { extractErrorDetails } from '../types/slack-errors';
 
 export function formatEmoji(emoji: string): string {
   if (!emoji) return '';
@@ -259,7 +260,7 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
-  sort: 'asc' | 'desc',
+  sort: 'asc' | 'desc' = 'desc',
 ): Promise<Match[]> {
   GlobalContext.log.debug(`Original search query: ${query}`);
 
@@ -292,4 +293,54 @@ export async function searchSlackMessages(
     cursor = paging && 'next_cursor' in paging ? (paging.next_cursor as string) : null;
   }
   return matches;
+}
+
+/**
+ * Fetch reactions for a single message
+ */
+export async function getMessageReactions(
+  client: WebClient,
+  channel: string,
+  timestamp: string,
+): Promise<Array<{ name: string; count: number; users: string[] }> | undefined> {
+  try {
+    GlobalContext.log.debug(`Fetching reactions for message in ${channel} at ${timestamp}`);
+
+    const response = await client.reactions.get({
+      channel,
+      timestamp,
+      full: true,
+    });
+
+    if (response.ok && response.type === 'message' && response.message?.reactions) {
+      // Filter and transform reactions to ensure all properties are defined
+      return response.message.reactions
+        .filter((reaction) => reaction.name && reaction.count && reaction.users)
+        .map((reaction) => ({
+          name: reaction.name!,
+          count: reaction.count!,
+          users: reaction.users!,
+        }));
+    }
+
+    return undefined;
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to fetch reactions for message: ${errorDetails.message}`);
+    return undefined;
+  }
 }

@@ -1,14 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as slackApi from '../../../src/slack-api';
+import * as userUtils from '../../../src/utils/user-utils';
 import {
   formatEmoji,
   calculateExpirationTime,
   setSlackStatus,
   getSlackStatus,
   getUserProfile,
+  getMessageReactions,
+  searchSlackMessages,
 } from '../../../src/services/slack-services';
+import { SlackAPIError } from '../../../src/types/slack-errors';
 
-vi.mock('../../../src/slack-api');
+vi.mock('../../../src/slack-api', () => ({
+  createWebClient: vi.fn(),
+}));
+
+vi.mock('../../../src/utils/user-utils', () => ({
+  enhanceSearchQuery: vi.fn(),
+}));
+
+vi.mock('../../../src/auth/keychain');
 
 describe('Slack Services', () => {
   let mockClient: any;
@@ -384,6 +396,339 @@ describe('Slack Services', () => {
       mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
 
       await expect(getUserProfile('U12345')).rejects.toThrow(/User profile retrieval failed/);
+    });
+  });
+
+  describe('getMessageReactions', () => {
+    beforeEach(() => {
+      // Setup mock client
+      mockClient = {
+        reactions: {
+          get: vi.fn(),
+        },
+      };
+
+      // Mock createWebClient to return our mockClient
+      vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+    });
+
+    it('should fetch reactions for a message', async () => {
+      mockClient.reactions.get.mockResolvedValueOnce({
+        ok: true,
+        type: 'message',
+        message: {
+          reactions: [
+            { name: 'thumbsup', count: 3, users: ['U1', 'U2', 'U3'] },
+            { name: 'heart', count: 1, users: ['U4'] },
+            { name: 'fire', count: 2, users: ['U5', 'U6'] },
+          ],
+        },
+      });
+
+      const result = await getMessageReactions(mockClient, 'C123456789', '1234567890.123456');
+
+      expect(mockClient.reactions.get).toHaveBeenCalledWith({
+        channel: 'C123456789',
+        timestamp: '1234567890.123456',
+        full: true,
+      });
+
+      expect(result).toEqual([
+        { name: 'thumbsup', count: 3, users: ['U1', 'U2', 'U3'] },
+        { name: 'heart', count: 1, users: ['U4'] },
+        { name: 'fire', count: 2, users: ['U5', 'U6'] },
+      ]);
+    });
+
+    it('should filter out reactions with missing properties', async () => {
+      mockClient.reactions.get.mockResolvedValueOnce({
+        ok: true,
+        type: 'message',
+        message: {
+          reactions: [
+            { name: 'thumbsup', count: 3, users: ['U1', 'U2', 'U3'] },
+            { name: undefined, count: 1, users: ['U4'] }, // Missing name
+            { name: 'heart', count: undefined, users: ['U5'] }, // Missing count
+            { name: 'fire', count: 2, users: undefined }, // Missing users
+            { name: 'star', count: 1, users: ['U6'] }, // Valid
+          ],
+        },
+      });
+
+      const result = await getMessageReactions(mockClient, 'C123', '123.456');
+
+      // Should only return reactions with all required properties
+      expect(result).toEqual([
+        { name: 'thumbsup', count: 3, users: ['U1', 'U2', 'U3'] },
+        { name: 'star', count: 1, users: ['U6'] },
+      ]);
+    });
+
+    it('should return undefined when no reactions exist', async () => {
+      mockClient.reactions.get.mockResolvedValueOnce({
+        ok: true,
+        type: 'message',
+        message: {
+          reactions: [],
+        },
+      });
+
+      const result = await getMessageReactions(mockClient, 'C123', '123.456');
+      expect(result).toEqual([]);
+    });
+
+    it('should return undefined when message has no reactions property', async () => {
+      mockClient.reactions.get.mockResolvedValueOnce({
+        ok: true,
+        type: 'message',
+        message: {},
+      });
+
+      const result = await getMessageReactions(mockClient, 'C123', '123.456');
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined when response is not ok', async () => {
+      mockClient.reactions.get.mockResolvedValueOnce({
+        ok: false,
+        error: 'message_not_found',
+      });
+
+      const result = await getMessageReactions(mockClient, 'C123', '123.456');
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle API errors gracefully', async () => {
+      mockClient.reactions.get.mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await getMessageReactions(mockClient, 'C123', '123.456');
+      expect(result).toBeUndefined();
+    });
+
+    it('should throw a specific error for rate limit responses', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 30,
+      };
+
+      mockClient.reactions.get.mockRejectedValueOnce(rateLimitError);
+
+      await expect(getMessageReactions(mockClient, 'C123', '123.456')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 30 seconds before trying again',
+      );
+    });
+
+    it('should use default retry time when not provided', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+      };
+
+      mockClient.reactions.get.mockRejectedValueOnce(rateLimitError);
+
+      await expect(getMessageReactions(mockClient, 'C123', '123.456')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 60 seconds before trying again',
+      );
+    });
+
+    it('should throw specific error for other Slack API errors', async () => {
+      const apiError = new Error('API Error') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'channel_not_found',
+      };
+
+      mockClient.reactions.get.mockRejectedValueOnce(apiError);
+
+      await expect(getMessageReactions(mockClient, 'C123', '123.456')).rejects.toThrow(
+        'SLACK_API_ERROR: channel_not_found',
+      );
+    });
+  });
+
+  describe('searchSlackMessages', () => {
+    beforeEach(() => {
+      // Setup mock client
+      mockClient = {
+        search: {
+          messages: vi.fn(),
+        },
+      };
+
+      // Mock createWebClient to return our mockClient
+      vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+
+      // Mock enhanceSearchQuery to return the query unchanged for simplicity
+      vi.mocked(userUtils.enhanceSearchQuery).mockImplementation((_client, query) =>
+        Promise.resolve(query),
+      );
+    });
+
+    it('should search messages with default sort order', async () => {
+      const mockMatches = [
+        {
+          channel: { id: 'C123' },
+          ts: '1234567890.123456',
+          text: 'Test message 1',
+          user: 'U123',
+        },
+        {
+          channel: { id: 'C123' },
+          ts: '1234567891.123456',
+          text: 'Test message 2',
+          user: 'U124',
+        },
+      ];
+
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: mockMatches,
+          paging: { count: 2, page: 1, pages: 1 },
+        },
+      });
+
+      const result = await searchSlackMessages(mockClient, 'test query', 10);
+
+      expect(mockClient.search.messages).toHaveBeenCalledWith({
+        query: 'test query',
+        sort: 'timestamp',
+        sort_dir: 'desc',
+        count: 10,
+        cursor: '*',
+      });
+
+      expect(result).toEqual(mockMatches);
+    });
+
+    it('should search messages with custom sort order', async () => {
+      const mockMatches = [{ channel: { id: 'C123' }, ts: '123.456', text: 'Test' }];
+
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: mockMatches,
+          paging: { count: 1, page: 1, pages: 1 },
+        },
+      });
+
+      await searchSlackMessages(mockClient, 'test', 5, 'asc');
+
+      expect(mockClient.search.messages).toHaveBeenCalledWith({
+        query: 'test',
+        sort: 'timestamp',
+        sort_dir: 'asc',
+        count: 5,
+        cursor: '*',
+      });
+    });
+
+    it('should handle pagination when more results are available', async () => {
+      // First page
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: [
+            { channel: { id: 'C1' }, ts: '1.1', text: 'Message 1' },
+            { channel: { id: 'C1' }, ts: '1.2', text: 'Message 2' },
+          ],
+          paging: {
+            count: 2,
+            page: 1,
+            pages: 2,
+            next_cursor: 'next_page_cursor',
+          },
+        },
+      });
+
+      // Second page
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: [{ channel: { id: 'C1' }, ts: '1.3', text: 'Message 3' }],
+          paging: {
+            count: 1,
+            page: 2,
+            pages: 2,
+          },
+        },
+      });
+
+      const result = await searchSlackMessages(mockClient, 'test', 5);
+
+      // Should have made two API calls
+      expect(mockClient.search.messages).toHaveBeenCalledTimes(2);
+
+      // First call with initial cursor
+      expect(mockClient.search.messages).toHaveBeenNthCalledWith(1, {
+        query: 'test',
+        sort: 'timestamp',
+        sort_dir: 'desc',
+        count: 5,
+        cursor: '*',
+      });
+
+      // Second call with next cursor
+      expect(mockClient.search.messages).toHaveBeenNthCalledWith(2, {
+        query: 'test',
+        sort: 'timestamp',
+        sort_dir: 'desc',
+        count: 5,
+        cursor: 'next_page_cursor',
+      });
+
+      // Should return all messages
+      expect(result).toHaveLength(3);
+    });
+
+    it('should respect count limit even with pagination', async () => {
+      // Mock multiple pages available but count limit reached
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: [
+            { channel: { id: 'C1' }, ts: '1.1', text: 'Message 1' },
+            { channel: { id: 'C1' }, ts: '1.2', text: 'Message 2' },
+          ],
+          paging: {
+            count: 2,
+            page: 1,
+            pages: 3,
+            next_cursor: 'next_cursor',
+          },
+        },
+      });
+
+      const result = await searchSlackMessages(mockClient, 'test', 2);
+
+      // Should only make one call since we reached the count limit
+      expect(mockClient.search.messages).toHaveBeenCalledTimes(1);
+      expect(result).toHaveLength(2);
+    });
+
+    it('should handle empty search results', async () => {
+      mockClient.search.messages.mockResolvedValueOnce({
+        messages: {
+          matches: [],
+          paging: { count: 0, page: 1, pages: 0 },
+        },
+      });
+
+      const result = await searchSlackMessages(mockClient, 'nonexistent', 10);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle API errors', async () => {
+      mockClient.search.messages.mockRejectedValueOnce(new Error('API Error'));
+
+      await expect(searchSlackMessages(mockClient, 'test', 10)).rejects.toThrow('API Error');
+    });
+
+    it('should handle missing messages property in response', async () => {
+      mockClient.search.messages.mockResolvedValueOnce({});
+
+      const result = await searchSlackMessages(mockClient, 'test', 10);
+
+      expect(result).toEqual([]);
     });
   });
 });

@@ -4,6 +4,7 @@ import { searchTool } from './search';
 import { reminderTool } from './reminders';
 import { threadRepliesTool } from './thread-replies';
 import { userProfileTool } from './user-profile';
+import { getReactionsTool } from './reactions';
 
 export const mcpTools = [
   myMessagesTool,
@@ -13,4 +14,5 @@ export const mcpTools = [
   reminderTool,
   threadRepliesTool,
   userProfileTool,
+  getReactionsTool,
 ];

@@ -2,9 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
 ## [Unreleased]
 
-## [1.2.1] - May 2025
+### Added
+- New `get-reactions` MCP tool to fetch emoji reactions for specific Slack messages
+- `getMessageReactions` function in slack-services.ts to fetch reactions using the Slack Web API
+- Comprehensive tests for the new reactions functionality and existing `searchSlackMessages` function
+- Rate limit detection and handling for Slack API calls with clear error messages
+- Rate limit warnings in the reactions tool output to inform users when they need to wait
+- Type-safe error handling utilities in `types/slack-errors.ts` to avoid using `any` type
+
+### Changed
+- Made `sort` parameter optional with default value 'desc' in `searchSlackMessages` function
+- Improved test coverage for slack-services.ts
+- Enhanced error handling in `getMessageReactions` to distinguish between rate limits and other errors
+- Improved type safety by replacing `any` types with proper TypeScript types and type guards
+
+## [1.2.1] - 2024-12-04
 
 ### Changed
 - Refactored authentication handling and improved error management
