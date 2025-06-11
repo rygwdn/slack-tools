@@ -113,7 +113,8 @@ export const getReactionsTool = tool({
       response.rate_limit_warning = {
         message: `⚠️ Slack API rate limit reached. Please wait ${rateLimitRetryAfter} seconds before making more requests.`,
         retry_after_seconds: String(rateLimitRetryAfter),
-        suggestion: 'Consider fetching reactions for fewer messages at a time or spacing out requests.',
+        suggestion:
+          'Consider fetching reactions for fewer messages at a time or spacing out requests.',
       };
     }
 
