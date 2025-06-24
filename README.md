@@ -1,6 +1,8 @@
 # Slack MCP
 
-A TypeScript library for interacting with Slack's local data, including token extraction from the desktop app and Model Context Protocol (MCP) support for AI assistants.
+An MCP (Model Context Protocol) server that enables AI assistants to interact with Slack using local user tokens extracted from the Slack desktop app.
+
+> **Note**: This is an internal Shopify fork of [rygwdn/slack-tools](https://github.com/rygwdn/slack-tools), originally created by @rygwdn (a Shopifolk). This fork simplifies internal development and usage at Shopify.
 
 ## Description
 
@@ -138,28 +140,28 @@ This project is built with TypeScript and is actively developed using AI-assiste
 
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. Run the CLI directly during development:
    ```bash
-   npm run cli -- <command>
+   pnpm run cli -- <command>
    ```
-   For example: `npm run cli -- mcp` or `npm run cli -- auth-from-app --store`
+   For example: `pnpm run cli -- mcp` or `pnpm run cli -- auth-from-app --store`
 
 
 ### Building and Testing
 
 ```bash
 # Run all checks in parallel (lint, format check, typecheck, test) and build
-npm run check
+pnpm run check
 
 # Or run individual tasks:
-npm run lint       # Check code style and potential errors
-npm run format     # Format code using Prettier
-npm run typecheck  # Check TypeScript types
-npm run test       # Run tests
-npm run build      # Build the project
+pnpm run lint       # Check code style and potential errors
+pnpm run format     # Format code using Prettier
+pnpm run typecheck  # Check TypeScript types
+pnpm run test       # Run tests
+pnpm run build      # Build the project
 ```
 
 ## License

@@ -1,8 +1,9 @@
 {
   "name": "slack-mcp",
   "description": "Tools for interacting with Slack's local data with Model Context Protocol support",
+  "type": "module",
   "bin": {
-    "slack-mcp": "dist/cli.mjs"
+    "slack-mcp": "dist/cli.js"
   },
   "scripts": {
     "cli": "tsx src/cli.ts",
@@ -18,7 +19,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "check": "npm-run-all --parallel lint format:check typecheck audit --serial test build",
-    "audit": "npm audit --production"
+    "audit": "pnpm audit --production"
   },
   "keywords": [
     "slack",

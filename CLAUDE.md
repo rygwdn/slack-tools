@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Test Commands
 
-- Check all: `npm run check` (runs lint, format check, typecheck, audit, tests, and build in parallel)
-- Build: `npm run build`
-- Lint: `npm run lint` (fix with `npm run lint:fix`)
-- Format: `npm run format` (check with `npm run format:check`)
-- Typecheck: `npm run typecheck`
-- Audit: `npm run audit` (security audit for production dependencies)
-- Test all: `npm run test`
-- Test coverage: `npm run test:coverage`
-- Start application: `npm run cli -- <command>`
+- Check all: `pnpm run check` (runs lint, format check, typecheck, audit, tests, and build in parallel)
+- Build: `pnpm run build`
+- Lint: `pnpm run lint` (fix with `pnpm run lint:fix`)
+- Format: `pnpm run format` (check with `pnpm run format:check`)
+- Typecheck: `pnpm run typecheck`
+- Audit: `pnpm run audit` (security audit for production dependencies)
+- Test all: `pnpm run test`
+- Test coverage: `pnpm run test:coverage`
+- Start application: `pnpm run cli -- <command>`
 
 ## Code Style Guidelines
 
@@ -25,4 +25,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Comments: Do not add comments to code unless absolutely necessary for clarity
 - Quality: All code must pass lint, format, and type checks before completion
 
-Always run quality checks (`npm run check`) before considering a task complete.
+Always run quality checks (`pnpm run check`) before considering a task complete.
