@@ -19,3 +19,9 @@ export async function getAuth(): Promise<SlackAuth> {
 
   return validateSlackAuth({ token, cookie });
 }
+
+export function hasAuth(): boolean {
+  const cookie = process.env.SLACK_COOKIE;
+  const token = process.env.SLACK_TOKEN;
+  return !!(cookie && token);
+}

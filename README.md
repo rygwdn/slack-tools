@@ -33,18 +33,18 @@ There are two ways to get your Slack credentials:
 
 2. **Extract from curl command:**
    ```bash
-   # Provide curl command as argument:
-   npx -y github:shopify-playground/slack-mcp auth-from-curl "curl -X POST https://slack.com/api/..."
-
-   # Or use interactive prompt:
-   npx -y github:shopify-playground/slack-mcp auth-from-curl
+   # Copy curl command to clipboard, then:
+   pbcopy | npx -y github:shopify-playground/slack-mcp auth-from-curl
+   
+   # On Windows:
+   Get-Clipboard | npx -y github:shopify-playground/slack-mcp auth-from-curl
    ```
    To get a curl command:
    1. In Chrome/Firefox, open Slack in your browser
    2. Open Developer Tools and go to the Network tab
    3. Perform any action (e.g., send a message or switch channels)
    4. Find a request to api.slack.com, right-click and select "Copy as cURL"
-   5. Paste the curl command as shown above (or paste into the interactive prompt)
+   5. Run the command above to pipe from clipboard
 
 ### Configuring Your MCP Client
 
@@ -71,6 +71,36 @@ Copy this configuration to your MCP client's configuration file:
 - **Other MCP Clients**: Refer to your client's documentation for configuration file location
 
 **Important**: The credentials are sensitive and should not be shared or committed to version control.
+
+## MCP Server Authentication
+
+The MCP server tests authentication credentials on startup. If credentials are missing or invalid, it provides a single tool to help guide configuration:
+
+```bash
+# Start MCP server
+npx -y github:shopify-playground/slack-mcp
+```
+
+### Available MCP Tools
+
+When authenticated (credentials valid):
+- **slack_search** - Search Slack messages using standard Slack search syntax
+- **slack_set_status** - Set your Slack status with optional emoji and expiration
+- **slack_get_status** - Get your current Slack status
+- **slack_create_reminder** - Create reminders in Slack
+- **slack_get_thread_replies** - Retrieve replies to a specific thread
+- **slack_my_messages** - Generate activity summaries for a date range
+- **slack_get_user_profile** - Get detailed user profile information
+
+When not authenticated (missing or invalid credentials):
+- **slack_configure_auth** - Provides instructions for the AI assistant to guide you through configuring Slack authentication
+
+The authentication tool helps the AI assistant guide you through:
+1. Obtaining credentials using the `auth-from-app` or `auth-from-curl` commands
+2. Configuring your MCP client with the credentials
+3. Restarting your MCP client to apply the changes
+
+**Note**: The AI assistant never sees your actual credentials - it only provides guidance on how to configure them.
 
 ## Available Commands
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getAuth } from '../../../src/auth/auth';
+import { getAuth, hasAuth } from '../../../src/auth/auth';
 import { validateSlackAuth } from '../../../src/slack-api';
 
 vi.mock('../../../src/slack-api', () => ({
@@ -61,6 +61,43 @@ describe('Auth', () => {
 
       await expect(getAuth()).rejects.toThrow('Authentication required');
       await expect(getAuth()).rejects.toThrow('MCP client');
+    });
+  });
+
+  describe('hasAuth', () => {
+    it('should return true when both environment variables are set', () => {
+      process.env.SLACK_COOKIE = 'xoxd-test-cookie';
+      process.env.SLACK_TOKEN = 'xoxc-test-token';
+
+      expect(hasAuth()).toBe(true);
+    });
+
+    it('should return false when SLACK_COOKIE is missing', () => {
+      delete process.env.SLACK_COOKIE;
+      process.env.SLACK_TOKEN = 'xoxc-test-token';
+
+      expect(hasAuth()).toBe(false);
+    });
+
+    it('should return false when SLACK_TOKEN is missing', () => {
+      process.env.SLACK_COOKIE = 'xoxd-test-cookie';
+      delete process.env.SLACK_TOKEN;
+
+      expect(hasAuth()).toBe(false);
+    });
+
+    it('should return false when both environment variables are missing', () => {
+      delete process.env.SLACK_COOKIE;
+      delete process.env.SLACK_TOKEN;
+
+      expect(hasAuth()).toBe(false);
+    });
+
+    it('should return false when environment variables are empty strings', () => {
+      process.env.SLACK_COOKIE = '';
+      process.env.SLACK_TOKEN = '';
+
+      expect(hasAuth()).toBe(false);
     });
   });
 });
