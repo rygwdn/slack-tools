@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { GlobalContext } from './context.js';
 import { SlackCache } from './commands/my_messages/types.js';
 
-const CONFIG_DIR = join(homedir(), '.slack-tools');
+const CONFIG_DIR = join(homedir(), '.slack-mcp');
 export const SLACK_CACHE_FILE = join(CONFIG_DIR, 'slack-cache.json');
 
 export const SLACK_CACHE_TTL = 24 * 60 * 60 * 1000;

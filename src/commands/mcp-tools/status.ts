@@ -22,6 +22,7 @@ export const setStatusTool = tool({
   name: 'slack_set_status',
   description: "Set the current user's Slack status, optionally with an emoji and duration.",
   parameters: setStatusParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: false,
@@ -42,6 +43,7 @@ export const getStatusTool = tool({
   name: 'slack_get_status',
   description: "Get the current user's Slack status including text, emoji, and expiration.",
   parameters: getStatusParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,

@@ -39,11 +39,11 @@ Please configure authentication using one of these methods:
    Store credentials securely using one of these commands:
 
    a) From Slack Desktop App (more reliable):
-      slack-tools-mcp auth-from-app --store
+      slack-mcp auth-from-app --store
 
    b) From Browser Network Request:
-      slack-tools-mcp auth-from-curl --store
+      slack-mcp auth-from-curl --store
 
-   See 'slack-tools-mcp auth-from-app --help' or 'slack-tools-mcp auth-from-curl --help' for details.
+   See 'slack-mcp auth-from-app --help' or 'slack-mcp auth-from-curl --help' for details.
 `.trim();
 }

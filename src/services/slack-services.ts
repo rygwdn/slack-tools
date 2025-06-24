@@ -238,15 +238,15 @@ export async function myMessages(
 
   const searchQuery = `from:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   GlobalContext.log.debug(`Search query: ${searchQuery}`);
-  const searchResults = await searchSlackMessages(client, searchQuery, count);
+  const searchResults = await searchSlackMessages(client, searchQuery, count, 'desc');
 
   const threadQuery = `is:thread with:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   GlobalContext.log.debug(`Thread query: ${threadQuery}`);
-  const threadResults = await searchSlackMessages(client, threadQuery, count);
+  const threadResults = await searchSlackMessages(client, threadQuery, count, 'desc');
 
   const mentionQuery = `to:@me after:${dayBeforeStartFormatted} before:${dayAfterEndFormatted}`;
   GlobalContext.log.debug(`Mention query: ${mentionQuery}`);
-  const mentionResults = await searchSlackMessages(client, mentionQuery, count);
+  const mentionResults = await searchSlackMessages(client, mentionQuery, count, 'desc');
 
   return {
     messages: searchResults,

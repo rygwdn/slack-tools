@@ -28,6 +28,7 @@ export const threadRepliesTool = tool({
   name: 'slack_get_thread_replies',
   description: 'Fetch replies for a specific message thread in a Slack channel.',
   parameters: threadRepliesParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,

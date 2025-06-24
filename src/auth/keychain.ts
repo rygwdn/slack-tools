@@ -2,7 +2,7 @@ import keytar from 'keytar';
 import { SlackAuth } from '../types.js';
 import { validateSlackAuth } from '../slack-api.js';
 
-const SERVICE_NAME = 'slack-tools';
+const SERVICE_NAME = 'slack-mcp';
 const TOKEN_KEY = 'slack-token';
 const COOKIE_KEY = 'slack-cookie';
 

@@ -1,0 +1,6 @@
+name: slack-mcp
+
+up:
+  - node:
+      version: 22.9.0
+      package_manager: pnpm@8.15.4

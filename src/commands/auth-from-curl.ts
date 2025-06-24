@@ -155,10 +155,10 @@ How to get a curl command:
   6. Paste the entire curl command after this command
 
 Examples:
-  npx -y github:rygwdn/slack-tools auth-from-curl --store "curl -X POST https://slack.com/api/..."
-  npx -y github:rygwdn/slack-tools auth-from-curl --store
+  npx -y github:rygwdn/slack-mcp auth-from-curl --store "curl -X POST https://slack.com/api/..."
+  npx -y github:rygwdn/slack-mcp auth-from-curl --store
   (This will prompt you to paste the curl command interactively)
-  cat curl-command.txt | npx -y github:rygwdn/slack-tools auth-from-curl --store
+  cat curl-command.txt | npx -y github:rygwdn/slack-mcp auth-from-curl --store
   (You can also pipe curl commands from a file or another command)
 
 Notes:

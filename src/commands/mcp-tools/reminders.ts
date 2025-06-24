@@ -15,6 +15,7 @@ export const reminderTool = tool({
   name: 'slack_create_reminder',
   description: 'Create a reminder in Slack for yourself.',
   parameters: reminderParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: false,

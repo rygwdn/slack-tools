@@ -1,4 +1,4 @@
-# Slack Tools MCP
+# Slack MCP
 
 A TypeScript library for interacting with Slack's local data, including token extraction from the desktop app and Model Context Protocol (MCP) support for AI assistants.
 
@@ -11,7 +11,7 @@ This tool provides programmatic access to the [Slack](https://slack.com/) ecosys
 No installation required! You can run the tool directly using npx with the npm package:
 
 ```bash
-npx -y slack-tools-mcp [options] [command]
+npx -y github:shopify-playground/slack-mcp [options] [command]
 ```
 
 ## Authentication
@@ -26,17 +26,17 @@ There are two ways to authenticate with Slack:
 
    - **Extract from Slack desktop app:**
      ```bash
-     npx -y slack-tools-mcp auth-from-app --store
+     npx -y github:shopify-playground/slack-mcp auth-from-app --store
      ```
      This will extract your Slack token and cookie directly from the Slack desktop app's local storage. **The Slack app must be closed while running this command.**
 
    - **Extract from curl command:**
      ```bash
      # Provide curl command as argument:
-     npx -y slack-tools-mcp auth-from-curl --store "curl -X POST https://slack.com/api/..."
+     npx -y github:shopify-playground/slack-mcp auth-from-curl --store "curl -X POST https://slack.com/api/..."
 
      # Or use interactive prompt:
-     npx -y slack-tools-mcp auth-from-curl --store
+     npx -y github:shopify-playground/slack-mcp auth-from-curl --store
      ```
      This extracts authentication from a Slack API curl command. You can get this by:
      1. In Chrome/Firefox, open Slack in your browser
@@ -74,8 +74,8 @@ This project is built with TypeScript and is actively developed using AI-assiste
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/rygwdn/slack-tools.git
-   cd slack-tools
+   git clone https://github.com/shopify-playground/slack-mcp.git
+   cd slack-mcp
    ```
 
 2. Install dependencies:

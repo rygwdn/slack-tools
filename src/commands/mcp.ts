@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
-import { version } from '../../package.json';
 import { mcpTools } from './mcp-tools/index';
 import { createWebClient } from '../slack-api';
 import { getAuth } from '../auth/keychain';
@@ -17,8 +16,8 @@ export function registerMcpCommand(program: Command): void {
         await createWebClient(auth);
 
         const server = new FastMCP({
-          name: 'slack-tools-mcp',
-          version: version as `${number}.${number}.${number}`,
+          name: 'slack-mcp',
+          version: '1.0.0',
         });
 
         for (const tool of mcpTools) {

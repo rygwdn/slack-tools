@@ -25,6 +25,7 @@ describe('auto-register-tools', () => {
       numParam: z.number().optional().describe('A number parameter'),
       boolParam: z.boolean().default(false).describe('A boolean parameter'),
     }),
+    timeoutMs: 30000,
     annotations: {},
     execute: vi.fn().mockResolvedValue('Test tool executed successfully'),
   });
@@ -33,6 +34,7 @@ describe('auto-register-tools', () => {
     name: 'simple_tool',
     description: 'A simple tool with no parameters',
     parameters: z.object({}),
+    timeoutMs: 30000,
     annotations: {},
     execute: vi.fn().mockResolvedValue('Simple tool executed'),
   });

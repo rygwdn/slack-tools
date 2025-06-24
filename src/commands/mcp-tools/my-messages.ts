@@ -26,6 +26,7 @@ export const myMessagesTool = tool({
   name: 'slack_my_messages',
   description: 'Fetch and summarize messages sent by the user in Slack within a given time range.',
   parameters: myMessagesParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,

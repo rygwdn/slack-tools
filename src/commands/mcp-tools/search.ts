@@ -32,6 +32,7 @@ export const searchTool = tool({
   description:
     'Perform a search in Slack using standard Slack search syntax and return matching messages.',
   parameters: searchParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,

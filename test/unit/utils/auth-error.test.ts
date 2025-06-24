@@ -86,8 +86,8 @@ describe('AuthError Utilities', () => {
       expect(message).toContain('export SLACK_TOKEN=xoxc-your-token');
       expect(message).toContain('export SLACK_COOKIE=xoxd-your-cookie');
       expect(message).toContain('2. System Keychain:');
-      expect(message).toContain('slack-tools-mcp auth-from-app --store');
-      expect(message).toContain('slack-tools-mcp auth-from-curl --store');
+      expect(message).toContain('slack-mcp auth-from-app --store');
+      expect(message).toContain('slack-mcp auth-from-curl --store');
     });
   });
 });

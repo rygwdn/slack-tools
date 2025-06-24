@@ -15,6 +15,7 @@ export const userProfileTool = tool({
   name: 'slack_get_user_profile',
   description: 'Fetch detailed profile information for a specific Slack user by their ID.',
   parameters: userProfileParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,

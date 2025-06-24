@@ -12,7 +12,7 @@ const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 
 const program = new Command();
 
 program
-  .name('slack-tools-mcp')
+  .name('slack-mcp')
   .description('CLI for extracting Slack tokens and cookies and making API calls with MCP support')
   .version(packageJson.version)
   .option('-d, --debug', 'Enable debug mode for detailed logging');
@@ -21,7 +21,7 @@ registerCommands(program);
 
 program.hook('preAction', async (thisCommand) => {
   const options = thisCommand.opts();
-  GlobalContext.debug = options.debug || process.env.SLACK_TOOLS_DEBUG === 'true';
+  GlobalContext.debug = options.debug || process.env.SLACK_MCP_DEBUG === 'true';
 });
 
 process.on('uncaughtException', (error) => {

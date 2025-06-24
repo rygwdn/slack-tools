@@ -35,7 +35,7 @@ vi.mock('../../../src/slack-api', async (importOriginal) => {
   };
 });
 
-const SERVICE_NAME = 'slack-tools'; // Corrected service name
+const SERVICE_NAME = 'slack-mcp'; // Corrected service name
 const COOKIE_KEY = 'slack-cookie';
 const TOKEN_KEY = 'slack-token';
 

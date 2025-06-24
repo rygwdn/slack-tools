@@ -1,9 +1,8 @@
 {
-  "name": "slack-tools-mcp",
-  "version": "1.2.1",
+  "name": "slack-mcp",
   "description": "Tools for interacting with Slack's local data with Model Context Protocol support",
   "bin": {
-    "slack-tools-mcp": "dist/cli.mjs"
+    "slack-mcp": "dist/cli.mjs"
   },
   "scripts": {
     "cli": "tsx src/cli.ts",
@@ -55,20 +54,15 @@
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.1.1"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
   "engines": {
     "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rygwdn/slack-tools.git"
+    "url": "git+https://github.com/shopify-playground/slack-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/rygwdn/slack-tools/issues"
+    "url": "https://github.com/shopify-playground/slack-mcp/issues"
   },
-  "homepage": "https://github.com/rygwdn/slack-tools#readme"
+  "homepage": "https://github.com/shopify-playground/slack-mcp#readme"
 }
