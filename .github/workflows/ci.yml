@@ -15,7 +15,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 8
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -23,20 +23,17 @@ jobs:
           node-version: 18
           cache: 'pnpm'
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Check formatting
-        run: npm run format:check
+        run: pnpm run format:check
 
       # Type checking is handled by the test runner
       # - name: Type check
 
       - name: Run tests
-        run: CI=true npm run test
+        run: CI=true pnpm run test
