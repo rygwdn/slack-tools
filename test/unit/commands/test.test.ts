@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as slackApi from '../../../src/slack-api';
-import * as keychain from '../../../src/auth/keychain';
+import * as auth from '../../../src/auth/auth';
 import { registerTestCommand } from '../../../src/commands/test';
 import { Command } from 'commander';
 import { SlackAuth } from '../../../src/types';
@@ -11,7 +11,7 @@ vi.mock('../../../src/slack-api', () => ({
   createWebClient: vi.fn(),
 }));
 
-vi.mock('../../../src/auth/keychain', () => ({
+vi.mock('../../../src/auth/auth', () => ({
   getAuth: vi.fn(),
 }));
 
@@ -47,7 +47,7 @@ describe('Test Command', () => {
         }),
       },
     };
-    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
+    vi.mocked(auth.getAuth).mockResolvedValue(mockAuth);
     vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
 
     // Mock console methods
@@ -106,7 +106,7 @@ describe('Test Command', () => {
     it('should call handleCommandError on authentication errors', async () => {
       // Mock API error (e.g., AuthError)
       const authFailureError = new authErrorUtils.AuthError('Invalid credentials');
-      vi.mocked(keychain.getAuth).mockRejectedValueOnce(authFailureError);
+      vi.mocked(auth.getAuth).mockRejectedValueOnce(authFailureError);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;
@@ -132,7 +132,7 @@ describe('Test Command', () => {
       const testApiError = new Error('Network Error');
       mockClient.auth.test.mockRejectedValueOnce(testApiError);
       vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
-      vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
+      vi.mocked(auth.getAuth).mockResolvedValue(mockAuth);
 
       // Setup command execution
       let actionCallback: ((options: any) => Promise<void>) | null = null;

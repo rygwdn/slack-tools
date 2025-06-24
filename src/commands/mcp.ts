@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
 import { mcpTools } from './mcp-tools/index';
 import { createWebClient } from '../slack-api';
-import { getAuth } from '../auth/keychain';
+import { getAuth } from '../auth/auth';
 import { handleCommandError } from '../utils/auth-error';
 
 export function registerMcpCommand(program: Command): void {

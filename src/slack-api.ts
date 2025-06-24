@@ -2,7 +2,7 @@ import { WebClient, LogLevel } from '@slack/web-api';
 import { SlackAuth } from './types.js';
 import { GlobalContext } from './context.js';
 import { redactLog } from './utils/log-utils.js';
-import { getAuth } from './auth/keychain.js';
+import { getAuth } from './auth/auth.js';
 import { AuthError } from './utils/auth-error.js';
 
 export async function createWebClient(auth?: SlackAuth): Promise<WebClient> {

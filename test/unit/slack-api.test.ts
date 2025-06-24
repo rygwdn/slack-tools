@@ -2,12 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import * as slackApi from '../../src/slack-api';
 import { GlobalContext } from '../../src/context';
 import { WebClient } from '@slack/web-api';
-import * as keychain from '../../src/auth/keychain';
 import { SlackAuth } from '../../src/types';
 import { AuthError } from '../../src/utils/auth-error';
 
 vi.mock('@slack/web-api');
-vi.mock('../../src/auth/keychain');
 
 const mockAuth: SlackAuth = { token: 'xoxc-test-token', cookie: 'xoxd-test-cookie' };
 
@@ -27,9 +25,6 @@ describe('Slack API Client', () => {
           },
         }) as any,
     );
-
-    vi.mocked(keychain.storeAuth).mockClear();
-    vi.mocked(keychain.clearStoredAuth).mockClear();
   });
 
   afterEach(() => {

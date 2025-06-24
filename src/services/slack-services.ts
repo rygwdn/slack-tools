@@ -259,7 +259,7 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
-  sort: 'asc' | 'desc'
+  sort: 'asc' | 'desc',
 ): Promise<Match[]> {
   GlobalContext.log.debug(`Original search query: ${query}`);
 

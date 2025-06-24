@@ -27,23 +27,19 @@ Authentication failed:
 
 ${error.message}
 
-Please configure authentication using one of these methods:
+Your MCP client needs to be configured with Slack credentials.
 
-1. Environment Variables:
-   Set the SLACK_TOKEN and SLACK_COOKIE environment variables:
-
-   export SLACK_TOKEN=xoxc-your-token
-   export SLACK_COOKIE=xoxd-your-cookie
-
-2. System Keychain:
-   Store credentials securely using one of these commands:
+1. Extract credentials using one of these commands:
 
    a) From Slack Desktop App (more reliable):
-      slack-mcp auth-from-app --store
+      npx -y github:shopify-playground/slack-mcp auth-from-app
 
    b) From Browser Network Request:
-      slack-mcp auth-from-curl --store
+      npx -y github:shopify-playground/slack-mcp auth-from-curl
 
-   See 'slack-mcp auth-from-app --help' or 'slack-mcp auth-from-curl --help' for details.
+2. Copy the JSON output to your MCP client's configuration file
+
+See 'npx -y github:shopify-playground/slack-mcp auth-from-app --help' or 
+'npx -y github:shopify-playground/slack-mcp auth-from-curl --help' for details.
 `.trim();
 }

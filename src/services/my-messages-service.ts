@@ -7,7 +7,7 @@ import { generateMarkdown } from '../commands/my_messages/formatters';
 import { saveSlackCache } from '../cache';
 import { Match } from '@slack/web-api/dist/types/response/SearchMessagesResponse.js';
 import { SlackCache } from '../commands/my_messages/types.js';
-import { getAuth } from '../auth/keychain';
+import { getAuth } from '../auth/auth';
 
 export interface MyMessagesOptions {
   count?: number;

@@ -1,5 +1,4 @@
 import { Command } from 'commander';
-import { storeAuth } from '../auth/keychain.js';
 import { getAvailableWorkspaces, WorkspaceInfo } from '../auth/token-extractor.js';
 import { fetchCookieFromApp } from '../auth/cookie-extractor.js';
 import { createWebClient } from '../slack-api.js';
@@ -12,7 +11,6 @@ export function registerAuthFromAppCommand(program: Command): void {
     .command('auth-from-app')
     .description('Extract and store Slack authentication directly from the Slack app')
     .option('-w, --workspace <workspace>', 'Specify Slack workspace name to extract token for')
-    .option('--store', 'Store the extracted auth in the system keychain for future use')
     .helpOption('-h, --help', 'Display help for command')
     .addHelpText(
       'after',
@@ -21,9 +19,8 @@ Notes:
   - The Slack desktop app must be CLOSED while running this command
   - If you're logged into multiple workspaces, you'll be prompted to select one
     (or use the --workspace option to specify directly)
-  - Use --store to save credentials in your system keychain
-  - Once stored, credentials will be automatically used for future commands
-  - The command will output the extracted token and cookie values for verification
+  - The command will output a valid MCP configuration
+  - Copy the JSON output to your MCP client's configuration file
 `,
     )
     .action(async (options) => {
@@ -47,16 +44,21 @@ Notes:
         const auth: SlackAuth = { token, cookie };
         await createWebClient(auth);
 
-        if (options.store) {
-          await storeAuth(auth);
-          GlobalContext.log.info('Credentials stored successfully.');
-        }
-
+        console.log('\nAuthentication extracted successfully!');
+        console.log('\nAdd this to your MCP client configuration:');
         console.log(
           JSON.stringify(
             {
-              SLACK_TOKEN: auth.token,
-              SLACK_COOKIE: auth.cookie,
+              mcpServers: {
+                'slack-mcp': {
+                  command: 'npx',
+                  args: ['-y', 'github:shopify-playground/slack-mcp'],
+                  env: {
+                    SLACK_TOKEN: auth.token,
+                    SLACK_COOKIE: auth.cookie,
+                  },
+                },
+              },
             },
             null,
             2,

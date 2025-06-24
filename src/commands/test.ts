@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getAuth } from '../auth/keychain';
+import { getAuth } from '../auth/auth';
 import { createWebClient } from '../slack-api';
 import { handleCommandError } from '../utils/auth-error';
 

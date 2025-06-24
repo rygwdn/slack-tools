@@ -9,7 +9,6 @@ import {
 } from '../../../src/services/slack-services';
 
 vi.mock('../../../src/slack-api');
-vi.mock('../../../src/auth/keychain');
 
 describe('Slack Services', () => {
   let mockClient: any;

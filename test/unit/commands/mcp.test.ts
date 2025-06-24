@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import { FastMCP } from 'fastmcp';
-import * as keychain from '../../../src/auth/keychain';
+import * as auth from '../../../src/auth/auth';
 import * as slackApi from '../../../src/slack-api';
 import { registerMcpCommand } from '../../../src/commands/mcp';
 import * as authErrorUtils from '../../../src/utils/auth-error';
@@ -9,7 +9,7 @@ import { SlackAuth } from '../../../src/types';
 
 // Mock dependencies
 vi.mock('fastmcp');
-vi.mock('../../../src/auth/keychain');
+vi.mock('../../../src/auth/auth');
 vi.mock('../../../src/slack-api');
 vi.mock('../../../src/commands/mcp-tools/index', () => ({ mcpTools: [] })); // Mock tools array
 vi.mock('../../../src/utils/auth-error', async (importOriginal) => {
@@ -30,7 +30,7 @@ describe('MCP Command', () => {
     vi.clearAllMocks();
     program = new Command();
     // Mock successful auth and client creation by default
-    vi.mocked(keychain.getAuth).mockResolvedValue(mockAuth);
+    vi.mocked(auth.getAuth).mockResolvedValue(mockAuth);
     vi.mocked(slackApi.createWebClient).mockResolvedValue({} as any); // Mock client object
     vi.mocked(FastMCP).mockClear(); // Clear constructor mock calls
 
@@ -57,7 +57,7 @@ describe('MCP Command', () => {
     expect(actionCallback).not.toBeNull();
     await actionCallback!();
 
-    expect(keychain.getAuth).toHaveBeenCalled();
+    expect(auth.getAuth).toHaveBeenCalled();
     expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
     expect(FastMCP).toHaveBeenCalled();
     const callArg = vi.mocked(FastMCP).mock.calls[0][0];
@@ -68,12 +68,12 @@ describe('MCP Command', () => {
 
   it('should call handleCommandError if getAuth fails', async () => {
     const authError = new authErrorUtils.AuthError('Keychain locked');
-    vi.mocked(keychain.getAuth).mockRejectedValueOnce(authError);
+    vi.mocked(auth.getAuth).mockRejectedValueOnce(authError);
 
     registerMcpCommand(program);
     await actionCallback!();
 
-    expect(keychain.getAuth).toHaveBeenCalled();
+    expect(auth.getAuth).toHaveBeenCalled();
     expect(slackApi.createWebClient).not.toHaveBeenCalled();
     expect(FastMCP).not.toHaveBeenCalled();
     expect(authErrorUtils.handleCommandError).toHaveBeenCalledWith(authError, program);
@@ -86,7 +86,7 @@ describe('MCP Command', () => {
     registerMcpCommand(program);
     await actionCallback!();
 
-    expect(keychain.getAuth).toHaveBeenCalled();
+    expect(auth.getAuth).toHaveBeenCalled();
     expect(slackApi.createWebClient).toHaveBeenCalledWith(mockAuth);
     expect(FastMCP).not.toHaveBeenCalled();
     expect(authErrorUtils.handleCommandError).toHaveBeenCalledWith(clientError, program);
