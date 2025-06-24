@@ -1,6 +1,8 @@
 # Slack MCP
 
-A TypeScript library for interacting with Slack's local data, including token extraction from the desktop app and Model Context Protocol (MCP) support for AI assistants.
+An MCP (Model Context Protocol) server that enables AI assistants to interact with Slack using local user tokens extracted from the Slack desktop app.
+
+> **Note**: This is an internal Shopify fork of [rygwdn/slack-tools](https://github.com/rygwdn/slack-tools), originally created by @rygwdn (a Shopifolk). This fork simplifies internal development and usage at Shopify.
 
 ## Description
 
