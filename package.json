@@ -28,7 +28,6 @@
     "model-context-protocol"
   ],
   "author": "rygwdn",
-  "license": "MIT",
   "dependencies": {
     "@slack/web-api": "^7.0.1",
     "commander": "^13.1.0",
