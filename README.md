@@ -90,6 +90,4 @@ pnpm run test       # Run tests
 pnpm run build      # Build the project
 ```
 
-## License
 
-MIT
