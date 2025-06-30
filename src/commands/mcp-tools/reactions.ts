@@ -31,6 +31,7 @@ export const getReactionsTool = tool({
   description:
     'Fetch emoji reactions for specific Slack messages. Requires channel ID and timestamp for each message.',
   parameters: reactionsParams,
+  timeoutMs: 30000,
   annotations: {
     openWorldHint: true,
     readOnlyHint: true,
