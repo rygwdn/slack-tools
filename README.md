@@ -14,12 +14,17 @@ Slack MCP requires authentication credentials to be configured in your MCP clien
 
 ### Getting Your Credentials
 
+> [!NOTE]
+> These commands should _ALWAYS_ output something, if there is no output then see the [Troubleshooting](#Troubleshooting) section.
+
 There are two ways to get your Slack credentials:
 
 1. **Extract from Slack desktop app:**
+
    ```bash
    npx -y github:shopify-playground/slack-mcp auth-from-app
    ```
+
    This will extract your Slack token and cookie directly from the Slack desktop app's local storage. **The Slack app must be closed while running this command.**
 
 2. **Extract from the Slack website:**
@@ -57,7 +62,6 @@ Copy this configuration to your MCP client:
 > [!WARNING]
 > The credentials are sensitive and should not be shared or committed to version control.
 
-
 ### Available MCP Tools
 
 - **slack_search** - Search Slack messages using standard Slack search syntax
@@ -68,6 +72,22 @@ Copy this configuration to your MCP client:
 - **slack_my_messages** - Generate activity summaries for a date range
 - **slack_get_user_profile** - Get detailed user profile information
 
+## Troubleshooting
+
+### Troubleshooting: No Output from Auth Commands
+
+If the auth commands don't produce any output, there may be an access issue. Test your access with:
+
+```bash
+# Check repository access (exit code 128 means access denied)
+bash -c 'npx -y github:shopify-playground/slack-mcp --version >/dev/null || echo $?'
+```
+
+**If you see "128":** This indicates one of two issues:
+- You don't have access to the github org
+- Your GitHub token doesn't have the necessary permissions
+
+Follow the [GitHub access instructions on Vault](https://vault.shopify.io/page/GitHub-Organizations---Access~idk.md) to resolve both issues.
 
 ## Available Commands
 
@@ -89,5 +109,3 @@ pnpm run typecheck  # Check TypeScript types
 pnpm run test       # Run tests
 pnpm run build      # Build the project
 ```
-
-
