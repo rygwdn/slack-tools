@@ -53,14 +53,38 @@ Both authentication commands will output a JSON configuration that looks like th
 }
 ```
 
-Copy this configuration to your MCP client:
-
-- **Claude Code**: Run `claude mcp add-json --scope local slack '<json config here>'` (replace `<json config here>` with the JSON output from the auth command)
-- **Cursor**: Add to `~/.cursor/mcp.json` for global access or `.cursor/mcp.json` in your project directory for project-specific access
-- **Other MCP Clients**: Refer to your client's documentation for configuration
-
 > [!WARNING]
 > The credentials are sensitive and should not be shared or committed to version control.
+
+Copy this configuration to your MCP client.
+
+#### Claude Code
+
+Run `claude mcp add-json --scope local slack '<json config here>'` (replace `<json config here>` with the slack-mcp JSON output from the auth command).
+
+```bash
+claude mcp add-json --scope local slack '{
+  "command": "npx",
+  "args": ["-y", "github:shopify-playground/slack-mcp"],
+  "env": {
+    "SLACK_TOKEN": "xoxc-your-token-here",
+    "SLACK_COOKIE": "xoxd-your-cookie-here"
+  }'
+```
+
+This should output `Added stdio MCP server slack to local config`.
+
+Run `claude` and try `What is my Slack username?`.
+
+#### Cursor
+
+Create/add the JSON configuration to `~/.cursor/mcp.json` for global access, or `.cursor/mcp.json` in your project directory for project-specific access.
+
+The Composer Agent automatically uses MCP tools listed under Available Tools when relevant. Try `What is my Slack username?` and choose `Run Tool` when offered to execute `slack_search`.
+
+#### Other MCP Clients
+
+Refer to your client's documentation for configuration
 
 ### Available MCP Tools
 
