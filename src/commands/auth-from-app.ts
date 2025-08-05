@@ -4,6 +4,7 @@ import { fetchCookieFromApp } from '../auth/cookie-extractor.js';
 import { createWebClient } from '../slack-api.js';
 import { GlobalContext } from '../context.js';
 import { SlackAuth } from '../types.js';
+import { displayAuthConfiguration } from '../utils/auth-config-display.js';
 import readline from 'node:readline/promises';
 
 export function registerAuthFromAppCommand(program: Command): void {
@@ -44,26 +45,7 @@ Notes:
         const auth: SlackAuth = { token, cookie };
         await createWebClient(auth);
 
-        console.log('\nAuthentication extracted successfully!');
-        console.log('\nAdd this to your MCP client configuration:');
-        console.log(
-          JSON.stringify(
-            {
-              mcpServers: {
-                'slack-mcp': {
-                  command: 'npx',
-                  args: ['-y', 'github:shopify-playground/slack-mcp'],
-                  env: {
-                    SLACK_TOKEN: auth.token,
-                    SLACK_COOKIE: auth.cookie,
-                  },
-                },
-              },
-            },
-            null,
-            2,
-          ),
-        );
+        displayAuthConfiguration(auth);
       } catch (error) {
         program.error(`Authentication extraction failed. ${(error as Error).message}`);
       }

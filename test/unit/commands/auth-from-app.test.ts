@@ -91,14 +91,12 @@ describe('Auth From App Command', () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
-          mcpServers: {
-            'slack-mcp': {
-              command: 'npx',
-              args: ['-y', 'github:shopify-playground/slack-mcp'],
-              env: {
-                SLACK_TOKEN: 'xoxc-test-token',
-                SLACK_COOKIE: 'xoxd-test-cookie',
-              },
+          'slack-mcp': {
+            command: 'npx',
+            args: ['-y', 'github:shopify-playground/slack-mcp'],
+            env: {
+              SLACK_TOKEN: 'xoxc-test-token',
+              SLACK_COOKIE: 'xoxd-test-cookie',
             },
           },
         },
@@ -106,6 +104,11 @@ describe('Auth From App Command', () => {
         2,
       ),
     );
+    expect(consoleSpy).toHaveBeenCalledWith('\nOr add to Claude Code:');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'claude mcp add slack-mcp -e SLACK_TOKEN="xoxc-test-token" -e SLACK_COOKIE="xoxd-test-cookie" -- npx -y github:shopify-playground/slack-mcp',
+    );
+    expect(consoleSpy).toHaveBeenCalledWith('\nOr add to Cursor with one click:');
     expect(errorSpy).not.toHaveBeenCalled();
   });
 

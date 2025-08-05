@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { GlobalContext } from '../context.js';
 import { createWebClient, validateSlackAuth } from '../slack-api.js';
 import { SlackAuth } from '../types.js';
+import { displayAuthConfiguration } from '../utils/auth-config-display.js';
 import * as readline from 'readline';
 
 async function readStdin(): Promise<string> {
@@ -188,26 +189,7 @@ Notes:
 
         const validAuth = await findValidAuth(authCombinations);
 
-        console.log('\nAuthentication extracted successfully!');
-        console.log('\nAdd this to your MCP client configuration:');
-        console.log(
-          JSON.stringify(
-            {
-              mcpServers: {
-                'slack-mcp': {
-                  command: 'npx',
-                  args: ['-y', 'github:shopify-playground/slack-mcp'],
-                  env: {
-                    SLACK_TOKEN: validAuth.token,
-                    SLACK_COOKIE: validAuth.cookie,
-                  },
-                },
-              },
-            },
-            null,
-            2,
-          ),
-        );
+        displayAuthConfiguration(validAuth);
       } catch (error) {
         program.error(`Authentication extraction failed. ${(error as Error).message}`);
       }
