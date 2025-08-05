@@ -9,7 +9,7 @@ import readline from 'node:readline/promises';
 
 export function registerAuthFromAppCommand(program: Command): void {
   program
-    .command('auth-from-app')
+    .command('auth-from-app', { hidden: true })
     .description('Extract and store Slack authentication directly from the Slack app')
     .option('-w, --workspace <workspace>', 'Specify Slack workspace name to extract token for')
     .helpOption('-h, --help', 'Display help for command')

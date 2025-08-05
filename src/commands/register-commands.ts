@@ -3,13 +3,13 @@ import { registerTestCommand } from './test';
 import { registerMcpCommand } from './mcp';
 import { registerToolAsCommand } from './auto-register-tools';
 import { mcpTools } from './mcp-tools';
-import { registerAuthFromCurlCommand } from './auth-from-curl';
+import { registerAuthCommand } from './auth';
 import { registerAuthFromAppCommand } from './auth-from-app';
 
 export function registerCommands(program: Command): void {
   registerTestCommand(program);
   registerMcpCommand(program);
-  registerAuthFromCurlCommand(program);
+  registerAuthCommand(program);
   registerAuthFromAppCommand(program);
 
   for (const tool of mcpTools) {
