@@ -23,7 +23,7 @@ export function displayAuthConfiguration(auth: SlackAuth): void {
   );
 
   // Generate Cursor installation link
-  const encodedConfig = Buffer.from(JSON.stringify(serverConfig)).toString('base64');
+  const encodedConfig = Buffer.from(JSON.stringify(serverConfig['slack-mcp'])).toString('base64');
   const cursorUrl = `cursor://anysphere.cursor-deeplink/mcp/install?name=slack-mcp&config=${encodedConfig}`;
   console.log('\nOr add to Cursor with one click:');
   console.log(cursorUrl);
