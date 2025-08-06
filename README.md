@@ -12,73 +12,98 @@ Slack MCP requires authentication credentials to be configured in your MCP clien
 - `SLACK_TOKEN` - Your Slack token (starts with `xoxc-`)
 - `SLACK_COOKIE` - Your Slack cookie (starts with `xoxd-`)
 
-### Getting Your Credentials
+### Step 1: Get Your Credentials
 
-> [!NOTE]
-> These commands should _ALWAYS_ output something, if there is no output then see the [Troubleshooting](#Troubleshooting) section.
+1. **Open Slack in Chrome**
+   - Go to your Slack workspace in Chrome (e.g., yourworkspace.slack.com)
+   - Make sure you're logged in and can see your channels
 
-There are two ways to get your Slack credentials:
+2. **Open Developer Tools**
+   - Press F12 on your keyboard, OR
+   - Right-click anywhere on the page and select "Inspect"
+   - Developer Tools window will open at the bottom or side of your screen
 
-1. **Extract from Slack desktop app:**
+3. **Go to Network Tab**
+   - In the Developer Tools window, click the "Network" tab
+   - You should see a mostly empty area with columns like "Name", "Status", "Type", etc.
 
+4. **Perform an Action in Slack**
+   - Do any of these actions in Slack:
+     - Send a message in any channel
+     - Switch to a different channel
+     - Click on a user's profile
+     - Search for something
+   - You should see network requests start appearing in the Network tab
+
+5. **Find a Slack API Request**
+   - Look for requests that start with `api.slack.com`, `edgeapi.slack.com`, or `shopify.enterprise.slack.com/api`
+   - You might see several - any one will work
+   - Examples: `list?_x_app_name=client...`, `info?_x_app_name=client...`
+
+6. **Copy the Request**
+   - Right-click on the request
+   - Select "Copy as cURL" from the menu
+   - This copies a long command to your clipboard
+
+### Step 2: Extract Your Credentials
+
+1. **Open Terminal**
+   - Press Cmd + Space, type "Terminal", press Enter
+
+2. **Run the Extraction Command**
    ```bash
-   npx -y github:shopify-playground/slack-mcp auth-from-app
+   # Pipe from clipboard (macOS)
+   pbpaste | npx -y github:shopify-playground/slack-mcp auth
+   
+   # Or interactive mode - paste curl when prompted
+   npx -y github:shopify-playground/slack-mcp auth
    ```
 
-   This will extract your Slack token and cookie directly from the Slack desktop app's local storage. **The Slack app must be closed while running this command.**
+3. **Check the Results**
+   
+   The command will output:
+   - Your MCP configuration in JSON format
+   - A ready-to-use Claude Code command
+   - A one-click Cursor installation link
+   
+   > [!NOTE]
+   > If this command outputs _nothing_ then see [Troubleshooting](#Troubleshooting)
 
-2. **Extract from the Slack website:**
-   1. Open Slack in Chrome
-   2. Open Developer Tools and go to the Network tab
-   3. Perform any action (e.g., send a message or switch channels)
-   4. Find a request to api.slack.com, right-click and select "Copy as cURL"
-   5. Run this command in a terminal to parse the curl command from the clipboard: `pbpaste | npx -y github:shopify-playground/slack-mcp auth-from-curl`
+### Step 3: Add to Your Client
 
-### Configuring Your MCP Client
-
-Both authentication commands will output a JSON configuration that looks like this:
-
-```json
-{
-  "mcpServers": {
-    "slack-mcp": {
-      "command": "npx",
-      "args": ["-y", "github:shopify-playground/slack-mcp"],
-      "env": {
-        "SLACK_TOKEN": "xoxc-your-token-here",
-        "SLACK_COOKIE": "xoxd-your-cookie-here"
-      }
-    }
-  }
-}
-```
+Follow the instructions below for your MCP client of choice. The auth command provides everything you need:
 
 > [!WARNING]
 > The credentials are sensitive and should not be shared or committed to version control.
 
-Copy this configuration to your MCP client.
-
 #### Claude Code
 
-Run `claude mcp add-json --scope local slack '<json config here>'` (replace `<json config here>` with the slack-mcp JSON output from the auth command).
+The auth command outputs a ready-to-use Claude Code command. Simply copy and run it:
 
 ```bash
-claude mcp add-json --scope local slack '{
+claude mcp add slack-mcp -e SLACK_TOKEN="xoxc-your-token" -e SLACK_COOKIE="xoxd-your-cookie" -- npx -y github:shopify-playground/slack-mcp
+```
+
+Or manually add with the JSON configuration:
+
+```bash
+claude mcp add-json --scope local slack-mcp '{
   "command": "npx",
   "args": ["-y", "github:shopify-playground/slack-mcp"],
   "env": {
     "SLACK_TOKEN": "xoxc-your-token-here",
     "SLACK_COOKIE": "xoxd-your-cookie-here"
-  }'
+  }
+}'
 ```
 
-This should output `Added stdio MCP server slack to local config`.
-
-Run `claude` and try `What is my Slack username?`.
+After installation, run `claude` and try `What is my Slack username?`.
 
 #### Cursor
 
-Create/add the JSON configuration to `~/.cursor/mcp.json` for global access, or `.cursor/mcp.json` in your project directory for project-specific access.
+The auth command provides a one-click installation link for Cursor. Simply click the link in the output.
+
+Alternatively, manually add the JSON configuration to `~/.cursor/mcp.json` for global access, or `.cursor/mcp.json` in your project directory for project-specific access.
 
 The Composer Agent automatically uses MCP tools listed under Available Tools when relevant. Try `What is my Slack username?` and choose `Run Tool` when offered to execute `slack_search`.
 
@@ -115,8 +140,7 @@ Follow the [GitHub access instructions on Vault](https://vault.shopify.io/page/G
 
 ## Available Commands
 
-- **auth-from-app** - Extract Slack credentials from the desktop app
-- **auth-from-curl** - Extract Slack credentials from a curl command
+- **auth** - Extract Slack credentials from a curl command (interactive or piped)
 - **test** - Test your authentication with Slack API
 - **mcp** - Start a Model Context Protocol server for AI assistants with Slack tools
 

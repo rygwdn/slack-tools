@@ -1,10 +1,10 @@
 import { Command, ErrorOptions } from 'commander';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  registerAuthFromCurlCommand,
+  registerAuthCommand,
   extractAuthFromCurl,
   findValidAuth,
-} from '../../../src/commands/auth-from-curl';
+} from '../../../src/commands/auth';
 import { createWebClient, validateSlackAuth } from '../../../src/slack-api';
 
 vi.mock('@slack/web-api', () => ({
@@ -144,7 +144,7 @@ describe('Auth From Curl Command', () => {
     vi.clearAllMocks();
     program = new Command();
     program.exitOverride();
-    registerAuthFromCurlCommand(program);
+    registerAuthCommand(program);
 
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(program, 'error').mockImplementation((message: string, _options?: ErrorOptions) => {
@@ -156,8 +156,9 @@ describe('Auth From Curl Command', () => {
     vi.restoreAllMocks();
   });
 
-  it('should register the auth-from-curl command', () => {
-    const command = program.commands.find((cmd) => cmd.name() === 'auth-from-curl');
-    expect(command).toBeDefined();
+  it('should register the auth-from-curl command as an alias', () => {
+    const authCommand = program.commands.find((cmd) => cmd.name() === 'auth');
+    expect(authCommand).toBeDefined();
+    expect(authCommand?.aliases()).toContain('auth-from-curl');
   });
 });

@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { GlobalContext } from '../context.js';
 import { createWebClient, validateSlackAuth } from '../slack-api.js';
 import { SlackAuth } from '../types.js';
+import { displayAuthConfiguration } from '../utils/auth-config-display.js';
 import * as readline from 'readline';
 
 async function readStdin(): Promise<string> {
@@ -135,9 +136,10 @@ export async function findValidAuth(authCombinations: SlackAuth[]): Promise<Slac
   );
 }
 
-export function registerAuthFromCurlCommand(program: Command): void {
+export function registerAuthCommand(program: Command): void {
   program
-    .command('auth-from-curl [curlCommand...]')
+    .command('auth [curlCommand...]')
+    .alias('auth-from-curl')
     .description('Extract and store Slack authentication from a curl command')
     .helpOption('-h, --help', 'Display help for command')
     .allowUnknownOption(true) // Allow unknown options to support curl command flags
@@ -153,10 +155,10 @@ How to get a curl command:
   6. Paste the entire curl command after this command
 
 Examples:
-  npx -y github:rygwdn/slack-mcp auth-from-curl "curl -X POST https://slack.com/api/..."
-  npx -y github:rygwdn/slack-mcp auth-from-curl
+  npx -y github:shopify-playground/slack-mcp auth "curl -X POST https://slack.com/api/..."
+  npx -y github:shopify-playground/slack-mcp auth
   (This will prompt you to paste the curl command interactively)
-  cat curl-command.txt | npx -y github:rygwdn/slack-mcp auth-from-curl
+  cat curl-command.txt | npx -y github:shopify-playground/slack-mcp auth
   (You can also pipe curl commands from a file or another command)
 
 Notes:
@@ -164,8 +166,7 @@ Notes:
   - Tokens can be extracted from either Authorization headers or form data
   - If no curl command is provided, you will be prompted to enter it interactively
   - Multi-line curl commands are supported (use backslash at end of line for continuation)
-  - The command will output a valid MCP configuration
-  - Copy the JSON output to your MCP client's configuration file
+  - The command will output installation instructions for various MCP clients
 `,
     )
     .action(async (curlArgs, _options) => {
@@ -188,26 +189,7 @@ Notes:
 
         const validAuth = await findValidAuth(authCombinations);
 
-        console.log('\nAuthentication extracted successfully!');
-        console.log('\nAdd this to your MCP client configuration:');
-        console.log(
-          JSON.stringify(
-            {
-              mcpServers: {
-                'slack-mcp': {
-                  command: 'npx',
-                  args: ['-y', 'github:shopify-playground/slack-mcp'],
-                  env: {
-                    SLACK_TOKEN: validAuth.token,
-                    SLACK_COOKIE: validAuth.cookie,
-                  },
-                },
-              },
-            },
-            null,
-            2,
-          ),
-        );
+        displayAuthConfiguration(validAuth);
       } catch (error) {
         program.error(`Authentication extraction failed. ${(error as Error).message}`);
       }
