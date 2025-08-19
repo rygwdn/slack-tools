@@ -46,16 +46,17 @@ export const getReactionsTool = tool({
     let rateLimitEncountered = false;
     let rateLimitRetryAfter = 0;
 
-    // Fetch reactions in parallel for better performance
-    const reactionPromises = messages.map(async (msg: z.infer<typeof messageIdentifier>) => {
+    // Fetch reactions sequentially to reduce rate limit issues
+    const results: ReactionResult[] = [];
+    for (const msg of messages) {
       try {
         const reactions = await getMessageReactions(client, msg.channel, msg.timestamp);
-        return {
+        results.push({
           channel: msg.channel,
           timestamp: msg.timestamp,
           reactions,
           error: undefined,
-        };
+        });
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -68,16 +69,14 @@ export const getReactionsTool = tool({
           }
         }
 
-        return {
+        results.push({
           channel: msg.channel,
           timestamp: msg.timestamp,
           reactions: undefined,
           error: errorMessage,
-        };
+        });
       }
-    });
-
-    const results = await Promise.all(reactionPromises);
+    }
 
     // Count successes and errors
     const successCount = results.filter((r: ReactionResult) => r.reactions !== undefined).length;

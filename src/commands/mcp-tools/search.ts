@@ -24,7 +24,11 @@ const searchParams = z.object({
     .optional()
     .default(100)
     .describe('Maximum number of results to return (1-1000). Default is 100.'),
-  sort: z.string().describe('Timestamp sort order, can be `asc` or `desc`'),
+  sort: z
+    .enum(['asc', 'desc'])
+    .optional()
+    .default('desc')
+    .describe('Timestamp sort order. Default is desc (newest first).'),
 });
 
 export const searchTool = tool({

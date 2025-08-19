@@ -71,8 +71,24 @@ export async function setSlackStatus(text: string, emoji?: string, durationMinut
       emoji: formattedEmoji,
       expirationTime: expirationTime ? new Date(expirationTime * 1000).toISOString() : null,
     };
-  } catch (error) {
-    throw new Error(`Status update failed: ${error}`);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to set status: ${errorDetails.message}`);
+    throw new Error(`Status update failed: ${errorDetails.message}`);
   }
 }
 
@@ -93,8 +109,24 @@ export async function getSlackStatus() {
         ? new Date(Number(userProfile.profile.status_expiration) * 1000).toISOString()
         : null,
     };
-  } catch (error) {
-    throw new Error(`Status retrieval failed: ${error}`);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to get status: ${errorDetails.message}`);
+    throw new Error(`Status retrieval failed: ${errorDetails.message}`);
   }
 }
 
@@ -119,8 +151,24 @@ export async function createSlackReminder(text: string, time: string) {
       success: true,
       reminder: response.reminder,
     };
-  } catch (error) {
-    throw new Error(`Reminder creation failed: ${error}`);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to create reminder: ${errorDetails.message}`);
+    throw new Error(`Reminder creation failed: ${errorDetails.message}`);
   }
 }
 
@@ -165,8 +213,24 @@ export async function getSlackThreadReplies(channel: string, ts: string, limit?:
       replies: messages,
       entities: cache.entities,
     };
-  } catch (error) {
-    throw new Error(`Getting thread replies failed: ${error}`);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to get thread replies: ${errorDetails.message}`);
+    throw new Error(`Getting thread replies failed: ${errorDetails.message}`);
   }
 }
 
@@ -221,8 +285,24 @@ export async function getUserProfile(userId: string) {
         ? new Date(Number(userInfo.user.updated) * 1000).toISOString()
         : null,
     };
-  } catch (error) {
-    throw new Error(`User profile retrieval failed: ${error}`);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
+    }
+
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
+
+    GlobalContext.log.warn(`Failed to get user profile: ${errorDetails.message}`);
+    throw new Error(`User profile retrieval failed: ${errorDetails.message}`);
   }
 }
 
@@ -260,39 +340,59 @@ export async function searchSlackMessages(
   client: WebClient,
   query: string,
   count: number,
-  sort: 'asc' | 'desc' = 'desc',
+  sort: 'asc' | 'desc',
 ): Promise<Match[]> {
-  GlobalContext.log.debug(`Original search query: ${query}`);
+  try {
+    GlobalContext.log.debug(`Original search query: ${query}`);
 
-  const enhancedQuery = await enhanceSearchQuery(client, query);
-  GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
+    const enhancedQuery = await enhanceSearchQuery(client, query);
+    GlobalContext.log.debug(`Executing search with enhanced query: ${enhancedQuery}`);
 
-  const queryArgs: SearchMessagesArguments = {
-    query: enhancedQuery,
-    sort: 'timestamp',
-    sort_dir: sort,
-    count: Math.min(100, count),
-  };
+    const queryArgs: SearchMessagesArguments = {
+      query: enhancedQuery,
+      sort: 'timestamp',
+      sort_dir: sort,
+      count: Math.min(100, count),
+    };
 
-  const matches: Match[] = [];
+    const matches: Match[] = [];
 
-  let cursor: string | null = '*';
-  while (matches.length < count && cursor) {
-    const searchResults = await client.search.messages({
-      ...queryArgs,
-      cursor,
-    } as SearchMessagesArguments);
+    let cursor: string | null = '*';
+    while (matches.length < count && cursor) {
+      const searchResults = await client.search.messages({
+        ...queryArgs,
+        cursor,
+      } as SearchMessagesArguments);
 
-    if (!searchResults.messages?.matches?.length) {
-      break;
+      if (!searchResults.messages?.matches?.length) {
+        break;
+      }
+
+      matches.push(...searchResults.messages.matches);
+
+      const paging = searchResults.messages.paging;
+      cursor = paging && 'next_cursor' in paging ? (paging.next_cursor as string) : null;
+    }
+    return matches;
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+
+    // Check if this is a rate limit error
+    if (errorDetails.isRateLimit) {
+      const retryAfter = errorDetails.retryAfter || 60;
+      GlobalContext.log.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+      throw new Error(`RATE_LIMITED: Please wait ${retryAfter} seconds before trying again`);
     }
 
-    matches.push(...searchResults.messages.matches);
+    // Check for other known Slack API errors
+    if (errorDetails.slackError) {
+      GlobalContext.log.warn(`Slack API error: ${errorDetails.slackError}`);
+      throw new Error(`SLACK_API_ERROR: ${errorDetails.slackError}`);
+    }
 
-    const paging = searchResults.messages.paging;
-    cursor = paging && 'next_cursor' in paging ? (paging.next_cursor as string) : null;
+    GlobalContext.log.warn(`Failed to search messages: ${errorDetails.message}`);
+    throw new Error(`Search failed: ${errorDetails.message}`);
   }
-  return matches;
 }
 
 /**

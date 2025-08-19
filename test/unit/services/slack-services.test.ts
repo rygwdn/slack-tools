@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as slackApi from '../../../src/slack-api';
 import * as userUtils from '../../../src/utils/user-utils';
+import * as slackEntityCache from '../../../src/commands/my_messages/slack-entity-cache';
 import {
   formatEmoji,
   calculateExpirationTime,
   setSlackStatus,
   getSlackStatus,
+  createSlackReminder,
+  getSlackThreadReplies,
   getUserProfile,
   getMessageReactions,
   searchSlackMessages,
@@ -18,6 +21,10 @@ vi.mock('../../../src/slack-api', () => ({
 
 vi.mock('../../../src/utils/user-utils', () => ({
   enhanceSearchQuery: vi.fn(),
+}));
+
+vi.mock('../../../src/commands/my_messages/slack-entity-cache', () => ({
+  getCacheForMessages: vi.fn(),
 }));
 
 vi.mock('../../../src/auth/keychain');
@@ -187,9 +194,34 @@ describe('Slack Services', () => {
       mockClient.users.profile.set.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(setSlackStatus('Failed')).rejects.toThrow(
-        'Status update failed: Error: API Error',
+      await expect(setSlackStatus('Failed')).rejects.toThrow('Status update failed: API Error');
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 30,
+      };
+
+      mockClient.users.profile.set.mockRejectedValueOnce(rateLimitError);
+
+      await expect(setSlackStatus('Test')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 30 seconds before trying again',
       );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('Invalid auth') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'invalid_auth',
+      };
+
+      mockClient.users.profile.set.mockRejectedValueOnce(apiError);
+
+      await expect(setSlackStatus('Test')).rejects.toThrow('SLACK_API_ERROR: invalid_auth');
     });
   });
 
@@ -248,7 +280,199 @@ describe('Slack Services', () => {
       mockClient.users.profile.get.mockRejectedValueOnce(mockError);
 
       // Expect the function to throw
-      await expect(getSlackStatus()).rejects.toThrow('Status retrieval failed: Error: API Error');
+      await expect(getSlackStatus()).rejects.toThrow('Status retrieval failed: API Error');
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 45,
+      };
+
+      mockClient.users.profile.get.mockRejectedValueOnce(rateLimitError);
+
+      await expect(getSlackStatus()).rejects.toThrow(
+        'RATE_LIMITED: Please wait 45 seconds before trying again',
+      );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('Token revoked') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'token_revoked',
+      };
+
+      mockClient.users.profile.get.mockRejectedValueOnce(apiError);
+
+      await expect(getSlackStatus()).rejects.toThrow('SLACK_API_ERROR: token_revoked');
+    });
+  });
+
+  describe('createSlackReminder', () => {
+    beforeEach(() => {
+      // Setup mock client
+      mockClient = {
+        reminders: {
+          add: vi.fn().mockResolvedValue({
+            ok: true,
+            reminder: {
+              id: 'Rm12345',
+              text: 'Test reminder',
+              user: 'U123',
+              time: 1234567890,
+            },
+          }),
+        },
+      };
+
+      // Mock createWebClient to return our mockClient
+      vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+    });
+
+    it('should create a reminder successfully', async () => {
+      const result = await createSlackReminder('Meeting at 3pm', 'tomorrow at 3pm');
+
+      expect(mockClient.reminders.add).toHaveBeenCalledWith({
+        text: 'Meeting at 3pm',
+        time: 'tomorrow at 3pm',
+      });
+
+      expect(result).toEqual({
+        success: true,
+        reminder: {
+          id: 'Rm12345',
+          text: 'Test reminder',
+          user: 'U123',
+          time: 1234567890,
+        },
+      });
+    });
+
+    it('should handle API errors', async () => {
+      mockClient.reminders.add.mockRejectedValueOnce(new Error('API Error'));
+
+      await expect(createSlackReminder('Test', 'tomorrow')).rejects.toThrow(
+        'Reminder creation failed: API Error',
+      );
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 45,
+      };
+
+      mockClient.reminders.add.mockRejectedValueOnce(rateLimitError);
+
+      await expect(createSlackReminder('Test', 'tomorrow')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 45 seconds before trying again',
+      );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('Invalid time') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'invalid_time',
+      };
+
+      mockClient.reminders.add.mockRejectedValueOnce(apiError);
+
+      await expect(createSlackReminder('Test', 'invalid')).rejects.toThrow(
+        'SLACK_API_ERROR: invalid_time',
+      );
+    });
+  });
+
+  describe('getSlackThreadReplies', () => {
+    beforeEach(() => {
+      // Setup mock client
+      mockClient = {
+        conversations: {
+          replies: vi.fn().mockResolvedValue({
+            ok: true,
+            messages: [
+              {
+                ts: '123.456',
+                text: 'Parent message',
+                user: 'U123',
+              },
+              {
+                ts: '123.457',
+                text: 'Reply 1',
+                user: 'U124',
+                thread_ts: '123.456',
+              },
+            ],
+          }),
+        },
+      };
+
+      // Mock createWebClient to return our mockClient
+      vi.mocked(slackApi.createWebClient).mockResolvedValue(mockClient);
+
+      // Mock getCacheForMessages to return empty cache
+      vi.mocked(slackEntityCache.getCacheForMessages).mockResolvedValue({
+        entities: {
+          users: {} as Record<string, any>,
+          channels: {} as Record<string, any>,
+        },
+      } as any);
+    });
+
+    it('should get thread replies successfully', async () => {
+      const result = await getSlackThreadReplies('C123', '123.456', 10);
+
+      expect(mockClient.conversations.replies).toHaveBeenCalledWith({
+        channel: 'C123',
+        ts: '123.456',
+        limit: 10,
+      });
+
+      expect(result.replies).toHaveLength(2);
+      expect(result.entities).toBeDefined();
+    });
+
+    it('should handle API errors', async () => {
+      mockClient.conversations.replies.mockRejectedValueOnce(new Error('API Error'));
+
+      await expect(getSlackThreadReplies('C123', '123.456')).rejects.toThrow(
+        'Getting thread replies failed: API Error',
+      );
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 20,
+      };
+
+      mockClient.conversations.replies.mockRejectedValueOnce(rateLimitError);
+
+      await expect(getSlackThreadReplies('C123', '123.456')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 20 seconds before trying again',
+      );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('Thread not found') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'thread_not_found',
+      };
+
+      mockClient.conversations.replies.mockRejectedValueOnce(apiError);
+
+      await expect(getSlackThreadReplies('C123', '123.456')).rejects.toThrow(
+        'SLACK_API_ERROR: thread_not_found',
+      );
     });
   });
 
@@ -395,7 +619,36 @@ describe('Slack Services', () => {
       // Make users.info throw an error
       mockClient.users.info.mockRejectedValueOnce(new Error('API Error'));
 
-      await expect(getUserProfile('U12345')).rejects.toThrow(/User profile retrieval failed/);
+      await expect(getUserProfile('U12345')).rejects.toThrow(
+        'User profile retrieval failed: API Error',
+      );
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 30,
+      };
+
+      mockClient.users.info.mockRejectedValueOnce(rateLimitError);
+
+      await expect(getUserProfile('U12345')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 30 seconds before trying again',
+      );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('User not active') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'user_not_active',
+      };
+
+      mockClient.users.info.mockRejectedValueOnce(apiError);
+
+      await expect(getUserProfile('U12345')).rejects.toThrow('SLACK_API_ERROR: user_not_active');
     });
   });
 
@@ -590,7 +843,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await searchSlackMessages(mockClient, 'test query', 10);
+      const result = await searchSlackMessages(mockClient, 'test query', 10, 'desc');
 
       expect(mockClient.search.messages).toHaveBeenCalledWith({
         query: 'test query',
@@ -653,7 +906,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await searchSlackMessages(mockClient, 'test', 5);
+      const result = await searchSlackMessages(mockClient, 'test', 5, 'desc');
 
       // Should have made two API calls
       expect(mockClient.search.messages).toHaveBeenCalledTimes(2);
@@ -697,7 +950,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await searchSlackMessages(mockClient, 'test', 2);
+      const result = await searchSlackMessages(mockClient, 'test', 2, 'desc');
 
       // Should only make one call since we reached the count limit
       expect(mockClient.search.messages).toHaveBeenCalledTimes(1);
@@ -712,7 +965,7 @@ describe('Slack Services', () => {
         },
       });
 
-      const result = await searchSlackMessages(mockClient, 'nonexistent', 10);
+      const result = await searchSlackMessages(mockClient, 'nonexistent', 10, 'desc');
 
       expect(result).toEqual([]);
     });
@@ -720,13 +973,44 @@ describe('Slack Services', () => {
     it('should handle API errors', async () => {
       mockClient.search.messages.mockRejectedValueOnce(new Error('API Error'));
 
-      await expect(searchSlackMessages(mockClient, 'test', 10)).rejects.toThrow('API Error');
+      await expect(searchSlackMessages(mockClient, 'test', 10, 'desc')).rejects.toThrow(
+        'Search failed: API Error',
+      );
+    });
+
+    it('should handle rate limit errors with retry information', async () => {
+      const rateLimitError = new Error('Rate limited') as SlackAPIError;
+      rateLimitError.data = {
+        ok: false,
+        error: 'rate_limited',
+        retry_after: 60,
+      };
+
+      mockClient.search.messages.mockRejectedValueOnce(rateLimitError);
+
+      await expect(searchSlackMessages(mockClient, 'test', 10, 'desc')).rejects.toThrow(
+        'RATE_LIMITED: Please wait 60 seconds before trying again',
+      );
+    });
+
+    it('should handle Slack API errors with specific error message', async () => {
+      const apiError = new Error('Invalid query') as SlackAPIError;
+      apiError.data = {
+        ok: false,
+        error: 'invalid_query',
+      };
+
+      mockClient.search.messages.mockRejectedValueOnce(apiError);
+
+      await expect(searchSlackMessages(mockClient, 'test', 10, 'desc')).rejects.toThrow(
+        'SLACK_API_ERROR: invalid_query',
+      );
     });
 
     it('should handle missing messages property in response', async () => {
       mockClient.search.messages.mockResolvedValueOnce({});
 
-      const result = await searchSlackMessages(mockClient, 'test', 10);
+      const result = await searchSlackMessages(mockClient, 'test', 10, 'desc');
 
       expect(result).toEqual([]);
     });
