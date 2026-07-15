@@ -10,36 +10,69 @@ import { GlobalContext } from '../context';
 
 const exec = promisify(execCallback);
 
+const KEYCHAIN_ACCOUNTS = ['Slack App Store Key', 'Slack Key'] as const;
+
+interface SlackInstall {
+  cookiesPath: string;
+  keychainAccount: string;
+  variant: 'app-store' | 'direct-download';
+}
+
+const SLACK_INSTALLS: SlackInstall[] = [
+  {
+    cookiesPath: 'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies',
+    keychainAccount: 'Slack App Store Key',
+    variant: 'app-store',
+  },
+  {
+    cookiesPath: 'Library/Application Support/Slack/Cookies',
+    keychainAccount: 'Slack Key',
+    variant: 'direct-download',
+  },
+];
+
 /**
- * Decrypt the cookie value with the encryption key
+ * Decrypt the cookie value with the encryption key.
+ * Handles Chromium 130+ format (cookies DB version >= 24) where a 32-byte
+ * SHA-256 hash of the host_key is prepended to the plaintext.
  */
-function decryptCookieValue(encryptedValue: Buffer, encryptionKey: Buffer): string {
+function decryptCookieValue(
+  encryptedValue: Buffer,
+  encryptionKey: Buffer,
+  hostKey?: string,
+): string {
   try {
-    // Check for 'v10' or 'v11' prefix
     const prefix = encryptedValue.slice(0, 3).toString();
     let ciphertext: Buffer;
 
     if (prefix === 'v10' || prefix === 'v11') {
-      // Remove the 3-byte prefix
       ciphertext = encryptedValue.slice(3);
     } else {
       throw new Error('Unsupported cookie version');
     }
 
-    // Python uses a fixed IV of 16 spaces
     const iv = Buffer.from(' '.repeat(16));
 
-    // Decrypt using AES-128-CBC
     const decipher = crypto.createDecipheriv('aes-128-cbc', encryptionKey, iv);
     const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 
-    // Remove padding (PKCS#7 padding is handled automatically by crypto)
-    let endPos = decrypted.length;
-    while (endPos > 0 && decrypted[endPos - 1] === 0) {
+    let payload = decrypted;
+
+    // Chromium 130+ (cookies DB version >= 24) prepends SHA-256(host_key) to the plaintext
+    if (hostKey) {
+      const hostHash = crypto.createHash('sha256').update(hostKey).digest();
+      if (payload.length > 32 && payload.slice(0, 32).equals(hostHash)) {
+        GlobalContext.log.debug('Detected Chromium 130+ SHA-256 host_key prefix, stripping');
+        payload = payload.slice(32);
+      }
+    }
+
+    let endPos = payload.length;
+    while (endPos > 0 && payload[endPos - 1] === 0) {
       endPos--;
     }
 
-    const result = decrypted.slice(0, endPos).toString('utf8');
+    const result = payload.slice(0, endPos).toString('utf8');
     GlobalContext.log.debug(`Decrypted cookie value: ${result}`);
     return result;
   } catch (error) {
@@ -50,62 +83,81 @@ function decryptCookieValue(encryptedValue: Buffer, encryptionKey: Buffer): stri
 }
 
 /**
- * Get the encryption key from the macOS keychain
+ * Try to retrieve the Slack Safe Storage password from the macOS Keychain.
+ * Tries both "Slack App Store Key" and "Slack Key" account names, returning
+ * the first one that succeeds along with the account name used.
  */
-async function getEncryptionKey(): Promise<Buffer> {
-  try {
-    // Get the encryption key from the macOS keychain
-    // The keychain item name for Slack is "Slack App Store Key"
-    const { stdout } = await exec('security find-generic-password -wa "Slack App Store Key"');
-
-    // The key is hex-encoded, we need to convert it to a buffer
-    // But first, trim any whitespace
-    const key = stdout.trim();
-
-    // The key is used as-is for AES-128-CBC, but we need to derive a key using PBKDF2
-    // We use the same salt 'saltysalt' that Chrome uses
-    const salt = Buffer.from('saltysalt');
-    const keyLength = 16; // 128 bits for AES-128
-    const iterations = 1003;
-
-    GlobalContext.log.debug(`Found encryption key`);
-    return crypto.pbkdf2Sync(key, salt, iterations, keyLength, 'sha1');
-  } catch (error) {
-    throw new Error(
-      `Could not retrieve Slack encryption key from keychain: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+async function getEncryptionKeyForAccount(account: string): Promise<Buffer> {
+  const { stdout } = await exec(
+    `security find-generic-password -wa ${JSON.stringify(account)}`,
+  );
+  const key = stdout.trim();
+  const salt = Buffer.from('saltysalt');
+  return crypto.pbkdf2Sync(key, salt, 1003, 16, 'sha1');
 }
 
 /**
- * Get the path to the Slack cookies database file
+ * Detect the Slack installation variant and return the matching cookies path
+ * and encryption key. Tries each known install location paired with its
+ * corresponding Keychain account.
  */
-function getCookiesDbPath(): string {
-  const paths = [
-    join(homedir(), 'Library/Application Support/Slack/Cookies'),
-    join(
-      homedir(),
-      'Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cookies',
-    ),
-  ];
+async function detectSlackInstall(): Promise<{ dbPath: string; encryptionKey: Buffer }> {
+  const errors: string[] = [];
 
-  for (const path of paths) {
-    if (existsSync(path)) {
-      GlobalContext.log.debug(`Using cookies database path: ${path}`);
-      return path;
+  for (const install of SLACK_INSTALLS) {
+    const fullPath = join(homedir(), install.cookiesPath);
+    if (!existsSync(fullPath)) {
+      continue;
+    }
+
+    try {
+      const encryptionKey = await getEncryptionKeyForAccount(install.keychainAccount);
+      GlobalContext.log.debug(
+        `Using ${install.variant} install: ${fullPath} with Keychain account "${install.keychainAccount}"`,
+      );
+      return { dbPath: fullPath, encryptionKey };
+    } catch (e) {
+      errors.push(
+        `${install.variant} (${install.keychainAccount}): ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
-  throw new Error("Could not find Slack's cookies database");
+
+  // Fallback: cookies file exists but the matching Keychain account was not found.
+  // Try every combination in case the user migrated between install types.
+  for (const install of SLACK_INSTALLS) {
+    const fullPath = join(homedir(), install.cookiesPath);
+    if (!existsSync(fullPath)) continue;
+
+    for (const account of KEYCHAIN_ACCOUNTS) {
+      if (account === install.keychainAccount) continue;
+      try {
+        const encryptionKey = await getEncryptionKeyForAccount(account);
+        GlobalContext.log.debug(
+          `Cross-matched: cookies from ${install.variant} with Keychain account "${account}"`,
+        );
+        return { dbPath: fullPath, encryptionKey };
+      } catch {
+        // not a match
+      }
+    }
+  }
+
+  throw new Error(
+    "Could not find a matching Slack cookies database and Keychain entry.\n" +
+      `Tried:\n  ${errors.join('\n  ')}\n` +
+      'Ensure Slack is installed and you have logged in at least once.',
+  );
 }
 
 /**
- * Extract and decrypt cookie value for Slack
- * This should only be used by the auth-from-app command
+ * Extract and decrypt cookie value for Slack.
+ * Automatically detects App Store vs direct-download installs and handles
+ * both classic and Chromium 130+ cookie encryption formats.
  */
 export async function fetchCookieFromApp(): Promise<string> {
   try {
-    const dbPath = getCookiesDbPath();
-    const encryptionKey = await getEncryptionKey();
+    const { dbPath, encryptionKey } = await detectSlackInstall();
 
     const db = await open({
       filename: dbPath,
@@ -115,7 +167,7 @@ export async function fetchCookieFromApp(): Promise<string> {
 
     try {
       const results = await db.all(
-        'SELECT name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC',
+        'SELECT host_key, name, encrypted_value FROM cookies WHERE name = "d" ORDER BY LENGTH(encrypted_value) DESC',
       );
 
       if (!results || results.length === 0 || !results[0].encrypted_value) {
@@ -128,7 +180,11 @@ export async function fetchCookieFromApp(): Promise<string> {
 
         for (const result of results) {
           try {
-            const decrypted = decryptCookieValue(result.encrypted_value, encryptionKey);
+            const decrypted = decryptCookieValue(
+              result.encrypted_value,
+              encryptionKey,
+              result.host_key,
+            );
             const xoxdIndex = decrypted.indexOf('xoxd-');
 
             if (xoxdIndex !== -1) {
@@ -151,7 +207,11 @@ export async function fetchCookieFromApp(): Promise<string> {
       const result = results[0];
       GlobalContext.log.debug('Found d= cookie');
 
-      const decryptedValue = decryptCookieValue(result.encrypted_value, encryptionKey);
+      const decryptedValue = decryptCookieValue(
+        result.encrypted_value,
+        encryptionKey,
+        result.host_key,
+      );
 
       const xoxdIndex = decryptedValue.indexOf('xoxd-');
       if (xoxdIndex !== -1) {
