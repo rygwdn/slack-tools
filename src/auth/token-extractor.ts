@@ -2,10 +2,13 @@ import { Level } from 'level';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import { GlobalContext } from '../context';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 
 /**
- * Gets the path to Slack's LevelDB
+ * Gets the path to Slack's LevelDB.
+ * When multiple paths exist (e.g. App Store container and direct download),
+ * the most recently modified one is preferred so stale data from old
+ * installations is not used.
  */
 function getLevelDBPath(): string {
   if (platform() !== 'darwin') {
@@ -20,15 +23,19 @@ function getLevelDBPath(): string {
     join(homedir(), 'Library/Application Support/Slack/Local Storage/leveldb'),
   ];
 
-  // Return the first path that exists
-  for (const path of paths) {
-    if (existsSync(path)) {
-      GlobalContext.log.debug(`Found leveldb path: ${path}`);
-      return path;
-    }
+  const existing = paths
+    .filter((p) => existsSync(p))
+    .map((p) => ({ path: p, mtime: statSync(p).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+
+  if (existing.length === 0) {
+    throw new Error("Could not find Slack's Local Storage directory");
   }
 
-  throw new Error("Could not find Slack's Local Storage directory");
+  GlobalContext.log.debug(
+    `Found ${existing.length} leveldb path(s), using most recent: ${existing[0].path}`,
+  );
+  return existing[0].path;
 }
 
 export interface WorkspaceInfo {

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 import { exec as execCallback } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import Database from 'sqlite3';
 import { open } from 'sqlite';
 import crypto from 'crypto';
@@ -98,24 +98,36 @@ async function getEncryptionKeyForAccount(account: string): Promise<Buffer> {
 
 /**
  * Detect the Slack installation variant and return the matching cookies path
- * and encryption key. Tries each known install location paired with its
- * corresponding Keychain account.
+ * and encryption key. When multiple valid installations exist, the one with
+ * the most recently modified cookies file wins (i.e. the actively-used Slack).
  */
 async function detectSlackInstall(): Promise<{ dbPath: string; encryptionKey: Buffer }> {
+  interface Candidate {
+    dbPath: string;
+    encryptionKey: Buffer;
+    variant: string;
+    account: string;
+    mtime: number;
+  }
+
+  const candidates: Candidate[] = [];
   const errors: string[] = [];
 
+  // First pass: match each install path with its natural Keychain account.
   for (const install of SLACK_INSTALLS) {
     const fullPath = join(homedir(), install.cookiesPath);
-    if (!existsSync(fullPath)) {
-      continue;
-    }
+    if (!existsSync(fullPath)) continue;
 
     try {
       const encryptionKey = await getEncryptionKeyForAccount(install.keychainAccount);
-      GlobalContext.log.debug(
-        `Using ${install.variant} install: ${fullPath} with Keychain account "${install.keychainAccount}"`,
-      );
-      return { dbPath: fullPath, encryptionKey };
+      const mtime = statSync(fullPath).mtimeMs;
+      candidates.push({
+        dbPath: fullPath,
+        encryptionKey,
+        variant: install.variant,
+        account: install.keychainAccount,
+        mtime,
+      });
     } catch (e) {
       errors.push(
         `${install.variant} (${install.keychainAccount}): ${e instanceof Error ? e.message : String(e)}`,
@@ -123,31 +135,50 @@ async function detectSlackInstall(): Promise<{ dbPath: string; encryptionKey: Bu
     }
   }
 
-  // Fallback: cookies file exists but the matching Keychain account was not found.
-  // Try every combination in case the user migrated between install types.
-  for (const install of SLACK_INSTALLS) {
-    const fullPath = join(homedir(), install.cookiesPath);
-    if (!existsSync(fullPath)) continue;
+  // Second pass (fallback): try cross-matching in case the user migrated.
+  if (candidates.length === 0) {
+    for (const install of SLACK_INSTALLS) {
+      const fullPath = join(homedir(), install.cookiesPath);
+      if (!existsSync(fullPath)) continue;
 
-    for (const account of KEYCHAIN_ACCOUNTS) {
-      if (account === install.keychainAccount) continue;
-      try {
-        const encryptionKey = await getEncryptionKeyForAccount(account);
-        GlobalContext.log.debug(
-          `Cross-matched: cookies from ${install.variant} with Keychain account "${account}"`,
-        );
-        return { dbPath: fullPath, encryptionKey };
-      } catch {
-        // not a match
+      for (const account of KEYCHAIN_ACCOUNTS) {
+        if (account === install.keychainAccount) continue;
+        try {
+          const encryptionKey = await getEncryptionKeyForAccount(account);
+          const mtime = statSync(fullPath).mtimeMs;
+          candidates.push({
+            dbPath: fullPath,
+            encryptionKey,
+            variant: `${install.variant} (cross-matched)`,
+            account,
+            mtime,
+          });
+        } catch {
+          // not a match
+        }
       }
     }
   }
 
-  throw new Error(
-    "Could not find a matching Slack cookies database and Keychain entry.\n" +
-      `Tried:\n  ${errors.join('\n  ')}\n` +
-      'Ensure Slack is installed and you have logged in at least once.',
+  if (candidates.length === 0) {
+    throw new Error(
+      "Could not find a matching Slack cookies database and Keychain entry.\n" +
+        `Tried:\n  ${errors.join('\n  ')}\n` +
+        'Ensure Slack is installed and you have logged in at least once.',
+    );
+  }
+
+  // Prefer the most recently modified cookies file.
+  candidates.sort((a, b) => b.mtime - a.mtime);
+  const winner = candidates[0];
+
+  GlobalContext.log.debug(
+    `Using ${winner.variant} install: ${winner.dbPath} ` +
+      `(modified ${new Date(winner.mtime).toISOString()}) ` +
+      `with Keychain account "${winner.account}"`,
   );
+
+  return { dbPath: winner.dbPath, encryptionKey: winner.encryptionKey };
 }
 
 /**
